@@ -142,7 +142,8 @@ final class WorkspaceTests: XCTestCase {
                     pinsFile: sandbox.appending(component: "Package.resolved"),
                     manifestLoader: manifestLoader,
                     delegate: MockWorkspaceDelegate(),
-                    cachePath: fs.swiftPMCacheDirectory.appending(component: "repositories")
+                    cachePath: fs.swiftPMCacheDirectory.appending(component: "repositories"),
+                    verbosity: TSCUtility.verbosity
                 )
             }
 
@@ -3785,15 +3786,15 @@ final class WorkspaceTests: XCTestCase {
         // From here the API should be simple and straightforward:
         let diagnostics = DiagnosticsEngine()
         let manifest = try tsc_await {
-            ManifestLoader.loadManifest(packagePath: package, swiftCompiler: swiftCompiler, swiftCompilerFlags: [], packageKind: .local, on: .global(), completion: $0)
+            ManifestLoader.loadManifest(packagePath: package, swiftCompiler: swiftCompiler, swiftCompilerFlags: [], packageKind: .local, verbosity: TSCUtility.verbosity, on: .global(), completion: $0)
         }
 
         let loadedPackage = try tsc_await {
-            PackageBuilder.loadPackage(packagePath: package, swiftCompiler: swiftCompiler, swiftCompilerFlags: [], xcTestMinimumDeploymentTargets: [:], diagnostics: diagnostics, on: .global(), completion: $0)
+            PackageBuilder.loadPackage(packagePath: package, swiftCompiler: swiftCompiler, swiftCompilerFlags: [], xcTestMinimumDeploymentTargets: [:], diagnostics: diagnostics, verbosity: TSCUtility.verbosity, on: .global(), completion: $0)
         }
 
         let graph = try Workspace.loadGraph(
-            packagePath: package, swiftCompiler: swiftCompiler, swiftCompilerFlags: [], diagnostics: diagnostics
+            packagePath: package, swiftCompiler: swiftCompiler, swiftCompilerFlags: [], diagnostics: diagnostics, verbosity: TSCUtility.verbosity
         )
 
         XCTAssertEqual(manifest.name, "SwiftPM")

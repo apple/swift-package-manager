@@ -19,7 +19,7 @@ import SPMBuildCore
 public final class XcodeBuildSystem: BuildSystem {
     private let buildParameters: BuildParameters
     private let packageGraphLoader: () throws -> PackageGraph
-    private let isVerbose: Bool
+    private let verbosity: Verbosity
     private let diagnostics: DiagnosticsEngine
     private let xcbuildPath: AbsolutePath
     private var packageGraph: PackageGraph?
@@ -52,13 +52,13 @@ public final class XcodeBuildSystem: BuildSystem {
     public init(
         buildParameters: BuildParameters,
         packageGraphLoader: @escaping () throws -> PackageGraph,
-        isVerbose: Bool,
+        verbosity: Verbosity,
         diagnostics: DiagnosticsEngine,
         stdoutStream: OutputByteStream
     ) throws {
         self.buildParameters = buildParameters
         self.packageGraphLoader = packageGraphLoader
-        self.isVerbose = isVerbose
+        self.verbosity = verbosity
         self.diagnostics = diagnostics
         self.stdoutStream = stdoutStream
 
@@ -151,14 +151,14 @@ public final class XcodeBuildSystem: BuildSystem {
 
     /// Returns a new instance of `XCBuildDelegate` for a build operation.
     private func createBuildDelegate() -> XCBuildDelegate {
-        let progressAnimation: ProgressAnimationProtocol = isVerbose
+        let progressAnimation: ProgressAnimationProtocol = self.verbosity != .concise
             ? VerboseProgressAnimation(stream: stdoutStream)
             : MultiLinePercentProgressAnimation(stream: stdoutStream, header: "")
         let delegate = XCBuildDelegate(
             diagnostics: diagnostics,
             outputStream: stdoutStream,
             progressAnimation: progressAnimation)
-        delegate.isVerbose = isVerbose
+        delegate.isVerbose = self.verbosity != .concise
         return delegate
     }
 

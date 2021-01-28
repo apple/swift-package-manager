@@ -29,6 +29,7 @@ public final class LocalPackageContainer: PackageContainer {
     private let manifestLoader: ManifestLoaderProtocol
     private let toolsVersionLoader: ToolsVersionLoaderProtocol
     private let currentToolsVersion: ToolsVersion
+    private let verbosity: Verbosity
 
     /// The file system that shoud be used to load this package.
     private let fs: FileSystem
@@ -53,6 +54,7 @@ public final class LocalPackageContainer: PackageContainer {
                                     toolsVersion: toolsVersion,
                                     packageKind: identifier.kind,
                                     fileSystem: fs,
+                                    verbosity: self.verbosity,
                                     on: .global(),
                                     completion: $0)
             }
@@ -75,7 +77,8 @@ public final class LocalPackageContainer: PackageContainer {
         manifestLoader: ManifestLoaderProtocol,
         toolsVersionLoader: ToolsVersionLoaderProtocol,
         currentToolsVersion: ToolsVersion,
-        fs: FileSystem = localFileSystem
+        fs: FileSystem = localFileSystem,
+        verbosity: Verbosity
     ) {
         assert(URL.scheme(identifier.path) == nil, "unexpected scheme \(URL.scheme(identifier.path)!) in \(identifier.path)")
         self.identifier = identifier
@@ -84,6 +87,7 @@ public final class LocalPackageContainer: PackageContainer {
         self.toolsVersionLoader = toolsVersionLoader
         self.currentToolsVersion = currentToolsVersion
         self.fs = fs
+        self.verbosity = verbosity
     }
     
     public func isToolsVersionCompatible(at version: Version) -> Bool {

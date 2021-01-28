@@ -380,8 +380,8 @@ public class SwiftTool {
             (packageRoot ?? cwd).appending(component: ".build")
         
         // Setup the globals.
-        verbosity = Verbosity(rawValue: options.verbosity)
-        Process.verbose = verbosity != .concise
+        TSCUtility.verbosity = Verbosity(rawValue: options.verbosity)
+        Process.verbose = TSCUtility.verbosity != .concise
     }
     
     static func postprocessArgParserResult(options: SwiftToolOptions, diagnostics: DiagnosticsEngine) throws {
@@ -530,7 +530,8 @@ public class SwiftTool {
             isResolverPrefetchingEnabled: options.shouldEnableResolverPrefetching,
             skipUpdate: options.skipDependencyUpdate,
             enableResolverTrace: options.enableResolverTrace,
-            cachePath: cachePath
+            cachePath: cachePath,
+            verbosity: isVerbose ? .verbose : .concise
         )
         _workspace = workspace
         _workspaceDelegate = delegate
@@ -638,6 +639,7 @@ public class SwiftTool {
             buildParameters: buildParameters(),
             cacheBuildManifest: cacheBuildManifest && self.canUseCachedBuildManifest(),
             packageGraphLoader: graphLoader,
+            verbosity: TSCUtility.verbosity,
             diagnostics: diagnostics,
             stdoutStream: self.stdoutStream
         )
@@ -656,6 +658,7 @@ public class SwiftTool {
                 buildParameters: buildParameters ?? self.buildParameters(),
                 cacheBuildManifest: self.canUseCachedBuildManifest(),
                 packageGraphLoader: graphLoader,
+                verbosity: TSCUtility.verbosity,
                 diagnostics: diagnostics,
                 stdoutStream: stdoutStream
             )
@@ -664,7 +667,7 @@ public class SwiftTool {
             buildSystem = try XcodeBuildSystem(
                 buildParameters: buildParameters ?? self.buildParameters(),
                 packageGraphLoader: graphLoader,
-                isVerbose: verbosity != .concise,
+                verbosity: TSCUtility.verbosity,
                 diagnostics: diagnostics,
                 stdoutStream: stdoutStream
             )
@@ -709,7 +712,8 @@ public class SwiftTool {
                 useExplicitModuleBuild: options.useExplicitModuleBuild,
                 isXcodeBuildSystemEnabled: options.buildSystem == .xcode,
                 printManifestGraphviz: options.printManifestGraphviz,
-                forceTestDiscovery: options.enableTestDiscovery // backwards compatibility, remove with --enable-test-discovery
+                forceTestDiscovery: options.enableTestDiscovery, // backwards compatibility, remove with --enable-test-discovery
+                verbosity: TSCUtility.verbosity
             )
         })
     }()

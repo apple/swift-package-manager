@@ -738,6 +738,7 @@ class PackageDescription4_2LoadingTests: PackageDescriptionLoadingTests {
                                                                baseURL: manifestPath.pathString,
                                                                toolsVersion: .v4_2,
                                                                packageKind: .local,
+                                                               verbosity: TSCUtility.verbosity,
                                                                on: .global(),
                                                                completion: $0) }
             XCTAssertEqual(manifest.name, "Trivial")
@@ -752,6 +753,7 @@ class PackageDescription4_2LoadingTests: PackageDescriptionLoadingTests {
                                     toolsVersion: .v4_2,
                                     packageKind: .local,
                                     diagnostics: diagnostics,
+                                    verbosity: TSCUtility.verbosity,
                                     on: .global()) { result in
                     defer { sync.leave() }
 
@@ -810,6 +812,7 @@ class PackageDescription4_2LoadingTests: PackageDescriptionLoadingTests {
                                     toolsVersion: .v4_2,
                                     packageKind: .local,
                                     diagnostics: diagnostics,
+                                    verbosity: TSCUtility.verbosity,
                                     on: .global()) { result in
                     defer { sync.leave() }
 

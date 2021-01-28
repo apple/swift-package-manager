@@ -117,6 +117,7 @@ public struct SwiftRunTool: SwiftCommand {
                 buildParameters: buildParameters,
                 cacheBuildManifest: false,
                 packageGraphLoader: graphLoader,
+                verbosity: TSCUtility.verbosity,
                 diagnostics: swiftTool.diagnostics,
                 stdoutStream: swiftTool.stdoutStream
             )

@@ -173,7 +173,8 @@ public final class MockWorkspace {
             isResolverPrefetchingEnabled: true,
             enablePubgrubResolver: self.enablePubGrub,
             skipUpdate: self.skipUpdate,
-            cachePath: localFileSystem.swiftPMCacheDirectory.appending(component: "repositories")
+            cachePath: localFileSystem.swiftPMCacheDirectory.appending(component: "repositories"),
+            verbosity: TSCUtility.verbosity
         )
         return self._workspace!
     }

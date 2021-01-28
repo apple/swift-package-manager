@@ -291,6 +291,7 @@ public final class PackageBuilder {
                              xcTestMinimumDeploymentTargets: xcTestMinimumDeploymentTargets,
                              diagnostics: diagnostics,
                              kind: kind,
+                             verbosity: TSCUtility.verbosity,
                              on: .global(),
                              completion: $0)
         }
@@ -310,6 +311,7 @@ public final class PackageBuilder {
             = MinimumDeploymentTarget.default.xcTestMinimumDeploymentTargets,
         diagnostics: DiagnosticsEngine,
         kind: PackageReference.Kind = .root,
+        verbosity: Verbosity,
         on queue: DispatchQueue,
         completion: @escaping (Result<Package, Error>) -> Void
     ) {
@@ -317,6 +319,7 @@ public final class PackageBuilder {
                                     swiftCompiler: swiftCompiler,
                                     swiftCompilerFlags: swiftCompilerFlags,
                                     packageKind: kind,
+                                    verbosity: verbosity,
                                     on: queue) { result in
             let result = result.tryMap { manifest -> Package in
                 let builder = PackageBuilder(

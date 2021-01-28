@@ -175,7 +175,8 @@ class RepositoryPackageContainerProviderTests: XCTestCase {
 
         let provider = RepositoryPackageContainerProvider(
             repositoryManager: repositoryManager,
-            manifestLoader: MockManifestLoader(manifests: [:])
+            manifestLoader: MockManifestLoader(manifests: [:]),
+            verbosity: TSCUtility.verbosity
         )
 
         let ref = PackageReference(identity: PackageIdentity(path: repoPath), path: repoPath.pathString)
@@ -227,7 +228,8 @@ class RepositoryPackageContainerProviderTests: XCTestCase {
             return RepositoryPackageContainerProvider(
                 repositoryManager: repositoryManager,
                 manifestLoader: MockManifestLoader(manifests: [:]),
-                currentToolsVersion: currentToolsVersion
+                currentToolsVersion: currentToolsVersion,
+                verbosity: TSCUtility.verbosity
             )
         }
 
@@ -308,7 +310,8 @@ class RepositoryPackageContainerProviderTests: XCTestCase {
 
         let provider = RepositoryPackageContainerProvider(
             repositoryManager: repositoryManager,
-            manifestLoader: MockManifestLoader(manifests: [:])
+            manifestLoader: MockManifestLoader(manifests: [:]),
+            verbosity: TSCUtility.verbosity
         )
         let ref = PackageReference(identity: PackageIdentity(path: repoPath), path: repoPath.pathString)
         let container = try provider.getContainer(for: ref, skipUpdate: false)
@@ -348,7 +351,8 @@ class RepositoryPackageContainerProviderTests: XCTestCase {
 
         let provider = RepositoryPackageContainerProvider(
             repositoryManager: repositoryManager,
-            manifestLoader: MockManifestLoader(manifests: [:])
+            manifestLoader: MockManifestLoader(manifests: [:]),
+            verbosity: TSCUtility.verbosity
         )
         let ref = PackageReference(identity: PackageIdentity(path: repoPath), path: repoPath.pathString)
         let container = try provider.getContainer(for: ref, skipUpdate: false)
@@ -535,7 +539,7 @@ class RepositoryPackageContainerProviderTests: XCTestCase {
                     try TargetDescription(name: packageDir.basename, path: packageDir.pathString),
                 ]
             )
-            let containerProvider = RepositoryPackageContainerProvider(repositoryManager: repositoryManager, manifestLoader: MockManifestLoader(manifests: [.init(url: packageDir.pathString, version: nil): manifest]))
+            let containerProvider = RepositoryPackageContainerProvider(repositoryManager: repositoryManager, manifestLoader: MockManifestLoader(manifests: [.init(url: packageDir.pathString, version: nil): manifest]), verbosity: TSCUtility.verbosity)
 
             // Get a hold of the container for the test package.
             let packageRef = PackageReference(identity: PackageIdentity(path: packageDir), path: packageDir.pathString)
@@ -612,7 +616,8 @@ class RepositoryPackageContainerProviderTests: XCTestCase {
                 repositoryManager: repositoryManager,
                 manifestLoader: MockManifestLoader(
                     manifests: [.init(url: packageDirectory.pathString, version: Version(1, 0, 0)): manifest]
-                )
+                ),
+                verbosity: TSCUtility.verbosity
             )
 
             let packageReference = PackageReference(identity: PackageIdentity(path: packageDirectory), path: packageDirectory.pathString)

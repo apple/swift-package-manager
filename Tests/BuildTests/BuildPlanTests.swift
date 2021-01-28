@@ -64,7 +64,8 @@ final class BuildPlanTests: XCTestCase {
         shouldLinkStaticSwiftStdlib: Bool = false,
         destinationTriple: TSCUtility.Triple = hostTriple,
         indexStoreMode: BuildParameters.IndexStoreMode = .off,
-        useExplicitModuleBuild: Bool = false
+        useExplicitModuleBuild: Bool = false,
+        verbosity: Verbosity = TSCUtility.verbosity
     ) -> BuildParameters {
         return BuildParameters(
             dataPath: buildPath,
@@ -76,7 +77,8 @@ final class BuildPlanTests: XCTestCase {
             jobs: 3,
             shouldLinkStaticSwiftStdlib: shouldLinkStaticSwiftStdlib,
             indexStoreMode: indexStoreMode,
-            useExplicitModuleBuild: useExplicitModuleBuild
+            useExplicitModuleBuild: useExplicitModuleBuild,
+            verbosity: verbosity
         )
     }
 

@@ -59,7 +59,7 @@ public struct SymbolGraphExtract {
         let process = Process(
             arguments: arguments,
             outputRedirection: .none,
-            verbose: verbosity != .concise
+            verbose: TSCUtility.verbosity != .concise
         )
         try process.launch()
         try process.waitUntilExit()

@@ -61,6 +61,7 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
     private let manifestLoader: ManifestLoaderProtocol
     private let toolsVersionLoader: ToolsVersionLoaderProtocol
     private let currentToolsVersion: ToolsVersion
+    private let verbosity: Verbosity
 
     /// The cached dependency information.
     private var dependenciesCache = [String: [ProductFilter: (Manifest, [Constraint])]] ()
@@ -80,7 +81,8 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
         repository: Repository,
         manifestLoader: ManifestLoaderProtocol,
         toolsVersionLoader: ToolsVersionLoaderProtocol,
-        currentToolsVersion: ToolsVersion
+        currentToolsVersion: ToolsVersion,
+        verbosity: Verbosity
     ) {
         self.identifier = identifier
         self.mirrors = mirrors
@@ -88,6 +90,7 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
         self.manifestLoader = manifestLoader
         self.toolsVersionLoader = toolsVersionLoader
         self.currentToolsVersion = currentToolsVersion
+        self.verbosity = verbosity
     }
     
     // Compute the map of known versions.
@@ -287,6 +290,7 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
                                     toolsVersion: toolsVersion,
                                     packageKind: identifier.kind,
                                     fileSystem: fs,
+                                    verbosity: self.verbosity,
                                     on: .global(),
                                     completion: $0)
             }
@@ -318,6 +322,8 @@ public class RepositoryPackageContainerProvider: PackageContainerProvider {
     /// The tools version loader.
     let toolsVersionLoader: ToolsVersionLoaderProtocol
 
+    private let verbosity: Verbosity
+
     /// Create a repository-based package provider.
     ///
     /// - Parameters:
@@ -330,13 +336,15 @@ public class RepositoryPackageContainerProvider: PackageContainerProvider {
         mirrors: DependencyMirrors = [:],
         manifestLoader: ManifestLoaderProtocol,
         currentToolsVersion: ToolsVersion = ToolsVersion.currentToolsVersion,
-        toolsVersionLoader: ToolsVersionLoaderProtocol = ToolsVersionLoader()
+        toolsVersionLoader: ToolsVersionLoaderProtocol = ToolsVersionLoader(),
+        verbosity: Verbosity
     ) {
         self.repositoryManager = repositoryManager
         self.mirrors = mirrors
         self.manifestLoader = manifestLoader
         self.currentToolsVersion = currentToolsVersion
         self.toolsVersionLoader = toolsVersionLoader
+        self.verbosity = verbosity
     }
 
     public func getContainer(
@@ -353,7 +361,8 @@ public class RepositoryPackageContainerProvider: PackageContainerProvider {
                     manifestLoader: self.manifestLoader,
                     toolsVersionLoader: self.toolsVersionLoader,
                     currentToolsVersion: self.currentToolsVersion,
-                    fs: self.repositoryManager.fileSystem)
+                    fs: self.repositoryManager.fileSystem,
+                    verbosity: self.verbosity)
                 completion(.success(container))
             }
         }
@@ -373,7 +382,8 @@ public class RepositoryPackageContainerProvider: PackageContainerProvider {
                         repository: repository,
                         manifestLoader: self.manifestLoader,
                         toolsVersionLoader: self.toolsVersionLoader,
-                        currentToolsVersion: self.currentToolsVersion
+                        currentToolsVersion: self.currentToolsVersion,
+                        verbosity: self.verbosity
                     )
                 }
                 completion(result)

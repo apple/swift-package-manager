@@ -57,6 +57,7 @@ public final class MockManifestLoader: ManifestLoaderProtocol {
         packageKind: PackageReference.Kind,
         fileSystem: FileSystem?,
         diagnostics: DiagnosticsEngine?,
+        verbosity: Verbosity,
         on queue: DispatchQueue,
         completion: @escaping (Result<Manifest, Error>) -> Void
     ) {
@@ -82,6 +83,6 @@ extension ManifestLoader {
               fileSystem: PackageLoading.FileSystem? = nil,
               diagnostics: TSCBasic.DiagnosticsEngine? = nil
     ) throws -> Manifest{
-        try tsc_await { self.load(package: path, baseURL: baseURL, toolsVersion: toolsVersion, packageKind: packageKind, fileSystem: fileSystem, diagnostics: diagnostics, on: .global(), completion: $0) }
+        try tsc_await { self.load(package: path, baseURL: baseURL, toolsVersion: toolsVersion, packageKind: packageKind, fileSystem: fileSystem, diagnostics: diagnostics, verbosity: TSCUtility.verbosity, on: .global(), completion: $0) }
     }
 }

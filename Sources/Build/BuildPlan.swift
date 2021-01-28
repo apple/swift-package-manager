@@ -47,7 +47,7 @@ extension BuildParameters {
     public var swiftCompilerFlags: [String] {
         var flags = self.flags.cCompilerFlags.flatMap({ ["-Xcc", $0] })
         flags += self.flags.swiftCompilerFlags
-        flags += verbosity.ccArgs
+        flags += self.verbosity.ccArgs
         return flags
     }
 

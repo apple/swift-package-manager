@@ -165,6 +165,9 @@ public struct BuildParameters: Encodable {
     // What strategy to use to discover tests
     public var testDiscoveryStrategy: TestDiscoveryStrategy
 
+    // Setting for verbose level
+    public var verbosity: Verbosity
+
     public init(
         dataPath: AbsolutePath,
         configuration: BuildConfiguration,
@@ -189,7 +192,8 @@ public struct BuildParameters: Encodable {
         isXcodeBuildSystemEnabled: Bool = false,
         printManifestGraphviz: Bool = false,
         enableTestability: Bool? = nil,
-        forceTestDiscovery: Bool = false
+        forceTestDiscovery: Bool = false,
+        verbosity: Verbosity
     ) {
         let triple = destinationTriple ?? .getHostTriple(usingSwiftCompiler: toolchain.swiftCompiler)
 
@@ -219,6 +223,7 @@ public struct BuildParameters: Encodable {
         self.enableTestability = enableTestability ?? (.debug == configuration)
         // decide if to enable the use of test manifests based on platform. this is likely to change in the future
         self.testDiscoveryStrategy = triple.isDarwin() ? .objectiveC : .manifest(generate: forceTestDiscovery)
+        self.verbosity = verbosity
     }
 
     /// The path to the build directory (inside the data directory).
@@ -339,3 +344,5 @@ extension BuildParameters {
         }
     }
 }
+
+extension Verbosity: Encodable { }

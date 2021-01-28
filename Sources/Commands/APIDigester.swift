@@ -92,7 +92,8 @@ struct APIDigesterBaselineDumper {
         let workspace = Workspace.create(
             forRootPackage: baselinePackageRoot,
             manifestLoader: manifestLoader,
-            repositoryManager: repositoryManager
+            repositoryManager: repositoryManager,
+            verbosity: TSCUtility.verbosity
         )
 
         let graph = try workspace.loadPackageGraph(
@@ -112,6 +113,7 @@ struct APIDigesterBaselineDumper {
             buildParameters: buildParameters,
             cacheBuildManifest: false,
             packageGraphLoader: { graph },
+            verbosity: TSCUtility.verbosity,
             diagnostics: diags,
             stdoutStream: stdoutStream
         )
@@ -178,7 +180,7 @@ public struct SwiftAPIDigester {
         let process = Process(
             arguments: arguments,
             outputRedirection: .none,
-            verbose: verbosity != .concise
+            verbose: TSCUtility.verbosity != .concise
         )
         try process.launch()
         try process.waitUntilExit()

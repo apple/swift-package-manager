@@ -91,6 +91,7 @@ public protocol ManifestLoaderProtocol {
         packageKind: PackageReference.Kind,
         fileSystem: FileSystem?,
         diagnostics: DiagnosticsEngine?,
+        verbosity: Verbosity,
         on queue: DispatchQueue,
         completion: @escaping (Result<Manifest, Error>) -> Void
     )
@@ -123,6 +124,7 @@ extension ManifestLoaderProtocol {
         packageKind: PackageReference.Kind,
         fileSystem: FileSystem? = nil,
         diagnostics: DiagnosticsEngine? = nil,
+        verbosity: Verbosity,
         on queue: DispatchQueue,
         completion: @escaping (Result<Manifest, Error>) -> Void
     ) {
@@ -135,6 +137,7 @@ extension ManifestLoaderProtocol {
             packageKind: packageKind,
             fileSystem: fileSystem,
             diagnostics: diagnostics,
+            verbosity: verbosity,
             on: queue,
             completion: completion
         )
@@ -209,6 +212,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
                               swiftCompiler: swiftCompiler,
                               swiftCompilerFlags: swiftCompilerFlags,
                               packageKind: packageKind,
+                              verbosity: TSCUtility.verbosity,
                               on: .global(),
                               completion: $0)
         }
@@ -226,6 +230,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         swiftCompiler: AbsolutePath,
         swiftCompilerFlags: [String],
         packageKind: PackageReference.Kind,
+        verbosity: Verbosity,
         on queue: DispatchQueue,
         completion: @escaping (Result<Manifest, Error>) -> Void
     ) {
@@ -240,6 +245,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
                 toolsVersion: toolsVersion,
                 packageKind: packageKind,
                 fileSystem: fileSystem,
+                verbosity: verbosity,
                 on: queue,
                 completion: completion
             )
@@ -269,6 +275,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
                       packageKind: packageKind,
                       fileSystem: fileSystem,
                       diagnostics: diagnostics,
+                      verbosity: TSCUtility.verbosity,
                       on: .global(),
                       completion: $0)
         }
@@ -283,6 +290,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         packageKind: PackageReference.Kind,
         fileSystem: FileSystem? = nil,
         diagnostics: DiagnosticsEngine? = nil,
+        verbosity: Verbosity,
         on queue: DispatchQueue,
         completion: @escaping (Result<Manifest, Error>) -> Void
     ) {
@@ -299,7 +307,8 @@ public final class ManifestLoader: ManifestLoaderProtocol {
                           packageKind: packageKind,
                           fileSystem: fileSystem,
                           diagnostics: diagnostics,
-                          on: queue) { result in
+                          on: queue,
+                          verbosity: verbosity) { result in
 
                 completion(result)
             }
@@ -328,6 +337,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         fileSystem: FileSystem,
         diagnostics: DiagnosticsEngine? = nil,
         on queue: DispatchQueue,
+        verbosity: Verbosity,
         completion: @escaping (Result<Manifest, Error>) -> Void
     ) {
         self.operationQueue.addOperation {
@@ -349,7 +359,8 @@ public final class ManifestLoader: ManifestLoaderProtocol {
                     toolsVersion: toolsVersion,
                     packageIdentity: packageIdentity,
                     fileSystem: fileSystem,
-                    diagnostics: diagnostics
+                    diagnostics: diagnostics,
+                    verbosity: verbosity
                 )
 
                 // Load the manifest from JSON.
@@ -568,7 +579,8 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         toolsVersion: ToolsVersion,
         packageIdentity: PackageIdentity,
         fileSystem: FileSystem,
-        diagnostics: DiagnosticsEngine?
+        diagnostics: DiagnosticsEngine?,
+        verbosity: Verbosity
     ) throws -> String {
 
         let cacheKey = try ManifestCacheKey(
@@ -580,7 +592,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
             fileSystem: fileSystem
         )
 
-        let result = self.parseAndCacheManifest(key: cacheKey, diagnostics: diagnostics)
+        let result = self.parseAndCacheManifest(key: cacheKey, diagnostics: diagnostics, verbosity: verbosity)
         // Throw now if we weren't able to parse the manifest.
         guard let parsedManifest = result.parsedManifest else {
             let errors = result.errorOutput ?? result.compilerOutput ?? "Unknown error parsing manifest for \(packageIdentity)"
@@ -599,7 +611,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         return parsedManifest
     }
 
-    fileprivate func parseAndCacheManifest(key: ManifestCacheKey, diagnostics: DiagnosticsEngine?) -> ManifestParseResult {
+    fileprivate func parseAndCacheManifest(key: ManifestCacheKey, diagnostics: DiagnosticsEngine?, verbosity: Verbosity) -> ManifestParseResult {
         let cache = self.databaseCacheDir.map { cacheDir -> SQLiteManifestCache in
             let path = Self.manifestCacheDBPath(cacheDir)
             var configuration = SQLiteManifestCache.Configuration()
@@ -623,7 +635,8 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         let result = self.parse(packageIdentity: key.packageIdentity,
                                 manifestPath: key.manifestPath,
                                 manifestContents: key.manifestContents,
-                                toolsVersion: key.toolsVersion)
+                                toolsVersion: key.toolsVersion,
+                                verbosity: verbosity)
 
         // only cache successfully parsed manifests,
         // this is important for swift-pm development
@@ -722,7 +735,8 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         packageIdentity: PackageIdentity,
         manifestPath: AbsolutePath,
         manifestContents: [UInt8],
-        toolsVersion: ToolsVersion
+        toolsVersion: ToolsVersion,
+        verbosity: Verbosity
     ) -> ManifestParseResult {
         /// Helper method for parsing the manifest.
         func _parse(

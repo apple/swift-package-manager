@@ -254,6 +254,8 @@ public class Workspace {
 
     fileprivate let additionalFileRules: [FileRuleDescription]
 
+    private let verbosity: Verbosity
+
     private let queue = DispatchQueue(label: "org.swift.swiftpm.workspace", attributes: .concurrent)
 
     /// Create a new package workspace.
@@ -291,7 +293,8 @@ public class Workspace {
         enablePubgrubResolver: Bool = false,
         skipUpdate: Bool = false,
         enableResolverTrace: Bool = false,
-        cachePath: AbsolutePath? = nil
+        cachePath: AbsolutePath? = nil,
+        verbosity: Verbosity
     ) {
         self.delegate = delegate
         self.dataPath = dataPath
@@ -303,6 +306,7 @@ public class Workspace {
         self.downloader = downloader
         self.netrcFilePath = netrcFilePath
         self.archiver = archiver
+        self.verbosity = verbosity
 
         var checksumAlgorithm = checksumAlgorithm
         #if canImport(CryptoKit)
@@ -335,7 +339,8 @@ public class Workspace {
             mirrors: self.config.mirrors,
             manifestLoader: manifestLoader,
             currentToolsVersion: currentToolsVersion,
-            toolsVersionLoader: toolsVersionLoader
+            toolsVersionLoader: toolsVersionLoader,
+            verbosity: self.verbosity
         )
         self.fileSystem = fileSystem
 
@@ -354,7 +359,8 @@ public class Workspace {
         forRootPackage packagePath: AbsolutePath,
         manifestLoader: ManifestLoaderProtocol,
         repositoryManager: RepositoryManager? = nil,
-        delegate: WorkspaceDelegate? = nil
+        delegate: WorkspaceDelegate? = nil,
+        verbosity: Verbosity
     ) -> Workspace {
         return Workspace(
             dataPath: packagePath.appending(component: ".build"),
@@ -362,7 +368,8 @@ public class Workspace {
             pinsFile: packagePath.appending(component: "Package.resolved"),
             manifestLoader: manifestLoader,
             repositoryManager: repositoryManager,
-            delegate: delegate
+            delegate: delegate,
+            verbosity: verbosity
         )
     }
 }
@@ -643,11 +650,12 @@ extension Workspace {
         packagePath: AbsolutePath,
         swiftCompiler: AbsolutePath,
         swiftCompilerFlags: [String],
-        diagnostics: DiagnosticsEngine
+        diagnostics: DiagnosticsEngine,
+        verbosity: Verbosity
     ) throws -> PackageGraph {
         let resources = try UserManifestResources(swiftCompiler: swiftCompiler, swiftCompilerFlags: swiftCompilerFlags)
         let loader = ManifestLoader(manifestResources: resources)
-        let workspace = Workspace.create(forRootPackage: packagePath, manifestLoader: loader)
+        let workspace = Workspace.create(forRootPackage: packagePath, manifestLoader: loader, verbosity: verbosity)
         return try workspace.loadPackageGraph(rootPath: packagePath, diagnostics: diagnostics)
     }
 
@@ -1482,6 +1490,7 @@ extension Workspace {
                                     toolsVersion: toolsVersion,
                                     packageKind: packageKind,
                                     diagnostics: diagnostics,
+                                    verbosity: self.verbosity,
                                     on: self.queue) { result in
 
                     switch result {
