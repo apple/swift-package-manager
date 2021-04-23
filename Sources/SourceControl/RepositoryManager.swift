@@ -28,6 +28,10 @@ public protocol RepositoryManagerDelegate: AnyObject {
 
     /// Called when a repository has finished updating from its remote.
     func handleDidUpdate(handle: RepositoryManager.RepositoryHandle)
+
+    /// Called every time the progress of a repository fetch operation updates.
+    func fetchingRepository(from repository: String, objectsFetched: Int, totalObjectsToFetch: Int)
+
 }
 
 public extension RepositoryManagerDelegate {
@@ -35,6 +39,7 @@ public extension RepositoryManagerDelegate {
     func fetchingDidFinish(handle: RepositoryManager.RepositoryHandle, error: Swift.Error?) {}
     func handleWillUpdate(handle: RepositoryManager.RepositoryHandle) {}
     func handleDidUpdate(handle: RepositoryManager.RepositoryHandle) {}
+    func fetchingRepository(from repository: String, objectsFetched: Int, totalObjectsToFetch: Int) {}
 }
 
 /// Manages a collection of bare repositories.
@@ -288,7 +293,9 @@ public class RepositoryManager {
                     var fetchDetails: FetchDetails? = nil
                     do {
                         // Start fetching.
-                        fetchDetails = try self.fetchAndPopulateCache(handle: handle, repositoryPath: repositoryPath)
+                        fetchDetails = try self.fetchAndPopulateCache(handle: handle,
+                                                                      repositoryPath: repositoryPath,
+                                                                      on: queue)
 
                         // Update status to available.
                         handle.status = .available
@@ -334,10 +341,24 @@ public class RepositoryManager {
     ///   - update: Update a repository that is already cached or alternatively fetch the repository into the cache.
     /// - Throws:
     /// - Returns: Details about the performed fetch.
-    @discardableResult
-    func fetchAndPopulateCache(handle: RepositoryHandle, repositoryPath: AbsolutePath) throws -> FetchDetails {
+   @discardableResult
+    func fetchAndPopulateCache(
+        handle: RepositoryHandle,
+        repositoryPath: AbsolutePath,
+        on queue: DispatchQueue
+    ) throws -> FetchDetails {
         var updatedCache = false
         var fromCache = false
+
+        func updateFetchProgress(progress: FetchProgress) -> Void {
+            queue.async {
+                if let total = progress.totalSteps {
+                    self.delegate?.fetchingRepository(from: handle.repository.url,
+                                                      objectsFetched: progress.step,
+                                                      totalObjectsToFetch: total)
+                }
+            }
+        }
 
         // We are expecting handle.repository.url to always be a resolved absolute path.
         let isLocal = (try? AbsolutePath(validating: handle.repository.url)) != nil
@@ -352,9 +373,9 @@ public class RepositoryManager {
                         // Fetch the repository into the cache.
                         if (fileSystem.exists(cachedRepositoryPath)) {
                             let repo = try self.provider.open(repository: handle.repository, at: cachedRepositoryPath)
-                            try repo.fetch()
+                            try repo.fetch(progress: updateFetchProgress(progress:))
                         } else {
-                            try self.provider.fetch(repository: handle.repository, to: cachedRepositoryPath)
+                            try self.provider.fetch(repository: handle.repository, to: cachedRepositoryPath, progress: updateFetchProgress(progress:))
                         }
                         updatedCache = true
                         // Copy the repository from the cache into the repository path.
@@ -367,12 +388,12 @@ public class RepositoryManager {
                 print("Skipping cache due to an error: \(error)")
                 // It is possible that we already created the directory before failing, so clear leftover data if present.
                 try fileSystem.removeFileTree(repositoryPath)
-                try self.provider.fetch(repository: handle.repository, to: repositoryPath)
+                try self.provider.fetch(repository: handle.repository, to: repositoryPath, progress: updateFetchProgress(progress:))
                 fromCache = false
             }
         } else {
             // Fetch without populating the cache when no `cachePath` is set.
-            try self.provider.fetch(repository: handle.repository, to: repositoryPath)
+            try self.provider.fetch(repository: handle.repository, to: repositoryPath, progress: updateFetchProgress(progress:))
             fromCache = false
         }
         return FetchDetails(fromCache: fromCache, updatedCache: updatedCache)

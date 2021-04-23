@@ -27,8 +27,11 @@ private struct GitShellHelper {
     /// Private function to invoke the Git tool with its default environment and given set of arguments.  The specified
     /// failure message is used only in case of error.  This function waits for the invocation to finish and returns the
     /// output as a string.
-    func run(_ args: [String], environment: [String: String] = Git.environment) throws -> String {
-        let process = Process(arguments: [Git.tool] + args, environment: environment, outputRedirection: .collect)
+    func run(_ args: [String],
+             environment: [String: String] = Git.environment,
+             outputRedirection: Process.OutputRedirection = .collect) throws -> String
+    {
+        let process = Process(arguments: [Git.tool] + args, environment: environment, outputRedirection: outputRedirection)
         let result: ProcessResult
         do {
             try self.processSet?.add(process)
@@ -66,15 +69,30 @@ public struct GitRepositoryProvider: RepositoryProvider {
     private func callGit(_ args: String...,
                          environment: [String: String] = Git.environment,
                          repository: RepositorySpecifier,
-                         failureMessage: String = "") throws -> String {
+                         failureMessage: String = "",
+                         progress: FetchProgress.Handler? = nil) throws -> String {
         do {
-            return try self.git.run(args, environment: environment)
+            if let progress = progress {
+                let outputRedirection = Process.OutputRedirection.stream {
+                    _ in
+                } stderr: {
+                    GitFetchProgress.gitFetchStatusFilter($0, progress: progress)
+                }
+                return try self.git.run(args + ["--progress"], environment: environment, outputRedirection: outputRedirection)
+            } else {
+                return try self.git.run(args, environment: environment)
+            }
         } catch let error as GitShellError {
             throw GitCloneError(repository: repository, message: failureMessage, result: error.result)
         }
     }
 
     public func fetch(repository: RepositorySpecifier, to path: AbsolutePath) throws {
+        try fetch(repository: repository, to: path, progress: nil)
+    }
+
+
+    public func fetch(repository: RepositorySpecifier, to path: AbsolutePath, progress: FetchProgress.Handler? = nil) throws {
         // Perform a bare clone.
         //
         // NOTE: We intentionally do not create a shallow clone here; the
@@ -87,7 +105,8 @@ public struct GitRepositoryProvider: RepositoryProvider {
         // NOTE: Explicitly set `core.symlinks=true` on `git clone` to ensure that symbolic links are correctly resolved.
         try self.callGit("clone", "-c", "core.symlinks=true", "--mirror", repository.url, path.pathString,
                          repository: repository,
-                         failureMessage: "Failed to clone repository \(repository.url)")
+                         failureMessage: "Failed to clone repository \(repository.url)",
+                         progress: progress)
     }
     
     public func isValidDirectory(_ directory: String) -> Bool {
@@ -302,9 +321,19 @@ public final class GitRepository: Repository, WorkingCheckout {
     @discardableResult
     private func callGit(_ args: String...,
                          environment: [String: String] = Git.environment,
-                         failureMessage: String = "") throws -> String {
+                         failureMessage: String = "",
+                         progress: FetchProgress.Handler? = nil) throws -> String {
         do {
-            return try self.git.run(["-C", self.path.pathString] + args, environment: environment)
+            if let progress = progress {
+                let outputRedirection = Process.OutputRedirection.stream {
+                    _ in
+                } stderr: {
+                    GitFetchProgress.gitFetchStatusFilter($0, progress: progress)
+                }
+                return try self.git.run(["-C", self.path.pathString] + args, environment: environment, outputRedirection: outputRedirection)
+            } else {
+                return try self.git.run(["-C", self.path.pathString] + args, environment: environment)
+            }
         } catch let error as GitShellError {
             throw GitRepositoryError(path: self.path, message: failureMessage, result: error.result)
         }
@@ -365,10 +394,14 @@ public final class GitRepository: Repository, WorkingCheckout {
     }
 
     public func fetch() throws {
+       try fetch(progress: nil)
+    }
+
+    public func fetch(progress: FetchProgress.Handler? = nil) throws {
         // use barrier for write operations
         try self.lock.withLock {
-            try callGit("remote", "update", "-p",
-                        failureMessage: "Couldn’t fetch updates from remote repositories")
+            try callGit("remote", "-v", "update", "-p",
+                        failureMessage: "Couldn’t fetch updates from remote repositories", progress: progress)
             self.cachedTags.clear()
         }
     }
@@ -920,5 +953,155 @@ public struct GitCloneError: Error, CustomStringConvertible, DiagnosticLocationP
         let stderr = (try? self.result.utf8stderrOutput()) ?? ""
         let output = (stdout + stderr).spm_chomp().spm_multilineIndent(count: 4)
         return "\(self.message):\n\(output)"
+    }
+}
+
+public enum GitFetchProgress: FetchProgress {
+    case enumeratingObjects(currentObjects: Int)
+    case countingObjects(progress: Double, currentObjects: Int, totalObjects: Int)
+    case compressingObjects(progress: Double, currentObjects: Int, totalObjects: Int)
+    case receivingObjects(progress: Double, currentObjects: Int, totalObjects: Int, downloadProgress: String?, downloadSpeed: String?)
+    case resolvingDeltas(progress: Double, currentObjects: Int, totalObjects: Int)
+
+    /// The pattern used to match git output. Caputre groups are labled from ?<i0> to ?<i19>.
+    static let pattern = #"""
+(?xi)
+(?:
+    remote: \h+ (?<i0>Enumerating \h objects): \h+ (?<i1>[0-9]+)
+)|
+(?:
+    remote: \h+ (?<i2>Counting \h objects): \h+ (?<i3>[0-9]+)% \h+ \((?<i4>[0-9]+)\/(?<i5>[0-9]+)\)
+)|
+(?:
+    remote: \h+ (?<i6>Compressing \h objects): \h+ (?<i7>[0-9]+)% \h+ \((?<i8>[0-9]+)\/(?<i9>[0-9]+)\)
+)|
+(?:
+    (?<i10>Resolving \h deltas): \h+ (?<i11>[0-9]+)% \h+ \((?<i12>[0-9]+)\/(?<i13>[0-9]+)\)
+)|
+(?:
+    (?<i14>Receiving \h objects): \h+ (?<i15>[0-9]+)% \h+ \((?<i16>[0-9]+)\/(?<i17>[0-9]+)\)
+    (?:, \h+ (?<i18>[0-9]+.?[0-9]+ \h [A-Z]iB) \h+ \| \h+ (?<i19>[0-9]+.?[0-9]+ \h [A-Z]iB\/s))?
+)
+"""#
+    static let regex = try? RegEx(pattern: pattern)
+
+    init?(from string: String) {
+        guard let matches = GitFetchProgress.regex?.matchGroups(in: string).first, matches.count == 20 else { return nil }
+
+        if matches[0] == "Enumerating objects" {
+            guard let currentObjects = Int(matches[1]) else { return nil }
+
+            self = .enumeratingObjects(currentObjects: currentObjects)
+        } else if matches[2] == "Counting objects" {
+            guard let progress = Double(matches[3]),
+                  let currentObjects = Int(matches[4]),
+                  let totalObjects = Int(matches[5]) else { return nil }
+
+            self = .countingObjects(progress: progress / 100, currentObjects: currentObjects, totalObjects: totalObjects)
+
+        } else if matches[6] == "Compressing objects" {
+            guard let progress = Double(matches[7]),
+                  let currentObjects = Int(matches[8]),
+                  let totalObjects = Int(matches[9]) else { return nil }
+
+            self = .compressingObjects(progress: progress / 100, currentObjects: currentObjects, totalObjects: totalObjects)
+
+        } else if matches[10] == "Resolving deltas" {
+            guard let progress = Double(matches[11]),
+                  let currentObjects = Int(matches[12]),
+                  let totalObjects = Int(matches[13]) else { return nil }
+
+            self = .resolvingDeltas(progress: progress / 100, currentObjects: currentObjects, totalObjects: totalObjects)
+
+        } else if matches[14] == "Receiving objects" {
+            guard let progress = Double(matches[15]),
+                  let currentObjects = Int(matches[16]),
+                  let totalObjects = Int(matches[17]) else { return nil }
+
+            let downloadProgress = matches[18]
+            let downloadSpeed = matches[19]
+
+            self = .receivingObjects(progress: progress / 100, currentObjects: currentObjects, totalObjects: totalObjects, downloadProgress: downloadProgress, downloadSpeed: downloadSpeed)
+
+        } else {
+            return nil
+        }
+    }
+
+    public var message: String {
+        switch self {
+        case .enumeratingObjects: return "Enumerating objects"
+        case .countingObjects: return "Counting objects"
+        case .compressingObjects: return "Compressing objects"
+        case .receivingObjects: return "Receiving objects"
+        case .resolvingDeltas: return "Resolving deltas"
+        }
+    }
+
+    public var step: Int {
+        switch self {
+        case .enumeratingObjects(let currentObjects):
+            return  currentObjects
+        case .countingObjects(_, let currentObjects, _):
+            return currentObjects
+        case .compressingObjects(_, let currentObjects, _):
+            return currentObjects
+        case .receivingObjects(_, let currentObjects, _, _, _):
+            return currentObjects
+        case .resolvingDeltas(_, let currentObjects, _):
+            return currentObjects
+        }
+    }
+
+    public var totalSteps: Int? {
+        switch self {
+        case .enumeratingObjects:
+            return 0
+        case .countingObjects(_, _, let totalObjects):
+            return totalObjects
+        case .compressingObjects(_, _, let totalObjects):
+            return totalObjects
+        case .receivingObjects(_, _, let totalObjects, _, _):
+            return totalObjects
+        case .resolvingDeltas(_, _, let totalObjects):
+            return totalObjects
+        }
+    }
+
+    public var downloadProgress: String? {
+        switch self {
+        case .receivingObjects(_, _, _, let downloadProgress, _):
+            return downloadProgress
+        default:
+            return nil
+        }
+    }
+
+    public var downloadSpeed: String? {
+        switch self {
+        case .receivingObjects(_, _, _, _, let downloadSpeed):
+            return downloadSpeed
+        default:
+            return nil
+        }
+    }
+
+    /// Processes stdout output and calls the progress callback with `GitStatus` objects.
+    static func gitFetchStatusFilter(_ bytes: [UInt8], progress: FetchProgress.Handler) {
+        guard let string = String(bytes: bytes, encoding: .utf8) else { return }
+        let lines = string
+            .split { $0 == "\r" || $0 == "\n"  }
+            .map { String($0) }
+
+        for line in lines {
+            if let status = GitFetchProgress(from: line) {
+                switch status {
+                case .receivingObjects:
+                    progress(status)
+                default:
+                    continue
+                }
+            }
+        }
     }
 }

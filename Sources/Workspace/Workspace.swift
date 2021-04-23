@@ -104,6 +104,9 @@ public protocol WorkspaceDelegate: AnyObject {
 
     /// The workspace finished downloading all binary artifacts.
     func didDownloadBinaryArtifacts()
+
+    /// Called every time the progress of the git fetch operation updates.
+    func fetchingRepository(from repository: String, objectsFetched: Int, totalObjectsToFetch: Int)
 }
 
 public extension WorkspaceDelegate {
@@ -138,11 +141,15 @@ public extension WorkspaceDelegate {
     func willResolveDependencies(reason: WorkspaceResolveReason) {}
     func dependenciesUpToDate() {}
     func resolvedFileChanged() {}
+
     func downloadingBinaryArtifact(from url: String, bytesDownloaded: Int64, totalBytesToDownload: Int64?) {}
+    func fetchingRepository(from repository: String, objectsFetched: Int, totalObjectsToFetch: Int) {}
+
     func didDownloadBinaryArtifacts() {}
 
     func fetchingWillBegin(repository: String) {}
     func fetchingDidFinish(repository: String, diagnostic: Diagnostic?) {}
+
 }
 
 private class WorkspaceRepositoryManagerDelegate: RepositoryManagerDelegate {
@@ -171,6 +178,10 @@ private class WorkspaceRepositoryManagerDelegate: RepositoryManagerDelegate {
 
     func handleDidUpdate(handle: RepositoryManager.RepositoryHandle) {
         workspaceDelegate.repositoryDidUpdate(handle.repository.url)
+    }
+
+    func fetchingRepository(from repository: String, objectsFetched: Int, totalObjectsToFetch: Int) {
+        workspaceDelegate.fetchingRepository(from: repository, objectsFetched: objectsFetched, totalObjectsToFetch: totalObjectsToFetch)
     }
 }
 

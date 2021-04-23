@@ -74,6 +74,15 @@ public protocol RepositoryProvider {
     /// - Throws: If there is any error fetching the repository.
     func fetch(repository: RepositorySpecifier, to path: AbsolutePath) throws
 
+    /// Fetch the complete repository at the given location to `path`.
+    ///
+    /// - Parameters:
+    ///   - repository: The specifier of the repository to fetch.
+    ///   - path: The destiantion path for the fetch.
+    ///   - progress: Reports the progress of the current fetch operation.
+    /// - Throws: If there is any error fetching the repository.
+    func fetch(repository: RepositorySpecifier, to path: AbsolutePath, progress: FetchProgress.Handler?) throws
+
     /// Open the given repository.
     ///
     /// - Parameters:
@@ -125,6 +134,20 @@ public protocol RepositoryProvider {
     func copy(from sourcePath: AbsolutePath, to destinationPath: AbsolutePath) throws
 }
 
+extension RepositoryProvider {
+    public func checkoutExists(at path: AbsolutePath) throws -> Bool {
+        fatalError("Unimplemented")
+    }
+
+    public func copy(from sourcePath: AbsolutePath, to destinationPath: AbsolutePath) throws {
+        fatalError("Unimplemented")
+    }
+
+    public func fetch(repository: RepositorySpecifier, to path: AbsolutePath, progress: FetchProgress.Handler?) throws {
+        try fetch(repository: repository, to: path)
+    }
+}
+
 /// Abstract repository operations.
 ///
 /// This interface provides access to an abstracted representation of a
@@ -165,6 +188,11 @@ public protocol Repository {
     /// - Throws: If an error occurs while performing the fetch operation.
     func fetch() throws
 
+    /// Fetch and update the repository from its remote.
+    ///
+    /// - Throws: If an error occurs while performing the fetch operation.
+    func fetch(progress: FetchProgress.Handler?) throws
+
     /// Returns true if the given revision exists.
     func exists(revision: Revision) -> Bool
 
@@ -199,6 +227,12 @@ public protocol Repository {
     ///
     /// - Throws: If an error occurs accessing the revision.
     func openFileView(tag: String) throws -> FileSystem
+}
+
+extension Repository {
+    public func fetch(progress: FetchProgress.Handler?) throws {
+        try fetch()
+    }
 }
 
 /// An editable checkout of a repository (i.e. a working copy) on the local file
@@ -264,4 +298,16 @@ extension Revision: JSONMappable {
         }
         self.init(identifier: identifier)
     }
+}
+
+public protocol FetchProgress {
+    typealias Handler = (FetchProgress) -> Void
+
+    var message: String { get }
+    var step: Int { get }
+    var totalSteps: Int? { get }
+    /// The current download progress including the unit
+    var downloadProgress: String? { get }
+    /// The current download speed including the unit
+    var downloadSpeed: String? { get }
 }

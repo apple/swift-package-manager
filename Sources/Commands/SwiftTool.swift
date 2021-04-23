@@ -37,6 +37,9 @@ private class ToolWorkspaceDelegate: WorkspaceDelegate {
     /// The progress animation for downloads.
     private let downloadAnimation: NinjaProgressAnimation
 
+    /// The progress animation for repository fetches.
+    private let fetchAnimation: NinjaProgressAnimation
+
     /// Wether the tool is in a verbose mode.
     private let isVerbose: Bool
 
@@ -45,8 +48,16 @@ private class ToolWorkspaceDelegate: WorkspaceDelegate {
         let totalBytesToDownload: Int64
     }
 
+    private struct FetchProgress {
+        let objectsFetched: Int
+        let totalObjectsToFetch: Int
+    }
+
     /// The progress of each individual downloads.
     private var downloadProgress: [String: DownloadProgress] = [:]
+
+    /// The progress of each individual fetch operation
+    private var fetchProgress: [String: FetchProgress] = [:]
 
     private let queue = DispatchQueue(label: "org.swift.swiftpm.commands.tool-workspace-delegate")
     private let diagnostics: DiagnosticsEngine
@@ -56,6 +67,7 @@ private class ToolWorkspaceDelegate: WorkspaceDelegate {
         // https://forums.swift.org/t/allow-self-x-in-class-convenience-initializers/15924
         self.stdoutStream = stdoutStream as? ThreadSafeOutputByteStream ?? ThreadSafeOutputByteStream(stdoutStream)
         self.downloadAnimation = NinjaProgressAnimation(stream: self.stdoutStream)
+        self.fetchAnimation = NinjaProgressAnimation(stream: self.stdoutStream)
         self.isVerbose = isVerbose
         self.diagnostics = diagnostics
     }
@@ -74,6 +86,17 @@ private class ToolWorkspaceDelegate: WorkspaceDelegate {
     }
 
     func fetchingDidFinish(repository: String, fetchDetails: RepositoryManager.FetchDetails?, diagnostic: Diagnostic?) {
+        queue.async {
+            if self.diagnostics.hasErrors {
+                self.fetchAnimation.clear()
+            }
+
+            self.fetchProgress.removeValue(forKey: repository)
+
+            if self.fetchProgress.isEmpty {
+                self.fetchAnimation.complete(success: true)
+            }
+        }
     }
 
     func repositoryWillUpdate(_ repository: String) {
@@ -209,6 +232,19 @@ private class ToolWorkspaceDelegate: WorkspaceDelegate {
             self.downloadProgress.removeAll()
         }
     }
+
+    func fetchingRepository(from repository: String, objectsFetched: Int, totalObjectsToFetch: Int) {
+        queue.async {
+            self.fetchProgress[repository] = FetchProgress(
+                objectsFetched: objectsFetched,
+                totalObjectsToFetch: totalObjectsToFetch)
+
+            let step = self.fetchProgress.values.reduce(0) { $0 + $1.objectsFetched }
+            let total = self.fetchProgress.values.reduce(0) { $0 + $1.totalObjectsToFetch }
+            self.fetchAnimation.update(step: step, total: total, text: "Fetching objects")
+        }
+    }
+
 }
 
 /// Handler for the main DiagnosticsEngine used by the SwiftTool class.
