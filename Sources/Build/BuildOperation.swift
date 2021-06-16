@@ -125,9 +125,18 @@ public final class BuildOperation: PackageStructureDelegate, SPMBuildCore.BuildS
             component: buildParameters.configuration.dirname
         )
         if localFileSystem.exists(oldBuildPath) {
-            try localFileSystem.removeFileTree(oldBuildPath)
+            do { try localFileSystem.removeFileTree(oldBuildPath) }
+            catch {
+                diagnostics.emit(warning: "unable to delete \(oldBuildPath), skip creating symbolic link: \(error)")
+                return
+            }
         }
-        try localFileSystem.createSymbolicLink(oldBuildPath, pointingAt: buildParameters.buildPath, relative: true)
+
+        do {
+            try localFileSystem.createSymbolicLink(oldBuildPath, pointingAt: buildParameters.buildPath, relative: true)
+        } catch {
+            diagnostics.emit(warning: "unable to create symbolic link at \(oldBuildPath): \(error)")
+        }
     }
 
     /// Compute the llbuild target name using the given subset.
