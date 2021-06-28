@@ -42,7 +42,7 @@ class SwiftPMXCTestHelperTests: XCTestCase {
               ] as Array<Dictionary<String, Any>>]] as Array<Dictionary<String, Any>>
             ] as Dictionary<String, Any> as NSDictionary
             // Run the XCTest helper tool and check result.
-            XCTAssertXCTestHelper(prefix.appending(components: ".build", Resources.default.toolchain.triple.tripleString, "debug", "SwiftPMXCTestHelperPackageTests.xctest"), testCases: testCases)
+            XCTAssertXCTestHelper(prefix.appending(components: ".build", Resources.default.toolchain.triple.platformBuildPathComponent(), "debug", "SwiftPMXCTestHelperPackageTests.xctest"), testCases: testCases)
         }
       #endif
     }

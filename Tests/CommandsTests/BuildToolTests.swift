@@ -74,7 +74,7 @@ final class BuildToolTests: XCTestCase {
     func testBinPathAndSymlink() throws {
         fixture(name: "ValidLayouts/SingleModule/ExecutableNew") { path in
             let fullPath = resolveSymlinks(path)
-            let targetPath = fullPath.appending(components: ".build", Resources.default.toolchain.triple.tripleString)
+            let targetPath = fullPath.appending(components: ".build", Resources.default.toolchain.triple.platformBuildPathComponent())
             let xcbuildTargetPath = fullPath.appending(components: ".build", "apple")
             XCTAssertEqual(try execute(["--show-bin-path"], packagePath: fullPath).stdout,
                            "\(targetPath.appending(component: "debug").pathString)\n")

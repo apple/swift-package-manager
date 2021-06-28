@@ -65,7 +65,14 @@ extension BinaryTarget {
         // Construct an ExecutableInfo for each matching variant.
         return executables.flatMap { entry in
             // FIXME: this filter needs to become more sophisticated
-            entry.value.variants.filter{ $0.supportedTriples.contains(triple) }.map{
+            entry.value.variants.filter {
+                let tripleStrings = $0.supportedTriples.map { $0.tripleString }
+                if triple.isDarwin() {
+                    return tripleStrings.contains(triple.tripleString(forPlatformVersion: ""))
+                } else {
+                    return tripleStrings.contains(triple.tripleString)
+                }
+            }.map{
                 ExecutableInfo(name: entry.key, executablePath: self.artifactPath.appending(RelativePath($0.path)))
             }
         }
