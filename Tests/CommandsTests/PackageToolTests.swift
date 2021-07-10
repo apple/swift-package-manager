@@ -916,6 +916,17 @@ final class PackageToolTests: XCTestCase {
         }
     }
 
+    fileprivate func check(stderr: String, _ block: () throws -> ()) {
+        do {
+            try block()
+            XCTFail()
+        } catch SwiftPMProductError.executionFailure(_, _, let stderrOutput) {
+            XCTAssertEqual(stderrOutput, stderr)
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
     func testMirrorConfig() throws {
         try testWithTemporaryDirectory { prefix in
             let fs = localFileSystem
@@ -947,17 +958,6 @@ final class PackageToolTests: XCTestCase {
             XCTAssertMatch(stderr, .contains("warning: '--package-url' option is deprecated; use '--original-url' instead"))
             (stdout, _) = try execute(["config", "get-mirror", "--original-url", "git@github.com:apple/swift-package-manager.git"], packagePath: packageRoot)
             XCTAssertEqual(stdout.spm_chomp(), "git@mygithub.com:foo/swift-package-manager.git")
-
-            func check(stderr: String, _ block: () throws -> ()) {
-                do {
-                    try block()
-                    XCTFail()
-                } catch SwiftPMProductError.executionFailure(_, _, let stderrOutput) {
-                    XCTAssertEqual(stderrOutput, stderr)
-                } catch {
-                    XCTFail("unexpected error: \(error)")
-                }
-            }
 
             check(stderr: "not found\n") {
                 try execute(["config", "get-mirror", "--original-url", "foo"], packagePath: packageRoot)
@@ -1080,4 +1080,205 @@ final class PackageToolTests: XCTestCase {
             }
         }
     }
+
+    #if BUILD_PACKAGE_SYNTAX
+    func testAddDependency() throws {
+        fixture(name: "PackageEditor/Empty") { packageRoot in
+            fixture(name: "PackageEditor/OneProduct") { dependencyRoot in
+                _ = try execute(["add-dependency", dependencyRoot.pathString], packagePath: packageRoot)
+                let (dumpOutput, _) = try execute(["dump-package"], packagePath: packageRoot)
+                let json = try JSON(bytes: ByteString(encodingAsUTF8: dumpOutput))
+                guard case .dictionary(let dict) = json else { XCTFail(); return }
+                guard case .array(let deps) = dict["dependencies"] else { XCTFail(); return }
+                guard case .dictionary(let depsMap) = deps[0] else { XCTFail(); return }
+                guard case .array(let localDeps) = depsMap["local"] else { XCTFail(); return }
+                XCTAssertEqual(localDeps.count, 1)
+                let dependency = localDeps[0]
+                XCTAssertEqual(dependency["name"], .string("MyPackage2"))
+                XCTAssertEqual(dependency["identity"], .string("packageeditor_oneproduct"))
+
+                check(stderr: "error: 'MyPackage' already has a dependency on '\(dependencyRoot.pathString)'\n") {
+                    try execute(["add-dependency", dependencyRoot.pathString], packagePath: packageRoot)
+                }
+
+                check(stderr: "error: only one requirement is allowed when specifiying a dependency\n") {
+                    try execute(["add-dependency", "http://www.githost.com/repo.git",
+                                 "--exact", "1.0.0", "--from", "1.0.0"],
+                                packagePath: packageRoot)
+                }
+
+                check(stderr: "error: '--to' and '--through' may only be used with '--from' to specify a range requirement\n") {
+                    _ = try execute(["add-dependency", "http://www.githost.com/repo.git",
+                                     "--exact", "1.0.0", "--to", "2.0.0"],
+                                    packagePath: packageRoot)
+                }
+
+                check(stderr: "error: '--to' and '--through' may not be used in the same requirement\n") {
+                    _ = try execute(["add-dependency", "http://www.githost.com/repo.git",
+                                     "--from", "1.0.0", "--to", "2.0.0", "--through", "3.0.0"],
+                                    packagePath: packageRoot)
+                }
+
+            }
+        }
+    }
+
+    func testAddTarget() throws {
+        fixture(name: "PackageEditor/Empty") { packageRoot in
+            fixture(name: "PackageEditor/OneProduct") { dependencyRoot in
+                _ = try execute(["add-dependency", dependencyRoot.pathString], packagePath: packageRoot)
+                _ = try execute(["add-target", "MyLibrary", "--dependencies", "Library"], packagePath: packageRoot)
+                _ = try execute(["add-target", "MyExecutable", "--type", "executable",
+                                 "--dependencies", "MyLibrary"], packagePath: packageRoot)
+                _ = try execute(["add-target", "--type", "test", "IntegrationTests",
+                                 "--dependencies", "MyLibrary"], packagePath: packageRoot)
+                let contents = try localFileSystem.readFileContents(packageRoot.appending(component: Manifest.filename)).description
+                XCTAssertEqual(contents, """
+                // swift-tools-version:5.3
+                import PackageDescription
+
+                let package = Package(
+                    name: "MyPackage",
+                    dependencies: [
+                        .package(name: "MyPackage2", path: "\(dependencyRoot.pathString)"),
+                    ],
+                    targets: [
+                        .target(
+                            name: "MyLibrary",
+                            dependencies: [
+                                .product(name: "Library", package: "MyPackage2"),
+                            ]
+                        ),
+                        .testTarget(
+                            name: "MyLibraryTests",
+                            dependencies: [
+                                "MyLibrary",
+                            ]
+                        ),
+                        .target(
+                            name: "MyExecutable",
+                            dependencies: [
+                                "MyLibrary",
+                            ]
+                        ),
+                        .testTarget(
+                            name: "IntegrationTests",
+                            dependencies: [
+                                "MyLibrary",
+                            ]
+                        ),
+                    ]
+                )
+                """)
+
+                XCTAssertTrue(localFileSystem.exists(packageRoot.appending(components: "Sources", "MyLibrary", "MyLibrary.swift")))
+                XCTAssertTrue(localFileSystem.exists(packageRoot.appending(components: "Tests", "MyLibraryTests", "MyLibraryTests.swift")))
+                XCTAssertTrue(localFileSystem.exists(packageRoot.appending(components: "Sources", "MyExecutable", "main.swift")))
+                XCTAssertTrue(localFileSystem.exists(packageRoot.appending(components: "Tests", "IntegrationTests", "IntegrationTests.swift")))
+
+                _ = try execute(["add-target", "MyLocalBinary", "--type", "binary",
+                                 "--path", "LocalBinary.xcframework"],
+                                packagePath: packageRoot)
+                check(stderr: "error: a target named 'MyLibrary' already exists in 'MyPackage'\n") {
+                    _ = try execute(["add-target", "MyLibrary"], packagePath: packageRoot)
+                }
+                check(stderr: "error: binary targets must specify either a path or both a URL and a checksum\n") {
+                    _ = try execute(["add-target", "MyLibrary", "--type", "binary"], packagePath: packageRoot)
+                }
+                check(stderr: "error: option '--checksum' is only supported for binary targets\n") {
+                    _ = try execute(["add-target", "MyLibrary", "--checksum", "checksum"], packagePath: packageRoot)
+                }
+                check(stderr: "error: option '--dependencies' is not supported for binary targets\n") {
+                    _ = try execute(["add-target", "MyLibrary", "--type", "binary", "--dependencies", "MyLibrary"],
+                                    packagePath: packageRoot)
+                }
+                check(stderr: "error: unsupported target type 'unsupported'; supported types are library, executable, test, and binary\n") {
+                    _ = try execute(["add-target", "MyLibrary", "--type", "unsupported"],
+                                    packagePath: packageRoot)
+                }
+
+            }
+        }
+    }
+
+    func testAddProduct() throws {
+        fixture(name: "PackageEditor/Empty") { packageRoot in
+            _ = try execute(["add-target", "MyLibrary", "--no-test-target"],
+                            packagePath: packageRoot)
+            _ = try execute(["add-target", "MyLibrary2", "--no-test-target"],
+                            packagePath: packageRoot)
+
+            _ = try execute(["add-product", "LibraryProduct",
+                             "--targets", "MyLibrary", "MyLibrary2"],
+                            packagePath: packageRoot)
+            _ = try execute(["add-product", "DynamicLibraryProduct",
+                             "--type", "dynamic-library",
+                             "--targets", "MyLibrary"],
+                            packagePath: packageRoot)
+            _ = try execute(["add-product", "StaticLibraryProduct",
+                             "--type", "static-library",
+                             "--targets", "MyLibrary"],
+                            packagePath: packageRoot)
+            _ = try execute(["add-product", "ExecutableProduct",
+                             "--type", "executable",
+                             "--targets", "MyLibrary2"],
+                            packagePath: packageRoot)
+            let contents = try localFileSystem.readFileContents(
+                packageRoot.appending(component: Manifest.filename)).description
+            XCTAssertEqual(contents, """
+            // swift-tools-version:5.3
+            import PackageDescription
+
+            let package = Package(
+                name: "MyPackage",
+                products: [
+                    .library(
+                        name: "LibraryProduct",
+                        targets: [
+                            "MyLibrary",
+                            "MyLibrary2",
+                        ]
+                    ),
+                    .library(
+                        name: "DynamicLibraryProduct",
+                        type: .dynamic,
+                        targets: [
+                            "MyLibrary",
+                        ]
+                    ),
+                    .library(
+                        name: "StaticLibraryProduct",
+                        type: .static,
+                        targets: [
+                            "MyLibrary",
+                        ]
+                    ),
+                    .executable(
+                        name: "ExecutableProduct",
+                        targets: [
+                            "MyLibrary2",
+                        ]
+                    ),
+                ],
+                targets: [
+                    .target(
+                        name: "MyLibrary",
+                        dependencies: []
+                    ),
+                    .target(
+                        name: "MyLibrary2",
+                        dependencies: []
+                    ),
+                ]
+            )
+            """)
+
+            check(stderr: "error: a product named 'LibraryProduct' already exists in 'MyPackage'\n") {
+                _ = try execute(["add-product", "LibraryProduct",
+                                 "--targets", "MyLibrary,MyLibrary2"],
+                                packagePath: packageRoot)
+            }
+        }
+    }
+    #endif
 }

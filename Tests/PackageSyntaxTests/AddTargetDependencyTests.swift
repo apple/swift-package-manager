@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2019 Apple Inc. and the Swift project authors
+ Copyright (c) 2021 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See http://swift.org/LICENSE.txt for license information
@@ -10,12 +10,12 @@
 
 import XCTest
 
-@testable import SPMPackageEditor
+import PackageSyntax
 
 final class AddTargetDependencyTests: XCTestCase {
     func testAddTargetDependency() throws {
         let manifest = """
-            // swift-tools-version:5.0
+            // swift-tools-version:5.2
             import PackageDescription
 
             let package = Package(
@@ -40,16 +40,16 @@ final class AddTargetDependencyTests: XCTestCase {
             )
             """
         
-        let editor = try ManifestRewriter(manifest)
-        try editor.addTargetDependency(
+        let editor = try ManifestRewriter(manifest, diagnosticsEngine: .init())
+        try editor.addByNameTargetDependency(
             target: "exec", dependency: "foo")
-        try editor.addTargetDependency(
+        try editor.addByNameTargetDependency(
             target: "exec", dependency: "bar")
-        try editor.addTargetDependency(
+        try editor.addByNameTargetDependency(
             target: "execTests", dependency: "foo")
 
         XCTAssertEqual(editor.editedManifest, """
-            // swift-tools-version:5.0
+            // swift-tools-version:5.2
             import PackageDescription
 
             let package = Package(
@@ -63,13 +63,19 @@ final class AddTargetDependencyTests: XCTestCase {
                         dependencies: []),
                     .target(
                         name: "exec",
-                        dependencies: ["foo", "bar"]),
+                        dependencies: [
+                            "foo",
+                            "bar",
+                        ]),
                     .target(
                         name: "c",
                         dependencies: []),
                     .testTarget(
                         name: "execTests",
-                        dependencies: ["exec", "foo"]),
+                        dependencies: [
+                            "exec",
+                            "foo",
+                        ]),
                 ]
             )
             """)
@@ -101,16 +107,16 @@ final class AddTargetDependencyTests: XCTestCase {
             )
             """
 
-        let editor = try ManifestRewriter(manifest)
-        try editor.addTargetDependency(
+        let editor = try ManifestRewriter(manifest, diagnosticsEngine: .init())
+        try editor.addByNameTargetDependency(
             target: "foo", dependency: "dep")
-        try editor.addTargetDependency(
+        try editor.addByNameTargetDependency(
             target: "foo1", dependency: "dep")
-        try editor.addTargetDependency(
+        try editor.addByNameTargetDependency(
             target: "foo2", dependency: "dep")
-        try editor.addTargetDependency(
+        try editor.addByNameTargetDependency(
             target: "foo3", dependency: "dep")
-        try editor.addTargetDependency(
+        try editor.addByNameTargetDependency(
             target: "foo4", dependency: "dep")
 
         XCTAssertEqual(editor.editedManifest, """
@@ -119,20 +125,28 @@ final class AddTargetDependencyTests: XCTestCase {
                 targets: [
                     .target(
                         name: "foo",
-                        dependencies: ["bar", "dep"]),
+                        dependencies: [
+                            "bar",
+                            "dep",
+                        ]),
                     .target(
                         name: "foo1",
-                        dependencies: ["bar", "dep"]),
+                        dependencies: [
+                            "bar",
+                            "dep",
+                        ]),
                     .target(
                         name: "foo2",
-                        dependencies: ["dep"]),
+                        dependencies: [
+                            "dep",
+                        ]),
                     .target(
                         name: "foo3",
-                        dependencies: ["foo", "bar", "dep"]),
+                        dependencies: ["foo", "bar", "dep",]),
                     .target(
                         name: "foo4",
                         dependencies: [
-                            "foo", "bar", "dep"
+                            "foo", "bar", "dep",
                         ]),
                 ]
             )

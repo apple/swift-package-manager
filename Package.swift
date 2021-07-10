@@ -19,7 +19,7 @@ This allowis some clients (such as IDEs) that use SwiftPM's data model but not i
 to not have to depend on SwiftDriver, SwiftLLBuild, etc. We should probably have better names here,
 though that could break some clients.
 */
-let swiftPMDataModelProduct = (
+var swiftPMDataModelProduct = (
     name: "SwiftPMDataModel",
     targets: [
         "SourceControl",
@@ -32,6 +32,10 @@ let swiftPMDataModelProduct = (
         "Workspace",
     ]
 )
+
+#if compiler(>=5.5)
+swiftPMDataModelProduct.targets.append("PackageSyntax")
+#endif
 
 /** The `libSwiftPM` set of interfaces to programatically work with Swift
  packages.  `libSwiftPM` includes all of the SwiftPM code except the
@@ -52,6 +56,14 @@ let swiftPMProduct = (
 automatic linking type with `-auto` suffix appended to product's name.
 */
 let autoProducts = [swiftPMProduct, swiftPMDataModelProduct]
+
+var commandsDependencies: [Target.Dependency] = ["SwiftToolsSupport-auto", "Basics", "Build", "PackageGraph", "SourceControl", "Xcodeproj", "Workspace", "XCBuildSupport", "ArgumentParser", "PackageCollections"]
+var commandsSwiftSettings: [SwiftSetting]? = nil
+
+#if compiler(>=5.5)
+commandsDependencies.append("PackageSyntax")
+commandsSwiftSettings = [.define("BUILD_PACKAGE_SYNTAX")]
+#endif
 
 let package = Package(
     name: "SwiftPM",
@@ -213,7 +225,8 @@ let package = Package(
         .target(
             /** High-level commands */
             name: "Commands",
-            dependencies: ["SwiftToolsSupport-auto", "Basics", "Build", "PackageGraph", "SourceControl", "Xcodeproj", "Workspace", "XCBuildSupport", "ArgumentParser", "PackageCollections"]),
+            dependencies: commandsDependencies,
+            swiftSettings: commandsSwiftSettings),
         .target(
             /** The main executable provided by SwiftPM */
             name: "swift-package",
@@ -259,7 +272,8 @@ let package = Package(
             dependencies: ["Build", "SPMTestSupport"]),
         .testTarget(
             name: "CommandsTests",
-            dependencies: ["swift-build", "swift-package", "swift-test", "swift-run", "Commands", "Workspace", "SPMTestSupport"]),
+            dependencies: ["swift-build", "swift-package", "swift-test", "swift-run", "Commands", "Workspace", "SPMTestSupport"],
+            swiftSettings: commandsSwiftSettings),
         .testTarget(
             name: "WorkspaceTests",
             dependencies: ["Workspace", "SPMTestSupport"]),
@@ -365,3 +379,23 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .package(path: "../swift-crypto"),
     ]
 }
+
+#if compiler(>=5.5)
+// SwiftSyntax depends on lib_InternalSwiftSyntaxParser from the toolchain,
+// which had an ABI break in Swift 5.5. As a result, we shouldn't attempt to
+// compile PackageSyntax with an earlier compiler version. Although PackageSyntax
+// should compile with any 5.5 compiler, it will only be functional when built
+// with a toolchain that has a compatible parser library.
+if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
+    package.dependencies += [.package(url: "https://github.com/apple/swift-syntax.git", .branch(relatedDependenciesBranch))]
+} else {
+    package.dependencies += [.package(path: "../swift-syntax")]
+}
+
+package.targets += [
+    .target(name: "PackageSyntax",
+            dependencies: ["Workspace", "PackageModel", "PackageLoading",
+                           "SourceControl", "SwiftSyntax", "SwiftToolsSupport-auto"]),
+    .testTarget(name: "PackageSyntaxTests", dependencies: ["PackageSyntax", "SPMTestSupport", "SwiftSyntax"]),
+]
+#endif

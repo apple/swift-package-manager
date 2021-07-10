@@ -346,7 +346,7 @@ public struct ToolsVersionLoader: ToolsVersionLoaderProtocol {
         do { manifestContents = try fileSystem.readFileContents(file) } catch {
             throw Error.inaccessibleManifest(path: file, reason: String(describing: error))
         }
-        
+
         // FIXME: This is doubly inefficient.
         // `contents`'s value comes from `FileSystem.readFileContents(_)`, which is [inefficient](https://github.com/apple/swift-tools-support-core/blob/8f9838e5d4fefa0e12267a1ff87d67c40c6d4214/Sources/TSCBasic/FileSystem.swift#L167). Calling `ByteString.validDescription` on `contents` is also [inefficient, and possibly incorrect](https://github.com/apple/swift-tools-support-core/blob/8f9838e5d4fefa0e12267a1ff87d67c40c6d4214/Sources/TSCBasic/ByteString.swift#L121). However, this is a one-time thing for each package manifest, and almost necessary in order to work with all Unicode line-terminators. We probably can improve its efficiency and correctness by using `URL` for the file's path, and get is content via `Foundation.String(contentsOf:encoding:)`. Swift System's [`FilePath`](https://github.com/apple/swift-system/blob/8ffa04c0a0592e6f4f9c30926dedd8fa1c5371f9/Sources/System/FilePath.swift) and friends might help as well.
         // This is source-breaking.
@@ -451,7 +451,7 @@ public struct ToolsVersionLoader: ToolsVersionLoaderProtocol {
             // If you changed the logic in this file, and this fatal error is triggered, then you need to re-check the logic, and make sure all possible error conditions are covered in the Else-block.
             throw Error.backwardIncompatiblePre5_4(.unidentified, specifiedVersion: version)
         }
-        
+
         return version
     }
     

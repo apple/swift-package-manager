@@ -23,15 +23,15 @@ import XCBuildSupport
 import Workspace
 import Foundation
 
+#if BUILD_PACKAGE_SYNTAX
+import PackageSyntax
+#endif
+
 /// swift-package tool namespace
 public struct SwiftPackageTool: ParsableCommand {
-    public static var configuration = CommandConfiguration(
-        commandName: "package",
-        _superCommandName: "swift",
-        abstract: "Perform operations on Swift packages",
-        discussion: "SEE ALSO: swift build, swift run, swift test",
-        version: SwiftVersion.currentVersion.completeDisplayString,
-        subcommands: [
+
+    private static let subcommands: [ParsableCommand.Type] = {
+        var subcommands: [ParsableCommand.Type] = [
             Clean.self,
             PurgeCache.self,
             Reset.self,
@@ -39,26 +39,43 @@ public struct SwiftPackageTool: ParsableCommand {
             Describe.self,
             Init.self,
             Format.self,
-            
+
             APIDiff.self,
             DumpSymbolGraph.self,
             DumpPIF.self,
             DumpPackage.self,
-            
+
             Edit.self,
             Unedit.self,
-            
+
             Config.self,
             Resolve.self,
             Fetch.self,
-            
+
             ShowDependencies.self,
             ToolsVersionCommand.self,
             GenerateXcodeProject.self,
             ComputeChecksum.self,
             ArchiveSource.self,
             CompletionTool.self,
-        ],
+        ]
+        #if BUILD_PACKAGE_SYNTAX
+        subcommands.append(contentsOf: [
+            AddDependency.self,
+            AddTarget.self,
+            AddProduct.self,
+        ])
+        #endif
+        return subcommands
+    }()
+
+    public static var configuration = CommandConfiguration(
+        commandName: "package",
+        _superCommandName: "swift",
+        abstract: "Perform operations on Swift packages",
+        discussion: "SEE ALSO: swift build, swift run, swift test",
+        version: SwiftVersion.currentVersion.completeDisplayString,
+        subcommands: subcommands,
         helpNames: [.short, .long, .customLong("help", withSingleDash: true)])
 
     @OptionGroup()
@@ -840,6 +857,262 @@ extension SwiftPackageTool {
         }
     }
 }
+
+#if BUILD_PACKAGE_SYNTAX
+extension SwiftPackageTool {
+    struct AddDependency: SwiftCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Add a dependency to the current package.")
+
+        @OptionGroup()
+        var swiftOptions: SwiftToolOptions
+
+        @Argument(help: "The URL of a remote package, or the path to a local package")
+        var dependencyURL: String
+
+        @Option(help: "Specifies an exact package version requirement")
+        var exact: Version?
+
+        @Option(help: "Specifies a package revision requirement")
+        var revision: String?
+
+        @Option(help: "Specifies a package branch requirement")
+        var branch: String?
+
+        @Option(help: "Specifies a package version requirement from the specified version up to the next major version")
+        var from: Version?
+
+        @Option(help: "Specifies a package version requirement from the specified version up to the next minor version")
+        var upToNextMinorFrom: Version?
+
+        @Option(help: "Specifies the upper bound of a range-based package version requirement")
+        var to: Version?
+
+        @Option(help: "Specifies the upper bound of a closed range-based package version requirement")
+        var through: Version?
+
+        func run(_ swiftTool: SwiftTool) throws {
+            var requirements: [PackageDependencyRequirement] = []
+            if let exactVersion = exact {
+                requirements.append(.exact(exactVersion.description))
+            }
+            if let revision = revision {
+                requirements.append(.revision(revision))
+            }
+            if let branch = branch {
+                requirements.append(.branch(branch))
+            }
+            if let version = from {
+                requirements.append(.upToNextMajor(version.description))
+            }
+            if let version = upToNextMinorFrom {
+                requirements.append(.upToNextMinor(version.description))
+            }
+
+            guard requirements.count <= 1 else {
+                swiftTool.diagnostics.emit(.error("only one requirement is allowed when specifiying a dependency"))
+                throw ExitCode.failure
+            }
+
+            var requirement = requirements.first
+
+            if case .upToNextMajor(let rangeStart) = requirement {
+                guard to == nil || through == nil else {
+                    swiftTool.diagnostics.emit(.error("'--to' and '--through' may not be used in the same requirement"))
+                    throw ExitCode.failure
+                }
+                if let rangeEnd = to {
+                    requirement = .range(rangeStart.description, rangeEnd.description)
+                } else if let closedRangeEnd = through {
+                    requirement = .closedRange(rangeStart.description, closedRangeEnd.description)
+                }
+            } else {
+                guard to == nil, through == nil else {
+                    swiftTool.diagnostics.emit(.error("'--to' and '--through' may only be used with '--from' to specify a range requirement"))
+                    throw ExitCode.failure
+                }
+            }
+
+            let manifestPath = try Manifest.path(atPackagePath: swiftTool.getPackageRoot(),
+                                                 fileSystem: localFileSystem)
+            let editor = try PackageEditor(manifestPath: manifestPath,
+                                           repositoryManager: swiftTool.getActiveWorkspace().repositoryManager,
+                                           toolchain: swiftTool.getToolchain(),
+                                           diagnosticsEngine: swiftTool.diagnostics)
+            do {
+                try editor.addPackageDependency(url: dependencyURL, requirement: requirement)
+            } catch Diagnostics.fatalError {
+                throw ExitCode.failure
+            }
+        }
+    }
+
+    struct AddTarget: SwiftCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Add a target to the current package.")
+
+        @OptionGroup()
+        var swiftOptions: SwiftToolOptions
+
+        @Argument(help: "The name of the new target")
+        var name: String
+
+        @Option(help: "The type of the new target (library, executable, test, or binary)")
+        var type: String = "library"
+
+        @Flag(help: "If present, no corresponding test target will be created for a new library target")
+        var noTestTarget: Bool = false
+
+        @Option(parsing: .upToNextOption,
+                help: "A list of target dependency names (targets and/or dependency products)")
+        var dependencies: [String] = []
+
+        @Option(help: "The URL for a remote binary target")
+        var url: String?
+
+        @Option(help: "The checksum for a remote binary target")
+        var checksum: String?
+
+        @Option(help: "The path for a local binary target")
+        var path: String?
+
+        func run(_ swiftTool: SwiftTool) throws {
+            let manifestPath = try Manifest.path(atPackagePath: swiftTool.getPackageRoot(),
+                                                 fileSystem: localFileSystem)
+            let editor = try PackageEditor(manifestPath: manifestPath,
+                                           repositoryManager: swiftTool.getActiveWorkspace().repositoryManager,
+                                           toolchain: swiftTool.getToolchain(),
+                                           diagnosticsEngine: swiftTool.diagnostics)
+            let newTarget: NewTarget
+            switch type {
+            case "library":
+                try verifyNoTargetBinaryOptionsPassed(swiftTool: swiftTool)
+                newTarget = .library(name: name,
+                                     includeTestTarget: !noTestTarget,
+                                     dependencyNames: dependencies)
+            case "executable":
+                try verifyNoTargetBinaryOptionsPassed(swiftTool: swiftTool)
+                newTarget = .executable(name: name,
+                                        dependencyNames: dependencies)
+            case "test":
+                try verifyNoTargetBinaryOptionsPassed(swiftTool: swiftTool)
+                newTarget = .test(name: name,
+                                  dependencyNames: dependencies)
+            case "binary":
+                guard dependencies.isEmpty else {
+                    swiftTool.diagnostics.emit(.error("option '--dependencies' is not supported for binary targets"))
+                    throw ExitCode.failure
+                }
+                // This check is somewhat forgiving, and does the right thing if
+                // the user passes a url with --path or a path with --url.
+                guard let urlOrPath = url ?? path, url == nil || path == nil else {
+                    swiftTool.diagnostics.emit(.error("binary targets must specify either a path or both a URL and a checksum"))
+                    throw ExitCode.failure
+                }
+                newTarget = .binary(name: name,
+                                    urlOrPath: urlOrPath,
+                                    checksum: checksum)
+            default:
+                swiftTool.diagnostics.emit(.error("unsupported target type '\(type)'; supported types are library, executable, test, and binary"))
+                throw ExitCode.failure
+            }
+
+            do {
+                try editor.addTarget(newTarget,
+                                     productPackageNameMapping: createProductPackageNameMapping(swiftTool: swiftTool))
+            } catch Diagnostics.fatalError {
+                throw ExitCode.failure
+            }
+        }
+
+        private func createProductPackageNameMapping(swiftTool: SwiftTool) throws -> [String: String] {
+            let graph = try swiftTool.loadPackageGraph()
+            var productPackageNameMapping: [String: String] = [:]
+            for dependencyPackage in graph.rootPackages.flatMap(\.dependencies) {
+                for product in dependencyPackage.products {
+                    productPackageNameMapping[product.name] = dependencyPackage.manifestName
+                }
+            }
+            return productPackageNameMapping
+        }
+
+        private func verifyNoTargetBinaryOptionsPassed(swiftTool: SwiftTool) throws {
+            guard url == nil else {
+                swiftTool.diagnostics.emit(.error("option '--url' is only supported for binary targets"))
+                throw ExitCode.failure
+            }
+            guard path == nil else {
+                swiftTool.diagnostics.emit(.error("option '--path' is only supported for binary targets"))
+                throw ExitCode.failure
+            }
+            guard checksum == nil else {
+                swiftTool.diagnostics.emit(.error("option '--checksum' is only supported for binary targets"))
+                throw ExitCode.failure
+            }
+        }
+    }
+
+    struct AddProduct: SwiftCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Add a product to the current package.")
+
+        @OptionGroup()
+        var swiftOptions: SwiftToolOptions
+
+        @Argument(help: "The name of the new product")
+        var name: String
+
+        @Option(help: "The type of the new product (library, static-library, dynamic-library, or executable)")
+        var type: ProductType?
+
+        @Option(parsing: .upToNextOption,
+                help: "A list of target names to add to the new product")
+        var targets: [String]
+
+        func run(_ swiftTool: SwiftTool) throws {
+            let manifestPath = try Manifest.path(atPackagePath: swiftTool.getPackageRoot(),
+                                                 fileSystem: localFileSystem)
+            let editor = try PackageEditor(manifestPath: manifestPath,
+                                           repositoryManager: swiftTool.getActiveWorkspace().repositoryManager,
+                                           toolchain: swiftTool.getToolchain(),
+                                           diagnosticsEngine: swiftTool.diagnostics)
+            do {
+                try editor.addProduct(name: name, type: type ?? .library(.automatic), targets: targets)
+            } catch Diagnostics.fatalError {
+                throw ExitCode.failure
+            }
+        }
+    }
+
+}
+
+extension Version: ExpressibleByArgument {
+    public init?(argument: String) {
+        self.init(string: argument)
+    }
+}
+
+extension ProductType: ExpressibleByArgument {
+    public init?(argument: String) {
+        switch argument {
+        case "library":
+            self = .library(.automatic)
+        case "static-library":
+            self = .library(.static)
+        case "dynamic-library":
+            self = .library(.dynamic)
+        case "executable":
+            self = .executable
+        default:
+            return nil
+        }
+    }
+
+    public static var defaultCompletionKind: CompletionKind {
+        .list(["library", "static-library", "dynamic-library", "executable"])
+    }
+}
+#endif
 
 extension SwiftPackageTool {
     struct Config: ParsableCommand {
