@@ -31,42 +31,60 @@ public struct SwiftPackageTool: ParsableCommand {
         abstract: "Perform operations on Swift packages",
         discussion: "SEE ALSO: swift build, swift run, swift test",
         version: SwiftVersion.currentVersion.completeDisplayString,
-        subcommands: [
-            Clean.self,
-            PurgeCache.self,
-            Reset.self,
-            Update.self,
-            Describe.self,
-            Init.self,
-            Format.self,
-            
-            APIDiff.self,
-            DumpSymbolGraph.self,
-            DumpPIF.self,
-            DumpPackage.self,
-            
-            Edit.self,
-            Unedit.self,
-            
-            Config.self,
-            Resolve.self,
-            Fetch.self,
-            
-            ShowDependencies.self,
-            ToolsVersionCommand.self,
-            GenerateXcodeProject.self,
-            ComputeChecksum.self,
-            ArchiveSource.self,
-            CompletionTool.self,
-        ],
+        subcommands: subCommands,
         helpNames: [.short, .long, .customLong("help", withSingleDash: true)])
 
     @OptionGroup()
     var swiftOptions: SwiftToolOptions
 
     public init() {}
+}
 
-    public static var _errorLabel: String { "error" }
+extension SwiftPackageTool {
+    // This way the feature flag can control if the new subcommads
+    // are visible
+    static var subCommands: [ParsableCommand.Type] {
+        get {
+            var commands: [ParsableCommand.Type] = [
+                Clean.self,
+                PurgeCache.self,
+                Reset.self,
+                Update.self,
+                Describe.self,
+                Init.self,
+                Format.self,
+                
+                APIDiff.self,
+                DumpSymbolGraph.self,
+                DumpPIF.self,
+                DumpPackage.self,
+                
+                Edit.self,
+                Unedit.self,
+                
+                Config.self,
+                Resolve.self,
+                Fetch.self,
+                
+                ShowDependencies.self,
+                ToolsVersionCommand.self,
+                GenerateXcodeProject.self,
+                ComputeChecksum.self,
+                ArchiveSource.self,
+                CompletionTool.self,
+            ]
+            
+            if InitPackage.createPackageMode == .new {
+                if let index = commands.firstIndex(where: { $0 == Init.self }) {
+                    commands.insert(Create.self, at: index + 1)
+                    commands.insert(AddTemplate.self, at: index + 2)
+                    commands.insert(UpdateTemplate.self, at: index + 3)
+                }
+            }
+            
+            return commands
+        }
+    }
 }
 
 extension DescribeMode: ExpressibleByArgument {}
@@ -189,7 +207,7 @@ extension SwiftPackageTool {
             describe(package, in: type, on: stdoutStream)
         }
     }
-
+    
     struct Init: SwiftCommand {
         public static let configuration = CommandConfiguration(
             abstract: "Initialize a new package")
@@ -198,23 +216,164 @@ extension SwiftPackageTool {
         var swiftOptions: SwiftToolOptions
         
         @Option(name: .customLong("type"), help: "Package type: empty | library | executable | system-module | manifest")
-        var initMode: InitPackage.PackageType = .library
+        var packageType: InitPackage.PackageType?
+        
+        @Option(help: "Create Package from template")
+        var template: String?
         
         @Option(name: .customLong("name"), help: "Provide custom package name")
         var packageName: String?
         
         func run(_ swiftTool: SwiftTool) throws {
             guard let cwd = localFileSystem.currentWorkingDirectory else {
-                throw InternalError("Could not find the current working directory")
+                throw InternalError("\(MakePackageErrors.currentWorkingDirectoryNotFound)")
             }
-
-            let packageName = self.packageName ?? cwd.basename
-            let initPackage = try InitPackage(
-                name: packageName, destinationPath: cwd, packageType: initMode)
+            
+            guard let configPath = try swiftTool.getConfigPath() else {
+                throw InternalError("\(MakePackageErrors.configPathNotFound)")
+            }
+            
+            guard packageType == nil || template == nil else {
+                throw MakePackageErrors.cannotUseTypeWithTemplate
+            }
+            
+            let initPackage = try InitPackage(fileSystem: localFileSystem,
+                                              configPath: configPath,
+                                              destinationPath: cwd,
+                                              mode: .initialize,
+                                              packageName: packageName ?? cwd.basename,
+                                              packageType: packageType,
+                                              packageTemplateName: template)
+            
             initPackage.progressReporter = { message in
                 print(message)
             }
-            try initPackage.writePackageStructure()
+            try initPackage.makePackage()
+        }
+    }
+
+    struct Create: SwiftCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Create a new package")
+
+        @OptionGroup(_hiddenFromHelp: true)
+        var swiftOptions: SwiftToolOptions
+        
+        @Option(name: .customLong("type"))
+        var packageType: InitPackage.PackageType?
+        
+        @Option(help: "Create Package from template")
+        var template: String?
+        
+        @Argument(help: "Package name")
+        var packageName: String
+
+        func run(_ swiftTool: SwiftTool) throws {
+            guard let cwd = localFileSystem.currentWorkingDirectory else {
+                throw InternalError("\(MakePackageErrors.currentWorkingDirectoryNotFound)")
+            }
+            
+            guard let configPath = try swiftTool.getConfigPath() else {
+                throw InternalError("\(MakePackageErrors.configPathNotFound)")
+            }
+            
+            guard packageType == nil || template == nil else {
+                throw MakePackageErrors.cannotUseTypeWithTemplate
+            }
+          
+            let initPackage = try InitPackage(fileSystem: localFileSystem,
+                                              configPath: configPath,
+                                              destinationPath: cwd.appending(component: packageName),
+                                              mode: .create,
+                                              packageName: packageName,
+                                              packageType: packageType,
+                                              packageTemplateName: template)
+            
+            initPackage.progressReporter = { message in
+                print(message)
+            }
+            try initPackage.makePackage()
+        }
+    }
+    
+    struct AddTemplate: SwiftCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Donwloads/moves a template into the default template directory")
+        
+        @OptionGroup(_hiddenFromHelp: true)
+        var swiftOptions: SwiftToolOptions
+        
+        @Argument(help: "URL to template (absolute path to template works too)")
+        var url: String
+        
+        @Option(help: "Custom template name")
+        var name: String?
+
+        func run(_ swiftTool: SwiftTool) throws {
+            guard let configPath = try swiftTool.getConfigPath() else {
+                throw InternalError("\(MakePackageErrors.configPathNotFound)")
+            }
+
+            let templatePath: AbsolutePath
+            if let path = try? AbsolutePath(validating: url) {
+                guard localFileSystem.exists(path) else {
+                    throw MakePackageErrors.templateNotFound(path)
+                }
+                
+                guard localFileSystem.isDirectory(path) else {
+                    throw StringError("\(path) is not a valid directory")
+                }
+                
+                templatePath = configPath.withTemplate(template: name ?? path.basename)
+                try localFileSystem.copy(from: path, to: templatePath)
+            } else {
+                let provider = GitRepositoryProvider()
+                
+                if let templateName = name {
+                    templatePath = configPath.withTemplate(template: templateName)
+                } else if let templateName = url.split(separator: "/").last?.replacingOccurrences(of: ".git", with: "").flatMap({ String($0) }) {
+                    templatePath = configPath.withTemplate(template: String(templateName))
+                } else {
+                    throw InternalError("Could not determine template name")
+                }
+                
+                try provider.fetch(repository: RepositorySpecifier(url: url), to: templatePath, mirror: false)
+            }
+            
+            guard localFileSystem.exists(templatePath.appending(component: "Package.swift")) else {
+                try localFileSystem.removeFileTree(templatePath)
+                throw StringError("\(templatePath) is not a valid template directory, missing 'Package.swift'")
+            }
+        }
+    }
+    
+    struct UpdateTemplate: SwiftCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Update template from remote")
+        
+        @OptionGroup(_hiddenFromHelp: true)
+        var swiftOptions: SwiftToolOptions
+        
+        @Argument(help: "Template to update")
+        var templateName: String
+        
+        func run(_ swiftTool: SwiftTool) throws {
+            guard let configPath = try swiftTool.getConfigPath() else {
+                throw InternalError("\(MakePackageErrors.configPathNotFound)")
+            }
+            
+            guard localFileSystem.exists(configPath.withTemplate(template: templateName)) else {
+                throw MakePackageErrors.templateNotFound(configPath.withTemplate(template: templateName))
+            }
+            
+            let provider = GitRepositoryProvider()
+            let templatePath = configPath.withTemplate(template: templateName)
+            
+            guard provider.isValidDirectory(templatePath.pathString) else {
+                throw StringError("Template: \(templateName) is not a git repo, and therefore could not be updated")
+            }
+            
+            try provider.pull(templatePath.pathString)
         }
     }
     
@@ -748,6 +907,26 @@ extension SwiftPackageTool {
             }
 
             stdoutStream.flush()
+        }
+    }
+}
+
+private enum MakePackageErrors: Swift.Error, CustomStringConvertible {
+    case currentWorkingDirectoryNotFound
+    case configPathNotFound
+    case templateNotFound(AbsolutePath)
+    case cannotUseTypeWithTemplate
+    
+    var description: String {
+        switch self {
+        case .currentWorkingDirectoryNotFound:
+            return "Could not find the current working directory."
+        case .configPathNotFound:
+            return "Could not find the config path."
+        case .templateNotFound(let path):
+            return "Could not find template: \(path)."
+        case .cannotUseTypeWithTemplate:
+            return "When using templates the package's type is derived from the template."
         }
     }
 }

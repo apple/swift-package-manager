@@ -63,18 +63,26 @@ public struct GitRepositoryProvider: RepositoryProvider {
     }
 
     @discardableResult
-    private func callGit(_ args: String...,
+    private func callGit(arguments: [String],
                          environment: [String: String] = Git.environment,
                          repository: RepositorySpecifier,
                          failureMessage: String = "") throws -> String {
         do {
-            return try self.git.run(args, environment: environment)
+            return try self.git.run(arguments, environment: environment)
         } catch let error as GitShellError {
             throw GitCloneError(repository: repository, message: failureMessage, result: error.result)
         }
     }
+    
+    @discardableResult
+    private func callGit(_ arguments: String...,
+                         environment: [String: String] = Git.environment,
+                         repository: RepositorySpecifier,
+                         failureMessage: String = "") throws -> String {
+        try self.callGit(arguments: arguments, environment: environment, repository: repository, failureMessage: failureMessage)
+    }
 
-    public func fetch(repository: RepositorySpecifier, to path: AbsolutePath) throws {
+    public func fetch(repository: RepositorySpecifier, to path: AbsolutePath, mirror: Bool) throws {
         // Perform a bare clone.
         //
         // NOTE: We intentionally do not create a shallow clone here; the
@@ -85,9 +93,22 @@ public struct GitRepositoryProvider: RepositoryProvider {
         // FIXME: Ideally we should pass `--progress` here and report status regularly.  We currently don't have callbacks for that.
         //
         // NOTE: Explicitly set `core.symlinks=true` on `git clone` to ensure that symbolic links are correctly resolved.
-        try self.callGit("clone", "-c", "core.symlinks=true", "--mirror", repository.url, path.pathString,
+        var args = ["clone", "-c", "core.symlinks=true"]
+        if mirror {
+            args.append("--mirror")
+        }
+        args += [repository.url, path.pathString]
+        try self.callGit(arguments: args,
                          repository: repository,
                          failureMessage: "Failed to clone repository \(repository.url)")
+    }
+    
+    public func fetch(repository: RepositorySpecifier, to path: AbsolutePath) throws {
+        try self.fetch(repository: repository, to: path, mirror: true)
+    }
+    
+    public func pull(_ directory: String) throws {
+        try self.callGit("-C", directory, "pull", "--ff-only", repository: RepositorySpecifier(url: directory))
     }
     
     public func isValidDirectory(_ directory: String) -> Bool {

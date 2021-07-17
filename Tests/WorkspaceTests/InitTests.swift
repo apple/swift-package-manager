@@ -19,19 +19,28 @@ class InitTests: XCTestCase {
     // MARK: TSCBasic package creation for each package type.
     
     func testInitPackageEmpty() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
+            let configPath = path.appending(components: "templates", "new-package")
             let name = path.basename
             try fs.createDirectory(path)
             
             // Create the package
-            let initPackage = try InitPackage(name: name, destinationPath: path, packageType: InitPackage.PackageType.empty)
+            let initPackage = try InitPackage(fileSystem: fs,
+                                              configPath: configPath,
+                                              destinationPath: path,
+                                              mode: .initialize,
+                                              packageName: name,
+                                              packageType: .empty,
+                                              packageTemplateName: nil)
+            
             var progressMessages = [String]()
             initPackage.progressReporter = { message in
                 progressMessages.append(message)
             }
-            try initPackage.writePackageStructure()
+            try initPackage.makePackage()
 
             // Not picky about the specific progress messages, just checking that we got some.
             XCTAssert(progressMessages.count > 0)
@@ -51,19 +60,28 @@ class InitTests: XCTestCase {
     }
     
     func testInitPackageExecutable() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
+            let configPath = path.appending(components: "templates", "new-package")
             let name = path.basename
             try fs.createDirectory(path)
 
             // Create the package
-            let initPackage = try InitPackage(name: name, destinationPath: path, packageType: InitPackage.PackageType.executable)
+            let initPackage = try InitPackage(fileSystem: fs,
+                                              configPath: configPath,
+                                              destinationPath: path,
+                                              mode: .initialize,
+                                              packageName: name,
+                                              packageType: .executable,
+                                              packageTemplateName: nil)
+            
             var progressMessages = [String]()
             initPackage.progressReporter = { message in
                 progressMessages.append(message)
             }
-            try initPackage.writePackageStructure()
+            try initPackage.makePackage()
 
             // Not picky about the specific progress messages, just checking that we got some.
             XCTAssert(progressMessages.count > 0)
@@ -99,19 +117,28 @@ class InitTests: XCTestCase {
     }
 
     func testInitPackageLibrary() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
+            let configPath = path.appending(components: "templates", "new-package")
             let name = path.basename
             try fs.createDirectory(path)
 
             // Create the package
-            let initPackage = try InitPackage(name: name, destinationPath: path, packageType: InitPackage.PackageType.library)
+            let initPackage = try InitPackage(fileSystem: fs,
+                                              configPath: configPath,
+                                              destinationPath: path,
+                                              mode: .initialize,
+                                              packageName: name,
+                                              packageType: .library,
+                                              packageTemplateName: nil)
+            
             var progressMessages = [String]()
             initPackage.progressReporter = { message in
                 progressMessages.append(message)
             }
-            try initPackage.writePackageStructure()
+            try initPackage.makePackage()
 
             // Not picky about the specific progress messages, just checking that we got some.
             XCTAssert(progressMessages.count > 0)
@@ -155,16 +182,24 @@ class InitTests: XCTestCase {
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
+            let configPath = path.appending(components: "templates", "new-package")
             let name = path.basename
             try fs.createDirectory(path)
             
             // Create the package
-            let initPackage = try InitPackage(name: name, destinationPath: path, packageType: InitPackage.PackageType.systemModule)
+            let initPackage = try InitPackage(fileSystem: fs,
+                                              configPath: configPath,
+                                              destinationPath: path,
+                                              mode: .initialize,
+                                              packageName: name,
+                                              packageType: .systemModule,
+                                              packageTemplateName: nil)
+            
             var progressMessages = [String]()
             initPackage.progressReporter = { message in
                 progressMessages.append(message)
             }
-            try initPackage.writePackageStructure()
+            try initPackage.makePackage()
             
             // Not picky about the specific progress messages, just checking that we got some.
             XCTAssert(progressMessages.count > 0)
@@ -186,16 +221,24 @@ class InitTests: XCTestCase {
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
+            let configPath = path.appending(components: "templates", "new-package")
             let name = path.basename
             try fs.createDirectory(path)
 
             // Create the package
-            let initPackage = try InitPackage(name: name, destinationPath: path, packageType: InitPackage.PackageType.manifest)
+            let initPackage = try InitPackage(fileSystem: fs,
+                                              configPath: configPath,
+                                              destinationPath: path,
+                                              mode: .initialize,
+                                              packageName: name,
+                                              packageType: .manifest,
+                                              packageTemplateName: nil)
+            
             var progressMessages = [String]()
             initPackage.progressReporter = { message in
                 progressMessages.append(message)
             }
-            try initPackage.writePackageStructure()
+            try initPackage.makePackage()
 
             // Not picky about the specific progress messages, just checking that we got some.
             XCTAssert(progressMessages.count > 0)
@@ -223,9 +266,16 @@ class InitTests: XCTestCase {
             XCTAssertTrue(localFileSystem.isDirectory(packageRoot))
             
             // Create the package
-            let initPackage = try InitPackage(name: packageName, destinationPath: packageRoot, packageType: InitPackage.PackageType.library)
-            initPackage.progressReporter = { message in }
-            try initPackage.writePackageStructure()
+            let initPackage = try InitPackage(fileSystem: localFileSystem,
+                                              configPath: tempDirPath.appending(components: "templates", "new-package"),
+                                              destinationPath: packageRoot,
+                                              mode: .initialize,
+                                              packageName: packageName,
+                                              packageType: .library,
+                                              packageTemplateName: nil)
+            
+            initPackage.progressReporter = { _ in }
+            try initPackage.makePackage()
 
             // Try building it.
             XCTAssertBuilds(packageRoot)
@@ -246,41 +296,20 @@ class InitTests: XCTestCase {
             XCTAssertTrue(localFileSystem.isDirectory(packageRoot))
             
             // Create package with non c99name.
-            let initPackage = try InitPackage(name: "package-name", destinationPath: packageRoot, packageType: InitPackage.PackageType.executable)
-            try initPackage.writePackageStructure()
+            let initPackage = try InitPackage(fileSystem: localFileSystem,
+                                              configPath: tempDirPath.appending(components: "templates", "new-package"),
+                                              destinationPath: tempDirPath,
+                                              mode: .initialize,
+                                              packageName: packageRoot.basename,
+                                              packageType: .executable,
+                                              packageTemplateName: nil)
+            try initPackage.makePackage()
             
             #if os(macOS)
               XCTAssertSwiftTest(packageRoot)
             #else
               XCTAssertBuilds(packageRoot)
             #endif
-        }
-    }
-
-    func testPlatforms() throws {
-        try withTemporaryDirectory(removeTreeOnDeinit: true) { tempDirPath in
-            var options = InitPackage.InitPackageOptions(packageType: .library)
-            options.platforms = [
-                .init(platform: .macOS, version: PlatformVersion("10.15")),
-                .init(platform: .iOS, version: PlatformVersion("12")),
-                .init(platform: .watchOS, version: PlatformVersion("2.1")),
-                .init(platform: .tvOS, version: PlatformVersion("999")),
-            ]
-
-            let packageRoot = tempDirPath.appending(component: "Foo")
-            try localFileSystem.removeFileTree(packageRoot)
-            try localFileSystem.createDirectory(packageRoot)
-
-            let initPackage = try InitPackage(
-                name: "Foo",
-                destinationPath: packageRoot,
-                options: options
-            )
-            try initPackage.writePackageStructure()
-
-            let contents = try localFileSystem.readFileContents(packageRoot.appending(component: "Package.swift")).cString
-            let expectedString = #"platforms: [.macOS(.v10_15), .iOS(.v12), .watchOS("2.1"), .tvOS("999.0")],"#
-            XCTAssert(contents.contains(expectedString), contents)
         }
     }
 

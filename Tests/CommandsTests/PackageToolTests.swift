@@ -507,6 +507,7 @@ final class PackageToolTests: XCTestCase {
     }
 
     func testInitEmpty() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
@@ -520,6 +521,7 @@ final class PackageToolTests: XCTestCase {
     }
 
     func testInitExecutable() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
@@ -541,6 +543,7 @@ final class PackageToolTests: XCTestCase {
     }
 
     func testInitLibrary() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
@@ -556,6 +559,7 @@ final class PackageToolTests: XCTestCase {
     }
 
     func testInitCustomNameExecutable() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .new)
         try testWithTemporaryDirectory { tmpPath in
             let fs = localFileSystem
             let path = tmpPath.appending(component: "Foo")
@@ -574,6 +578,43 @@ final class PackageToolTests: XCTestCase {
                 try fs.getDirectoryContents(path.appending(component: "Tests")).sorted(),
                 ["CustomNameTests"])
         }
+    }
+    
+    func testCreate() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .legacy)
+        try testWithTemporaryDirectory { tmpPath in
+            let fs = localFileSystem
+            let path = tmpPath.appending(component: "MyExe")
+            
+            // Here --config-path is used to avoid a situation where the 'default' template
+            // is present
+            _ = try execute(["create", "MyExe", "--config-path", tmpPath.pathString], packagePath: tmpPath)
+            
+            XCTAssert(fs.exists(path.appending(component: "Package.swift")))
+            XCTAssertEqual(try fs.getDirectoryContents(path.appending(component: "Sources")), ["main.swift"])
+        }
+    }
+    
+    func testCreateLibrary() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .legacy)
+        try testWithTemporaryDirectory { tmpPath in
+            let fs = localFileSystem
+            let path = tmpPath.appending(component: "MyLib")
+            
+            // Here --config-path is used to avoid a situation where the 'default' template
+            // is present
+            _ = try execute(["create", "MyLib", "--type", "library", "--config-path", tmpPath.pathString], packagePath: tmpPath)
+            
+            XCTAssert(fs.exists(path.appending(component: "Package.swift")))
+            XCTAssertEqual(try fs.getDirectoryContents(path.appending(component: "Sources")), ["MyLib.swift"])
+        }
+    }
+    
+    func testCreateNoNameArgument() throws {
+        try XCTSkipIf(InitPackage.createPackageMode == .legacy)
+        let result = try SwiftPMProduct.SwiftPackage.executeProcess(["create"])
+        let stderrOutput = try result.utf8stderrOutput()
+        XCTAssert(stderrOutput.contains("Error: Missing expected argument '<package-name>'"), #"actual: "\#(stderrOutput)""#)
     }
 
     func testPackageEditAndUnedit() {
@@ -975,7 +1016,7 @@ final class PackageToolTests: XCTestCase {
                 try execute(["config", "get-mirror", "--original-url", "git@github.com:apple/swift-package-manager.git"], packagePath: packageRoot)
             }
 
-            check(stderr: "error: mirror not found\n") {
+            check(stderr: "Error: mirror not found\n") {
                 try execute(["config", "unset-mirror", "--original-url", "foo"], packagePath: packageRoot)
             }
         }
@@ -1062,7 +1103,7 @@ final class PackageToolTests: XCTestCase {
                 XCTAssertEqual(result.exitStatus, .terminated(code: 1))
 
                 let stderrOutput = try result.utf8stderrOutput()
-                XCTAssert(stderrOutput.contains("error: root manifest not found"), #"actual: "\#(stderrOutput)""#)
+                XCTAssert(stderrOutput.contains("Error: root manifest not found"), #"actual: "\#(stderrOutput)""#)
             }
 
             // Runnning with output as absolute path to existing directory
@@ -1073,7 +1114,7 @@ final class PackageToolTests: XCTestCase {
 
                 let stderrOutput = try result.utf8stderrOutput()
                 XCTAssert(
-                    stderrOutput.contains("error: Couldn’t create an archive:") &&
+                    stderrOutput.contains("Error: Couldn’t create an archive:") &&
                         stderrOutput.contains("fatal: could not create archive file '/': Is a directory"),
                     #"actual: "\#(stderrOutput)""#
                 )

@@ -17,25 +17,6 @@ public final class InitPackage {
     /// The tool version to be used for new packages.
     public static let newPackageToolsVersion = ToolsVersion.currentToolsVersion
 
-    /// Options for the template package.
-    public struct InitPackageOptions {
-        /// The type of package to create.
-        public var packageType: PackageType
-
-        /// The list of platforms in the manifest.
-        ///
-        /// Note: This should only contain Apple platforms right now.
-        public var platforms: [SupportedPlatform]
-
-        public init(
-            packageType: PackageType,
-            platforms: [SupportedPlatform] = []
-        ) {
-            self.packageType = packageType
-            self.platforms = platforms
-        }
-    }
-
     /// Represents a package type for the purposes of initialization.
     public enum PackageType: String, CustomStringConvertible {
         case empty = "empty"
@@ -49,72 +30,221 @@ public final class InitPackage {
             return rawValue
         }
     }
+    
+    public struct PackageTemplate {
+        let sourcesDirectory: RelativePath
+        let testsDirectory: RelativePath?
+        let createSubDirectoryForModule: Bool
+        let packageType: PackageType
+        
+        public init(sourcesDirectory: RelativePath,
+                    testsDirectory: RelativePath?,
+                    createSubDirectoryForModule: Bool,
+                    packageType: InitPackage.PackageType) {
+            self.sourcesDirectory = sourcesDirectory
+            self.testsDirectory = testsDirectory
+            self.createSubDirectoryForModule = createSubDirectoryForModule
+            self.packageType = packageType
+        }
+    }
+    
+    public enum MakePackageMode {
+        case `initialize`
+        case create
+    }
 
     /// A block that will be called to report progress during package creation
     public var progressReporter: ((String) -> Void)?
 
     /// Where to create the new package
     let destinationPath: AbsolutePath
-
-    /// The type of package to create.
-    var packageType: PackageType { options.packageType }
-
-    /// The options for package to create.
-    let options: InitPackageOptions
-
-    /// The name of the package to create.
-    let pkgname: String
-
-    /// The name of the target to create.
-    var moduleName: String
-
-    /// The name of the type to create (within the package).
-    var typeName: String {
-        return moduleName
+    
+    /// Filesystem used for writing and or copying the package structure
+    let fileSystem: FileSystem
+    
+    /// Configuration path for templates
+    let configPath: AbsolutePath
+    
+    /// Name for the package
+    let packageName: String
+    
+    /// If being called from `init` or `create`
+    let mode: MakePackageMode
+    
+    /// Type of package
+    let packageType: InitPackage.PackageType
+    
+    /// Name of the template to create the new package from
+    let packageTemplateName: String?
+    
+    let suppliedPackageType: Bool
+    
+    private var moduleName: String {
+        get {
+            packageName.spm_mangledToC99ExtendedIdentifier()
+        }
+    }
+    
+    private var typeName: String {
+        get {
+            moduleName
+        }
     }
 
     /// Create an instance that can create a package with given arguments.
-    public convenience init(
-        name: String,
-        destinationPath: AbsolutePath,
-        packageType: PackageType
+    public init(fileSystem: FileSystem,
+                configPath: AbsolutePath,
+                destinationPath: AbsolutePath,
+                mode: MakePackageMode,
+                packageName: String,
+                packageType: InitPackage.PackageType?,
+                packageTemplateName: String?
     ) throws {
-        try self.init(
-            name: name,
-            destinationPath: destinationPath,
-            options: InitPackageOptions(packageType: packageType)
-        )
-    }
-
-    /// Create an instance that can create a package with given arguments.
-    public init(
-        name: String,
-        destinationPath: AbsolutePath,
-        options: InitPackageOptions
-    ) throws {
-        self.options = options
+        self.fileSystem = fileSystem
+        self.configPath = configPath
         self.destinationPath = destinationPath
-        self.pkgname = name
-        self.moduleName = name.spm_mangledToC99ExtendedIdentifier()
+        self.mode = mode
+        self.packageName = packageName
+        
+        // These are only needed in the event that --type was not used when creating a package
+        // otherwise if --type is used packageType will not be nill
+        switch (packageType, mode){
+        case (.some(let type), _):
+            self.packageType = type
+            self.suppliedPackageType = true
+        case (.none, .initialize):
+            self.packageType = .library
+            self.suppliedPackageType = false
+        case (.none, .create):
+            self.packageType = .executable
+            self.suppliedPackageType = false
+        }
+    
+        self.packageTemplateName = packageTemplateName
     }
 
+    public func makePackage() throws {
+        switch Self.createPackageMode {
+        case .new:
+            try makePackageNew()
+        case .legacy:
+            try makePackageLegacy()
+        }
+    }
+    
+    private func makePackageNew() throws {
+        var templateName: String?
+        
+        if let template = packageTemplateName {
+            guard fileSystem.exists(configPath.withTemplate(template: template)) else {
+                throw InternalError("Could not find template folder: \(configPath.withTemplate(template: template))")
+            }
+            
+            templateName = template
+        } else {
+            // Checking if a default template is present
+            if fileSystem.exists(configPath.withTemplate(template: "default")) {
+                templateName = "default"
+                // There is a guard preventing '--type' to be used in conjunction with '--template'
+                // In the event that the defualt template is present and '--type' was used we'll infrom
+                // the user that the package type is coming from the template and not their supplied type.
+                guard !suppliedPackageType else {
+                    throw StringError("Can't use '--type' when the 'default' template is defined")
+                }
+            }
+        }
+        
+        if let template = templateName {
+            try fileSystem.getDirectoryContents(configPath.withTemplate(template: template)).forEach {
+                progressReporter?("Copying \($0)")
+                try copyTemplate(fileSystem: fileSystem,
+                                 sourcePath: configPath.withTemplate(template: template).appending(component: $0),
+                                 destinationPath: destinationPath,
+                                 name: packageName)
+            }
+        } else {
+            let packageTemplate = PackageTemplate(sourcesDirectory: RelativePath("./Sources"),
+                                                  testsDirectory: nil,
+                                                  createSubDirectoryForModule: false,
+                                                  packageType: packageType)
+           
+            try writePackageStructure(template: packageTemplate)
+        }
+    }
+    
+    private func makePackageLegacy() throws {
+        let template = PackageTemplate(sourcesDirectory: RelativePath("./Sources"),
+                                       testsDirectory: RelativePath("./Tests"),
+                                       createSubDirectoryForModule: true,
+                                       packageType: packageType)
+        
+        try writePackageStructure(template: template)
+    }
+
+    private func copyTemplate(fileSystem: FileSystem, sourcePath: AbsolutePath, destinationPath: AbsolutePath, name: String) throws {
+        // Recursively copy the template package
+        // Currently only replaces the string literal "___NAME___", and "___NAME_AS_C99___"
+        let replaceName = "___NAME___"
+        let replaceNameC99 = "___NAME_AS_C99___"
+        
+        if fileSystem.isDirectory(sourcePath) {
+            if let dirName = sourcePath.pathString.split(separator: "/").last {
+                
+                let newDirName = dirName.replacingOccurrences(of: replaceName, with: packageName)
+                if !fileSystem.exists(destinationPath.appending(component: newDirName)) {
+                    try fileSystem.createDirectory(destinationPath.appending(component: newDirName))
+                }
+                
+                try fileSystem.getDirectoryContents(sourcePath).forEach {
+                    try copyTemplate(fileSystem: fileSystem,
+                                     sourcePath: sourcePath.appending(component: $0),
+                                     destinationPath: destinationPath.appending(components: newDirName),
+                                     name: name)
+                }
+            }
+        } else {
+            let fileContents = try fileSystem.readFileContents(sourcePath)
+            
+            if let validDescription = fileContents.validDescription {
+                if let fileName = sourcePath.pathString.split(separator: "/").last {
+                    
+                    let newFileName = fileName.replacingOccurrences(of: replaceName, with: packageName)
+                    if !fileSystem.exists(destinationPath.appending(component: newFileName)) {
+                        var renamed = validDescription.replacingOccurrences(of: replaceName, with: name)
+                        renamed = renamed.replacingOccurrences(of: replaceNameC99, with: name.spm_mangledToC99ExtendedIdentifier())
+                        
+                        try fileSystem.writeFileContents(destinationPath.appending(component: newFileName)) { $0 <<< renamed }
+                    }
+                }
+            } else {
+                // This else takes care of things such as images
+                if let fileName = sourcePath.pathString.split(separator: "/").last {
+                    let newFileName = fileName.replacingOccurrences(of: replaceName, with: packageName)
+                    if !fileSystem.exists(destinationPath.appending(component: newFileName)) {
+                        try fileSystem.copy(from: sourcePath, to: destinationPath.appending(component: newFileName))
+                    }
+                }
+            }
+        }
+    }
+    
     /// Actually creates the new package at the destinationPath
-    public func writePackageStructure() throws {
-        progressReporter?("Creating \(packageType) package: \(pkgname)")
+    private func writePackageStructure(template: PackageTemplate) throws {
+        progressReporter?("Creating \(template.packageType) package: \(packageName)")
 
         // FIXME: We should form everything we want to write, then validate that
         // none of it exists, and then act.
-        try writeManifestFile()
+        try writeManifestFile(template: template)
 
-        if packageType == .manifest {
+        if template.packageType == .manifest {
             return
         }
 
-        try writeREADMEFile()
         try writeGitIgnore()
-        try writeSources()
-        try writeModuleMap()
-        try writeTests()
+        try writeREADMEFile()
+        try writeSources(template: template)
+        try writeModuleMap(template: template)
+        try writeTests(template: template)
     }
 
     private func writePackageFile(_ path: AbsolutePath, body: (OutputByteStream) -> Void) throws {
@@ -122,7 +252,7 @@ public final class InitPackage {
         try localFileSystem.writeFileContents(path, body: body)
     }
 
-    private func writeManifestFile() throws {
+    private func writeManifestFile(template: PackageTemplate) throws {
         let manifest = destinationPath.appending(component: Manifest.filename)
         guard localFileSystem.exists(manifest) == false else {
             throw InitError.manifestAlreadyExists
@@ -140,41 +270,16 @@ public final class InitPackage {
 
             var pkgParams = [String]()
             pkgParams.append("""
-                    name: "\(pkgname)"
+                    name: "\(packageName)"
                 """)
 
-            var platformsParams = [String]()
-            for supportedPlatform in options.platforms {
-                let version = supportedPlatform.version
-                let platform = supportedPlatform.platform
-
-                var param = ".\(platform.manifestName)("
-                if supportedPlatform.isManifestAPIAvailable {
-                    if version.minor > 0 {
-                        param += ".v\(version.major)_\(version.minor)"
-                    } else {
-                        param += ".v\(version.major)"
-                    }
-                } else {
-                    param += "\"\(version.versionString)\""
-                }
-                param += ")"
-
-                platformsParams.append(param)
-            }
-            if !options.platforms.isEmpty {
-                pkgParams.append("""
-                        platforms: [\(platformsParams.joined(separator: ", "))]
-                    """)
-            }
-
-            if packageType == .library || packageType == .manifest {
+            if template.packageType == .library || template.packageType == .manifest {
                 pkgParams.append("""
                     products: [
                         // Products define the executables and libraries a package produces, and make them visible to other packages.
                         .library(
-                            name: "\(pkgname)",
-                            targets: ["\(pkgname)"]),
+                            name: "\(packageName)",
+                            targets: ["\(packageName)"]),
                     ]
                 """)
             }
@@ -186,7 +291,7 @@ public final class InitPackage {
                     ]
                 """)
 
-            if packageType == .library || packageType == .executable || packageType == .manifest {
+            if template.packageType == .library || template.packageType == .executable || template.packageType == .manifest {
                 var param = ""
 
                 param += """
@@ -195,7 +300,7 @@ public final class InitPackage {
                         // Targets can depend on other targets in this package, and on products in packages this package depends on.
 
                 """
-                if packageType == .executable {
+                if template.packageType == .executable {
                     param += """
                             .executableTarget(
                     """
@@ -204,15 +309,31 @@ public final class InitPackage {
                             .target(
                     """
                 }
+                
+                let targetPath = template.createSubDirectoryForModule ? template.sourcesDirectory.appending(component: packageName) : template.sourcesDirectory
                 param += """
 
-                            name: "\(pkgname)",
-                            dependencies: []),
-                        .testTarget(
-                            name: "\(pkgname)Tests",
-                            dependencies: ["\(pkgname)"]),
-                    ]
+                            name: "\(packageName)",
+                            dependencies: [],
+                            path: "\(targetPath)"),
                 """
+                
+                if let testsDir = template.testsDirectory {
+                    let testPath = template.createSubDirectoryForModule ? testsDir.appending(component: "\(packageName)Tests") : testsDir
+                    param += """
+                    
+                            .testTarget(
+                                name: "\(packageName)Tests",
+                                dependencies: ["\(packageName)"],
+                                path: "\(testPath)"),
+                        ]
+                    """
+                } else {
+                    param += """
+                    
+                        ]
+                    """
+                }
 
                 pkgParams.append(param)
             }
@@ -229,19 +350,18 @@ public final class InitPackage {
         try rewriteToolsVersionSpecification(
             toDefaultManifestIn: manifest.parentDirectory, specifying: version, fileSystem: localFileSystem)
     }
-
+    
     private func writeREADMEFile() throws {
         let readme = destinationPath.appending(component: "README.md")
-        guard localFileSystem.exists(readme) == false else {
+        guard !localFileSystem.exists(readme) else {
             return
         }
 
         try writePackageFile(readme) { stream in
             stream <<< """
-                # \(pkgname)
+                # \(packageName)
 
                 A description of this package.
-
                 """
         }
     }
@@ -262,35 +382,41 @@ public final class InitPackage {
                 DerivedData/
                 .swiftpm/config/registries.json
                 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-                .netrc
 
                 """
         }
     }
-
-    private func writeSources() throws {
-        if packageType == .systemModule || packageType == .manifest {
+    
+    private func writeSources(template: PackageTemplate) throws {
+        if template.packageType == .systemModule || template.packageType == .manifest {
             return
         }
-        let sources = destinationPath.appending(component: "Sources")
+        
+        let sources = destinationPath.appending(template.sourcesDirectory)
         guard localFileSystem.exists(sources) == false else {
             return
         }
+        
         progressReporter?("Creating \(sources.relative(to: destinationPath))/")
         try makeDirectories(sources)
 
-        if packageType == .empty {
+        if template.packageType == .empty {
             return
         }
         
-        let moduleDir = sources.appending(component: "\(pkgname)")
-        try makeDirectories(moduleDir)
+        let moduleDir: AbsolutePath
+        if template.createSubDirectoryForModule {
+            moduleDir = sources.appending(component: "\(packageName)")
+            try makeDirectories(moduleDir)
+        } else {
+            moduleDir = sources
+        }
         
-        let sourceFileName = (packageType == .executable) ? "main.swift" : "\(typeName).swift"
+        let sourceFileName = template.packageType == .executable ? "main.swift" : "\(typeName).swift"
         let sourceFile = moduleDir.appending(RelativePath(sourceFileName))
 
         let content: String
-        switch packageType {
+        switch template.packageType {
         case .library:
             content = """
                 public struct \(typeName) {
@@ -307,7 +433,7 @@ public final class InitPackage {
 
                 """
         case .systemModule, .empty, .manifest, .`extension`:
-            throw InternalError("invalid packageType \(packageType)")
+            throw InternalError("invalid packageType \(template.packageType)")
         }
 
         try writePackageFile(sourceFile) { stream in
@@ -315,15 +441,16 @@ public final class InitPackage {
         }
     }
 
-    private func writeModuleMap() throws {
-        if packageType != .systemModule {
+    private func writeModuleMap(template: PackageTemplate) throws {
+        if template.packageType != .systemModule {
             return
         }
+        
         let modulemap = destinationPath.appending(component: "module.modulemap")
         guard localFileSystem.exists(modulemap) == false else {
             return
         }
-
+        
         try writePackageFile(modulemap) { stream in
             stream <<< """
                 module \(moduleName) [system] {
@@ -336,21 +463,25 @@ public final class InitPackage {
         }
     }
 
-    private func writeTests() throws {
-        if packageType == .systemModule {
+    private func writeTests(template: PackageTemplate) throws {
+        if template.packageType == .systemModule {
             return
         }
-        let tests = destinationPath.appending(component: "Tests")
-        guard localFileSystem.exists(tests) == false else {
-            return
-        }
-        progressReporter?("Creating \(tests.relative(to: destinationPath))/")
-        try makeDirectories(tests)
+        
+        if let testDir = template.testsDirectory {
+            let tests = destinationPath.appending(testDir)
+            guard localFileSystem.exists(tests) == false else {
+                return
+            }
+            
+            progressReporter?("Creating \(tests.relative(to: destinationPath))/")
+            try makeDirectories(tests)
 
-        switch packageType {
-        case .systemModule, .empty, .manifest, .`extension`: break
-        case .library, .executable:
-            try writeTestFileStubs(testsPath: tests)
+            switch template.packageType {
+            case .systemModule, .empty, .manifest, .`extension`: break
+            case .library, .executable:
+                try writeTestFileStubs(template: template, testsPath: tests)
+            }
         }
     }
 
@@ -393,7 +524,7 @@ public final class InitPackage {
                         // Mac Catalyst won't have `Process`, but it is supported for executables.
                         #if !targetEnvironment(macCatalyst)
 
-                        let fooBinary = productsDirectory.appendingPathComponent("\(pkgname)")
+                        let fooBinary = productsDirectory.appendingPathComponent("\(packageName)")
 
                         let process = Process()
                         process.executableURL = fooBinary
@@ -428,19 +559,42 @@ public final class InitPackage {
         }
     }
 
-    private func writeTestFileStubs(testsPath: AbsolutePath) throws {
-        let testModule = testsPath.appending(RelativePath(pkgname + Target.testModuleNameSuffix))
+    private func writeTestFileStubs(template: PackageTemplate, testsPath: AbsolutePath) throws {
+        let testModule = testsPath.appending(RelativePath(packageName + Target.testModuleNameSuffix))
         progressReporter?("Creating \(testModule.relative(to: destinationPath))/")
         try makeDirectories(testModule)
 
         let testClassFile = testModule.appending(RelativePath("\(moduleName)Tests.swift"))
-        switch packageType {
+        switch template.packageType {
         case .systemModule, .empty, .manifest, .`extension`: break
         case .library:
             try writeLibraryTestsFile(testClassFile)
         case .executable:
             try writeExecutableTestsFile(testClassFile)
         }
+    }
+    
+    // TEMP 
+    public enum Mode {
+        case new
+        case legacy
+    }
+    
+    public static var createPackageMode: Mode {
+        get {
+            switch (ProcessEnv.vars["SWIFTPM_ENABLE_PACKAGE_CREATE"].map { $0.lowercased() }) {
+            case "true":
+                return .new
+            default:
+                return .legacy
+            }
+        }
+    }
+}
+
+extension AbsolutePath {
+    public func withTemplate(template: String) -> AbsolutePath {
+        return appending(components: "templates", "new-package", template)
     }
 }
 

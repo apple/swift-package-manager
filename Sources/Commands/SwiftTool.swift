@@ -522,7 +522,7 @@ public class SwiftTool {
         }
     }
 
-    private func getConfigPath(fileSystem: FileSystem = localFileSystem) throws -> AbsolutePath? {
+    func getConfigPath(fileSystem: FileSystem = localFileSystem) throws -> AbsolutePath? {
         if let explicitConfigPath = options.configPath {
             // Create the explicit config path if necessary
             if !fileSystem.exists(explicitConfigPath) {
