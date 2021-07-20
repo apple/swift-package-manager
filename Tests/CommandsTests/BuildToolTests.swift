@@ -72,6 +72,34 @@ final class BuildToolTests: XCTestCase {
         }
     }
 
+    func testImportOfMissedDepWarning() throws {
+        #if swift(<5.5)
+        try XCTSkipIf(true, "skipping because host compiler doesn't support '-import-prescan'")
+        #endif
+        fixture(name: "Miscellaneous/ImportOfMissingDependency") { path in
+            let fullPath = resolveSymlinks(path)
+            XCTAssertThrowsError(try build([], packagePath: fullPath)) { error in
+                guard case SwiftPMProductError.executionFailure(_, _, let stderr) = error else {
+                    XCTFail()
+                    return
+                }
+                XCTAssertTrue(stderr.contains("warning: Target A imports another target (B) in the package without declaring it a dependency."))
+            }
+        }
+
+        // Verify that the disable toggle works as expected
+        fixture(name: "Miscellaneous/ImportOfMissingDependency") { path in
+            let fullPath = resolveSymlinks(path)
+            XCTAssertThrowsError(try build(["--disable-explicit-target-dependency-import-checking"], packagePath: fullPath)) { error in
+                guard case SwiftPMProductError.executionFailure(_, _, let stderr) = error else {
+                    XCTFail()
+                    return
+                }
+                XCTAssertFalse(stderr.contains("warning: Target A imports another target (B) in the package without declaring it a dependency."))
+            }
+        }
+    }
+
     func testBinPathAndSymlink() throws {
         fixture(name: "ValidLayouts/SingleModule/ExecutableNew") { path in
             let fullPath = resolveSymlinks(path)

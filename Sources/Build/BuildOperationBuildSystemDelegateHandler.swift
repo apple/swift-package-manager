@@ -82,7 +82,6 @@ final class TestDiscoveryCommand: CustomLLBuildCommand {
             let className = iterator.key
             stream <<< indent(8) <<< "testCase(\(className).__allTests__\(className)),\n"
         }
-
         stream <<< """
             ]
         }
@@ -192,6 +191,7 @@ private final class InProcessTool: Tool {
 public struct BuildDescription: Codable {
     public typealias CommandName = String
     public typealias TargetName = String
+    public typealias CommandLineFlag = String
 
     /// The Swift compiler invocation targets.
     let swiftCommands: [BuildManifest.CmdName : SwiftCompilerTool]
@@ -204,6 +204,19 @@ public struct BuildDescription: Codable {
 
     /// The map of copy commands.
     let copyCommands: [BuildManifest.CmdName: LLBuildManifest.CopyTool]
+
+    /// A flag that inidcates this build should skip checking whether targets only import
+    /// their explicitly-declared dependencies
+    let disableExplicitTargetDependencyImportChecking: Bool
+
+    /// Every target's set of dependencies.
+    let targetDependencyMap: [TargetName: [TargetName]]
+
+    /// A full swift driver command-line invocation used to dependency-scan a given Swift target
+    let swiftTargetScanArgs: [TargetName: [CommandLineFlag]]
+
+    /// A set of all targets with generated source
+    let generatedSourceTargetSet: Set<TargetName>
 
     /// The built test products.
     public let builtTestProducts: [BuiltTestProduct]
@@ -219,7 +232,28 @@ public struct BuildDescription: Codable {
         self.swiftFrontendCommands = swiftFrontendCommands
         self.testDiscoveryCommands = testDiscoveryCommands
         self.copyCommands = copyCommands
-
+        self.disableExplicitTargetDependencyImportChecking = plan.buildParameters.disableExplicitTargetDependencyImportChecking
+        self.targetDependencyMap = try plan.targets.reduce(into: [TargetName: [TargetName]]()) {
+            let deps = try $1.target.recursiveTargetDependencies().map { $0.c99name }
+            $0[$1.target.c99name] = deps
+        }
+        var targetCommandLines: [TargetName: [CommandLineFlag]] = [:]
+        var generatedSourceTargets: [TargetName] = []
+        for (target, description) in plan.targetMap {
+            guard case .swift(let desc) = description else {
+                continue
+            }
+            targetCommandLines[target.c99name] =
+                try desc.emitCommandLine(scanInvocation: true) + ["-driver-use-frontend-path",
+                                                                  plan.buildParameters.toolchain.swiftCompiler.pathString]
+            if desc.testDiscoveryTarget {
+                generatedSourceTargets.append(target.c99name)
+            }
+        }
+        generatedSourceTargets.append(contentsOf: plan.graph.allTargets.filter {$0.type == .plugin}
+                                                                       .map { $0.c99name })
+        self.swiftTargetScanArgs = targetCommandLines
+        self.generatedSourceTargetSet = Set(generatedSourceTargets)
         self.builtTestProducts = plan.buildProducts.filter{ $0.product.type == .test }.map { desc in
             return BuiltTestProduct(
                 productName: desc.product.name,

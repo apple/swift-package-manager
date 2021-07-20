@@ -789,7 +789,8 @@ public class SwiftTool {
                 useExplicitModuleBuild: options.useExplicitModuleBuild,
                 isXcodeBuildSystemEnabled: options.buildSystem == .xcode,
                 printManifestGraphviz: options.printManifestGraphviz,
-                forceTestDiscovery: options.enableTestDiscovery // backwards compatibility, remove with --enable-test-discovery
+                forceTestDiscovery: options.enableTestDiscovery, // backwards compatibility, remove with --enable-test-discovery
+                disableExplicitTargetDependencyImportChecking: options.disableExplicitTargetDependencyImportChecking
             )
         })
     }()

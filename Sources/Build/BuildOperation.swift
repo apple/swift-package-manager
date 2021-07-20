@@ -17,6 +17,8 @@ import SPMLLBuild
 import TSCBasic
 import TSCUtility
 
+@_implementationOnly import SwiftDriver
+
 public final class BuildOperation: PackageStructureDelegate, SPMBuildCore.BuildSystem, BuildErrorAdviceProvider {
 
     /// The delegate used by the build system.
@@ -118,10 +120,70 @@ public final class BuildOperation: PackageStructureDelegate, SPMBuildCore.BuildS
         buildSystem?.cancel()
     }
 
+    // Emit a warning if a target imports another target in this build
+    // without specifying it as a dependency in the manifest
+    private func verifyTargetImports(in description: BuildDescription) throws {
+        guard !description.disableExplicitTargetDependencyImportChecking else {
+            return
+        }
+        // Ensure the compiler supports the import-scan operation
+        guard SwiftTargetBuildDescription.checkSupportedFrontendFlags(flags: ["import-prescan"], fs: localFileSystem) else {
+            return
+        }
+
+        for (target, commandLine) in description.swiftTargetScanArgs {
+            do {
+                guard let dependencies = description.targetDependencyMap[target] else {
+                    // Skip target if no dependency information is present
+                    continue
+                }
+                let targetDependenciesSet = Set(dependencies)
+                guard !description.generatedSourceTargetSet.contains(target),
+                      targetDependenciesSet.intersection(description.generatedSourceTargetSet).isEmpty else {
+                    // Skip targets which contain, or depend-on-targets, with generated source-code.
+                    // Such as test discovery targets and targets with plugins.
+                    continue
+                }
+                let resolver = try ArgsResolver(fileSystem: localFileSystem)
+                let executor = SPMSwiftDriverExecutor(resolver: resolver,
+                                                      fileSystem: localFileSystem,
+                                                      env: ProcessEnv.vars)
+
+                let consumeDiagnostics: DiagnosticsEngine = DiagnosticsEngine(handlers: [])
+                var driver = try Driver(args: commandLine,
+                                        diagnosticsEngine: consumeDiagnostics,
+                                        fileSystem: localFileSystem,
+                                        executor: executor)
+                guard !consumeDiagnostics.hasErrors else {
+                  // If we could not init the driver with this command, something went wrong,
+                  // proceed without checking this target.
+                  continue
+                }
+                let imports = try driver.performImportPrescan().imports
+                let nonDependencyTargetsSet =
+                    Set(description.targetDependencyMap.keys.filter { !targetDependenciesSet.contains($0) })
+                let importedTargetsMissingDependency = Set(imports).intersection(nonDependencyTargetsSet)
+                if let missedDependency = importedTargetsMissingDependency.first {
+                    diagnostics.emit(warning: "Target \(target) imports another target (\(missedDependency)) in the package without declaring it a dependency.", location: nil)
+                }
+            } catch {
+                // The above verification is a best-effort attempt to warn the user about a potential manifest
+                // error. If something went wrong during the import-prescan, proceed silently.
+                return
+            }
+        }
+    }
+
     /// Perform a build using the given build description and subset.
     public func build(subset: BuildSubset) throws {
+        // Get the build description
+        let buildDescription = try getBuildDescription()
+
+        // Verify dependency imports on the described targers
+        try verifyTargetImports(in: buildDescription)
+
         // Create the build system.
-        let buildSystem = try createBuildSystem(with: getBuildDescription())
+        let buildSystem = try createBuildSystem(with: buildDescription)
         self.buildSystem = buildSystem
 
         // Perform the build.

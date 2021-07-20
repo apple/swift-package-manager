@@ -796,23 +796,27 @@ public final class SwiftTargetBuildDescription {
         return args
     }
 
-    public func emitCommandLine() throws -> [String] {
+    /// When `scanInvocation` argument is set to `true`, omit the side-effect producing arguments
+    /// such as emitting a module or supplementary outputs.
+    public func emitCommandLine(scanInvocation: Bool = false) throws -> [String] {
         var result: [String] = []
         result.append(buildParameters.toolchain.swiftCompiler.pathString)
 
         result.append("-module-name")
         result.append(target.c99name)
 
-        result.append("-emit-dependencies")
+        if !scanInvocation {
+            result.append("-emit-dependencies")
 
-        // FIXME: Do we always have a module?
-        result.append("-emit-module")
-        result.append("-emit-module-path")
-        result.append(moduleOutputPath.pathString)
+            // FIXME: Do we always have a module?
+            result.append("-emit-module")
+            result.append("-emit-module-path")
+            result.append(moduleOutputPath.pathString)
 
-        result.append("-output-file-map")
-        // FIXME: Eliminate side effect.
-        result.append(try writeOutputFileMap().pathString)
+            result.append("-output-file-map")
+            // FIXME: Eliminate side effect.
+            result.append(try writeOutputFileMap().pathString)
+        }
 
         if buildParameters.useWholeModuleOptimization {
             result.append("-whole-module-optimization")

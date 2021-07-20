@@ -127,6 +127,10 @@ public struct BuildParameters: Encodable {
     /// Whether to use the explicit module build flow (with the integrated driver)
     public var useExplicitModuleBuild: Bool
 
+    /// A flag that inidcates this build should skip checking whether targets only import
+    /// their explicitly-declared dependencies
+    public var disableExplicitTargetDependencyImportChecking: Bool
+
     /// Whether to output a graphviz file visualization of the combined job graph for all targets
     public var printManifestGraphviz: Bool
 
@@ -191,7 +195,8 @@ public struct BuildParameters: Encodable {
         isXcodeBuildSystemEnabled: Bool = false,
         printManifestGraphviz: Bool = false,
         enableTestability: Bool? = nil,
-        forceTestDiscovery: Bool = false
+        forceTestDiscovery: Bool = false,
+        disableExplicitTargetDependencyImportChecking: Bool = false
     ) {
         let triple = destinationTriple ?? .getHostTriple(usingSwiftCompiler: toolchain.swiftCompiler)
 
@@ -221,6 +226,7 @@ public struct BuildParameters: Encodable {
         self.enableTestability = enableTestability ?? (.debug == configuration)
         // decide if to enable the use of test manifests based on platform. this is likely to change in the future
         self.testDiscoveryStrategy = triple.isDarwin() ? .objectiveC : .manifest(generate: forceTestDiscovery)
+        self.disableExplicitTargetDependencyImportChecking = disableExplicitTargetDependencyImportChecking
     }
 
     /// The path to the build directory (inside the data directory).
