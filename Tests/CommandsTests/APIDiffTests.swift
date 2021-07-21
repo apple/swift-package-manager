@@ -13,6 +13,7 @@ import Foundation
 import TSCBasic
 import Build
 import Commands
+import SourceControl
 import SPMTestSupport
 
 final class APIDiffTests: XCTestCase {
@@ -317,7 +318,45 @@ final class APIDiffTests: XCTestCase {
                     XCTFail("Unexpected error")
                     return
                 }
-                XCTAssertTrue(stderr.contains("error: Couldn’t check out revision ‘7.8.9’"))
+                XCTAssertTrue(stderr.contains("error: Couldn’t get revision"))
+            }
+        }
+    }
+
+    func testBranchUpdate() throws {
+        try skipIfApiDigesterUnsupported()
+        try withTemporaryDirectory { baselineDir in
+            fixture(name: "Miscellaneous/APIDiff/") { prefix in
+                let packageRoot = prefix.appending(component: "Foo")
+                let repo = GitRepository(path: packageRoot)
+                try repo.checkout(newBranch: "feature")
+                // Overwrite the existing decl.
+                try localFileSystem.writeFileContents(packageRoot.appending(component: "Foo.swift")) {
+                    $0 <<< "public let foo = 42"
+                }
+                try repo.stage(file: "Foo.swift")
+                try repo.commit(message: "Add foo")
+                XCTAssertThrowsError(try execute(["experimental-api-diff", "main", "--baseline-dir", baselineDir.pathString],
+                                                 packagePath: packageRoot)) { error in
+                    guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
+                        XCTFail("Unexpected error")
+                        return
+                    }
+                    XCTAssertTrue(output.contains("1 breaking change detected in Foo"))
+                    XCTAssertTrue(output.contains("💔 API breakage: func foo() has been removed"))
+                }
+
+                // Update `main` and ensure the baseline is regenerated.
+                try repo.checkout(revision: .init(identifier: "main"))
+                try localFileSystem.writeFileContents(packageRoot.appending(component: "Foo.swift")) {
+                    $0 <<< "public let foo = 42"
+                }
+                try repo.stage(file: "Foo.swift")
+                try repo.commit(message: "Add foo")
+                try repo.checkout(revision: .init(identifier: "feature"))
+                let (output, _) = try execute(["experimental-api-diff", "main", "--baseline-dir", baselineDir.pathString],
+                                              packagePath: packageRoot)
+                XCTAssertTrue(output.contains("No breaking changes detected in Foo"))
             }
         }
     }
@@ -332,6 +371,8 @@ final class APIDiffTests: XCTestCase {
             }
 
             let baselineDir = prefix.appending(component: "Baselines")
+            let repo = GitRepository(path: packageRoot)
+            let revision = try repo.resolveRevision(identifier: "1.2.3")
 
             XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3",
                                               "--baseline-dir", baselineDir.pathString],
@@ -342,7 +383,7 @@ final class APIDiffTests: XCTestCase {
                 }
                 XCTAssertTrue(output.contains("1 breaking change detected in Foo"))
                 XCTAssertTrue(output.contains("💔 API breakage: func foo() has been removed"))
-                XCTAssertTrue(localFileSystem.exists(baselineDir.appending(components: "1.2.3", "Foo.json")))
+                XCTAssertTrue(localFileSystem.exists(baselineDir.appending(components: revision.identifier, "Foo.json")))
             }
         }
     }
@@ -356,8 +397,11 @@ final class APIDiffTests: XCTestCase {
                 $0 <<< "public let foo = 42"
             }
 
+            let repo = GitRepository(path: packageRoot)
+            let revision = try repo.resolveRevision(identifier: "1.2.3")
+
             let baselineDir = prefix.appending(component: "Baselines")
-            let fooBaselinePath = baselineDir.appending(components: "1.2.3", "Foo.json")
+            let fooBaselinePath = baselineDir.appending(components: revision.identifier, "Foo.json")
 
             try localFileSystem.createDirectory(fooBaselinePath.parentDirectory, recursive: true)
             try localFileSystem.writeFileContents(fooBaselinePath) {
