@@ -37,7 +37,7 @@ string(COMPARE EQUAL ${CMAKE_SYSTEM_NAME} Windows CMAKE_INSTALL_DEFAULT)
 option(USE_CMAKE_INSTALL
   "Install build products using cmake's install() instead of the bootstrap script's install()"
   ${CMAKE_INSTALL_DEFAULT})
-  
+
 if(BUILD_SHARED_LIBS)
   set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 endif()
@@ -53,6 +53,7 @@ if(FIND_PM_DEPS)
   find_package(ArgumentParser CONFIG REQUIRED)
   find_package(SwiftCrypto CONFIG REQUIRED)
   find_package(SwiftDriver CONFIG REQUIRED)
+  find_package(SwiftCollections CONFIG REQUIRED)
 endif()
 
 find_package(dispatch QUIET)

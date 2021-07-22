@@ -445,7 +445,7 @@ public struct PubgrubDependencyResolver {
     /// If a conflict is found, the conflicting incompatibility is returned to
     /// resolve the conflict on.
     internal func propagate(state: State, node: DependencyResolutionNode) throws {
-        var changed: OrderedSet<DependencyResolutionNode> = [node]
+        var changed: Basics.OrderedSet<DependencyResolutionNode> = [node]
 
         while !changed.isEmpty {
             let package = changed.removeFirst()
@@ -1209,7 +1209,7 @@ private final class PubGrubPackageContainer {
                     throw InternalError("Unexpected unversioned requirement: \(constraint)")
                 }
                 return try constraint.nodes().map { dependencyNode in
-                    var terms: OrderedSet<Term> = []
+                    var terms: Basics.OrderedSet<Term> = []
                     terms.append(Term(node, .exact(version)))
                     terms.append(Term(not: dependencyNode, vs))
                     return try Incompatibility(terms, root: root, cause: .dependency(node: node))
@@ -1223,7 +1223,7 @@ private final class PubGrubPackageContainer {
                                                                 products: node.productFilter)
 
         return try constraints.map { constraint in
-            var terms: OrderedSet<Term> = []
+            var terms: Basics.OrderedSet<Term> = []
             let lowerBound = lowerBounds[constraint.package] ?? "0.0.0"
             let upperBound = upperBounds[constraint.package] ?? Version(version.major + 1, 0, 0)
             assert(lowerBound < upperBound)

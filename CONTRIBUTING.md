@@ -132,7 +132,7 @@ Please refer to the [_Get Started_ guide](https://github.com/apple/swift/blob/ma
 Clone the following repositories beside the SwiftPM directory:
 
 1. [swift-argument-parser] and check out tag with the [latest version](https://github.com/apple/swift-argument-parser/tags).
-   
+
    For example, if the latest tag is 0.4.3:
    ```sh
    $> git clone https://github.com/apple/swift-argument-parser --branch 0.4.3
@@ -150,7 +150,7 @@ Clone the following repositories beside the SwiftPM directory:
    ```
 
 4. [Yams] and checkout tag with the [latest version](https://github.com/jpsim/Yams.git/tags) before 5.0.0.
-   
+
    For example, if the latest tag is 4.0.6:
    ```sh
    $> git clone https://github.com/jpsim/yams --branch 4.0.6
@@ -162,13 +162,21 @@ Clone the following repositories beside the SwiftPM directory:
    ```
 
 6. [swift-crypto] and check out tag with the [latest version](https://github.com/apple/swift-crypto/tags).
-   
+
    For example, if the latest tag is 1.1.6:
    ```sh
    $> git clone https://github.com/apple/swift-crypto --branch 1.1.6
    ```
 
+7. [swift-collections] and check out tag with the [latest version](https://github.com/apple/swift-collections/tags).
+
+    For example, if the latest tag is 0.0.4:
+    ```sh
+    $> git clone https://github.com/apple/swift-collections --branch 0.0.4
+    ```
+
 [swift-argument-parser]: https://github.com/apple/swift-argument-parser
+[swift-collections]: https://github.com/apple/swift-collections
 [swift-crypto]: https://github.com/apple/swift-crypto
 [swift-driver]: https://github.com/apple/swift-driver
 [swift-llbuild]: https://github.com/apple/swift-llbuild
@@ -385,4 +393,3 @@ $> swift package update
 ```
 Alternatively, if you are using Xcode, you can update to the latest version of all packages:  
 **Xcode App** > *File* > *Swift Packages* > *Update to Latest Package Versions*
-

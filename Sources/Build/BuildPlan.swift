@@ -1987,7 +1987,7 @@ public class BuildPlan {
         }
 
         // Build cache
-        var cflagsCache: OrderedSet<String> = []
+        var cflagsCache: Basics.OrderedSet<String> = []
         var libsCache: [String] = []
         for tuple in ret {
             for cFlag in tuple.cFlags {

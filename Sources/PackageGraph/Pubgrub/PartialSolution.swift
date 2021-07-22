@@ -25,7 +25,7 @@ public struct PartialSolution {
 
     /// The intersection of all positive assignments for each package, minus any
     /// negative assignments that refer to that package.
-    public private(set) var _positive: OrderedDictionary<DependencyResolutionNode, Term> = [:]
+    public private(set) var _positive: Basics.OrderedDictionary<DependencyResolutionNode, Term> = [:]
 
     /// Union of all negative assignments for a package.
     ///
