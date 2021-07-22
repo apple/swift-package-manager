@@ -36,7 +36,7 @@ class CFamilyTargetTestCase: XCTestCase {
     func testCLibraryWithSpaces() {
         fixture(name: "CFamilyTargets/CLibraryWithSpaces") { prefix in
             XCTAssertBuilds(prefix)
-            let debugPath = prefix.appending(components: ".build", Resources.default.toolchain.triple.tripleString, "debug")
+            let debugPath = prefix.appending(components: ".build", Resources.default.toolchain.triple.platformBuildPathComponent(), "debug")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "Bar.c.o")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "Foo.c.o")
         }
@@ -46,7 +46,7 @@ class CFamilyTargetTestCase: XCTestCase {
         fixture(name: "DependencyResolution/External/CUsingCDep") { prefix in
             let packageRoot = prefix.appending(component: "Bar")
             XCTAssertBuilds(packageRoot)
-            let debugPath = prefix.appending(components: "Bar", ".build", Resources.default.toolchain.triple.tripleString, "debug")
+            let debugPath = prefix.appending(components: "Bar", ".build", Resources.default.toolchain.triple.platformBuildPathComponent(), "debug")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "Sea.c.o")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "Foo.c.o")
             let path = try SwiftPMProduct.packagePath(for: "Foo", packageRoot: packageRoot)
@@ -57,7 +57,7 @@ class CFamilyTargetTestCase: XCTestCase {
     func testModuleMapGenerationCases() {
         fixture(name: "CFamilyTargets/ModuleMapGenerationCases") { prefix in
             XCTAssertBuilds(prefix)
-            let debugPath = prefix.appending(components: ".build", Resources.default.toolchain.triple.tripleString, "debug")
+            let debugPath = prefix.appending(components: ".build", Resources.default.toolchain.triple.platformBuildPathComponent(), "debug")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "Jaz.c.o")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "main.swift.o")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "FlatInclude.c.o")
@@ -80,7 +80,7 @@ class CFamilyTargetTestCase: XCTestCase {
         // Try building a fixture which needs extra flags to be able to build.
         fixture(name: "CFamilyTargets/CDynamicLookup") { prefix in
             XCTAssertBuilds(prefix, Xld: ["-undefined", "dynamic_lookup"])
-            let debugPath = prefix.appending(components: ".build", Resources.default.toolchain.triple.tripleString, "debug")
+            let debugPath = prefix.appending(components: ".build", Resources.default.toolchain.triple.platformBuildPathComponent(), "debug")
             XCTAssertDirectoryContainsFile(dir: debugPath, filename: "Foo.c.o")
         }
     }
@@ -90,7 +90,7 @@ class CFamilyTargetTestCase: XCTestCase {
         fixture(name: "CFamilyTargets/ObjCmacOSPackage") { prefix in
             // Build the package.
             XCTAssertBuilds(prefix)
-            XCTAssertDirectoryContainsFile(dir: prefix.appending(components: ".build", Resources.default.toolchain.triple.tripleString, "debug"), filename: "HelloWorldExample.m.o")
+            XCTAssertDirectoryContainsFile(dir: prefix.appending(components: ".build", Resources.default.toolchain.triple.platformBuildPathComponent(), "debug"), filename: "HelloWorldExample.m.o")
             // Run swift-test on package.
             XCTAssertSwiftTest(prefix)
         }

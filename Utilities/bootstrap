@@ -300,7 +300,9 @@ def get_build_target(args, cross_compile=False):
         target_info_json = subprocess.check_output(command,
                                stderr=subprocess.PIPE, universal_newlines=True).strip()
         args.target_info = json.loads(target_info_json)
-        return args.target_info["target"]["unversionedTriple"]
+        if platform.system() == 'Darwin':
+          return args.target_info["target"]["unversionedTriple"]
+        return args.target_info["target"]["triple"]
     except Exception as e:
         # Temporary fallback for Darwin.
         if platform.system() == 'Darwin':

@@ -656,7 +656,8 @@ public class SwiftTool {
             // FIXME: At the moment we just pass the built products directory for the host. We will need to extend this
             // with a map of the names of tools available to each plugin. In particular this would not work with any
             // binary targets.
-            let builtToolsDir = dataDir.appending(components: try self._hostToolchain.get().triple.tripleString, buildEnvironment.configuration.dirname)
+            let hostTriple = try self._hostToolchain.get().triple
+            let builtToolsDir = dataDir.appending(components: hostTriple.platformBuildPathComponent(), buildEnvironment.configuration.dirname)
             let diagnostics = DiagnosticsEngine()
             
             // Create the cache directory, if needed.
@@ -769,7 +770,7 @@ public class SwiftTool {
             // can be used to build for any Apple platform and it has it's own
             // conventions for build subpaths based on platforms.
             let dataPath = buildPath.appending(
-                 component: options.buildSystem == .xcode ? "apple" : triple.tripleString)
+                component: options.buildSystem == .xcode ? "apple" : triple.platformBuildPathComponent())
             return BuildParameters(
                 dataPath: dataPath,
                 configuration: options.configuration,

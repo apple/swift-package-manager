@@ -55,7 +55,7 @@ class BuildPerfTests: XCTestCasePerf {
         fixture(name: name) { prefix in
             let app = prefix.appending(components: (appString ?? ""))
             let triple = Resources.default.toolchain.triple
-            let product = app.appending(components: ".build", triple.tripleString, "debug", productString)
+            let product = app.appending(components: ".build", triple.platformBuildPathComponent(), "debug", productString)
             try self.execute(packagePath: app)
             measure {
                 try! self.clean(packagePath: app)
@@ -69,7 +69,7 @@ class BuildPerfTests: XCTestCasePerf {
         fixture(name: name) { prefix in
             let app = prefix.appending(components: (appString ?? ""))
             let triple = Resources.default.toolchain.triple
-            let product = app.appending(components: ".build", triple.tripleString, "debug", productString)
+            let product = app.appending(components: ".build", triple.platformBuildPathComponent(), "debug", productString)
             try self.execute(packagePath: app)
             measure {
                 try! self.execute(packagePath: app)

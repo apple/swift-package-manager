@@ -21,7 +21,7 @@ class ModuleMapsTestCase: XCTestCase {
         SPMTestSupport.fixture(name: name) { prefix in
             let input = prefix.appending(components: cModuleName, "C", "foo.c")
             let triple = Resources.default.toolchain.triple
-            let outdir = prefix.appending(components: rootpkg, ".build", triple.tripleString, "debug")
+            let outdir = prefix.appending(components: rootpkg, ".build", triple.platformBuildPathComponent(), "debug")
             try makeDirectories(outdir)
             let output = outdir.appending(component: "libfoo\(triple.dynamicLibraryExtension)")
             try systemQuietly(["clang", "-shared", input.pathString, "-o", output.pathString])
@@ -41,7 +41,7 @@ class ModuleMapsTestCase: XCTestCase {
             XCTAssertBuilds(prefix.appending(component: "App"), Xld: Xld)
 
             let triple = Resources.default.toolchain.triple
-            let targetPath = prefix.appending(components: "App", ".build", triple.tripleString)
+            let targetPath = prefix.appending(components: "App", ".build", triple.platformBuildPathComponent())
             let debugout = try Process.checkNonZeroExit(args: targetPath.appending(components: "debug", "App").pathString)
             XCTAssertEqual(debugout, "123\n")
             let releaseout = try Process.checkNonZeroExit(args: targetPath.appending(components: "release", "App").pathString)
@@ -56,7 +56,7 @@ class ModuleMapsTestCase: XCTestCase {
 
             func verify(_ conf: String, file: StaticString = #file, line: UInt = #line) throws {
                 let triple = Resources.default.toolchain.triple
-                let out = try Process.checkNonZeroExit(args: prefix.appending(components: "packageA", ".build", triple.tripleString, conf, "packageA").pathString)
+                let out = try Process.checkNonZeroExit(args: prefix.appending(components: "packageA", ".build", triple.platformBuildPathComponent(), conf, "packageA").pathString)
                 XCTAssertEqual(out, """
                     calling Y.bar()
                     Y.bar() called
