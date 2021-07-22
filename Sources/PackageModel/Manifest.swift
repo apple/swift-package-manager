@@ -202,15 +202,33 @@ public final class Manifest: ObjectIdentifierProtocol {
         let productTargetNames = products.flatMap({ $0.targets })
 
         let dependentTargetNames = transitiveClosure(productTargetNames, successors: { targetName in
-            targetsByName[targetName]?.dependencies.compactMap({ dependency in
-                switch dependency {
-                case .target(let name, _),
-                     .byName(let name, _):
-                    return targetsByName.keys.contains(name) ? name : nil
-                default:
-                    return nil
+
+            if let target = targetsByName[targetName] {
+                let dependencies: [String] = target.dependencies.compactMap { dependency in
+                    switch dependency {
+                    case .target(let name, _),
+                         .byName(let name, _):
+                        return targetsByName.keys.contains(name) ? name : nil
+                    default:
+                        return nil
+                    }
                 }
-            }) ?? []
+
+                let plugins: [String] = target.pluginUsages?.compactMap { pluginUsage in
+                    switch pluginUsage {
+                    case .plugin(name: let name, package: nil):
+                        return targetsByName.keys.contains(name) ? name : nil
+                    default:
+                        return nil
+                    }
+                } ?? []
+
+                return dependencies + plugins
+            }
+            
+            return []
+
+            
         })
 
         let requiredTargetNames = Set(productTargetNames).union(dependentTargetNames)
