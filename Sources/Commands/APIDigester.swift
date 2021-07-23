@@ -24,8 +24,8 @@ import Workspace
 /// Helper for emitting a JSON API baseline for a module.
 struct APIDigesterBaselineDumper {
 
-    /// The git treeish to emit a baseline for.
-    let baselineTreeish: String
+    /// The revision to emit a baseline for.
+    let baselineRevision: Revision
 
     /// The root package path.
     let packageRoot: AbsolutePath
@@ -46,7 +46,7 @@ struct APIDigesterBaselineDumper {
     let diags: DiagnosticsEngine
 
     init(
-        baselineTreeish: String,
+        baselineRevision: Revision,
         packageRoot: AbsolutePath,
         buildParameters: BuildParameters,
         manifestLoader: ManifestLoaderProtocol,
@@ -54,7 +54,7 @@ struct APIDigesterBaselineDumper {
         apiDigesterTool: SwiftAPIDigester,
         diags: DiagnosticsEngine
     ) {
-        self.baselineTreeish = baselineTreeish
+        self.baselineRevision = baselineRevision
         self.packageRoot = packageRoot
         self.inputBuildParameters = buildParameters
         self.manifestLoader = manifestLoader
@@ -69,7 +69,7 @@ struct APIDigesterBaselineDumper {
                          force: Bool) throws -> AbsolutePath {
         var modulesToDiff = modulesToDiff
         let apiDiffDir = inputBuildParameters.apiDiff
-        let baselineDir = (baselineDir ?? apiDiffDir).appending(component: baselineTreeish)
+        let baselineDir = (baselineDir ?? apiDiffDir).appending(component: baselineRevision.identifier)
         let baselinePath: (String)->AbsolutePath = { module in
             baselineDir.appending(component: module + ".json")
         }
@@ -87,7 +87,7 @@ struct APIDigesterBaselineDumper {
         }
 
         // Setup a temporary directory where we can checkout and build the baseline treeish.
-        let baselinePackageRoot = apiDiffDir.appending(component: "\(baselineTreeish)-checkout")
+        let baselinePackageRoot = apiDiffDir.appending(component: "\(baselineRevision.identifier)-checkout")
         if localFileSystem.exists(baselinePackageRoot) {
             try localFileSystem.removeFileTree(baselinePackageRoot)
         }
@@ -101,7 +101,7 @@ struct APIDigesterBaselineDumper {
             editable: false
         )
 
-        try workingCopy.checkout(revision: Revision(identifier: baselineTreeish))
+        try workingCopy.checkout(revision: baselineRevision)
 
         // Create the workspace for this package.
         let workspace = Workspace.create(

@@ -41,6 +41,7 @@ public struct SwiftPackageTool: ParsableCommand {
             Format.self,
             
             APIDiff.self,
+            DeprecatedAPIDiff.self,
             DumpSymbolGraph.self,
             DumpPIF.self,
             DumpPackage.self,
@@ -287,13 +288,27 @@ extension SwiftPackageTool {
             }
         }
     }
+
+    struct DeprecatedAPIDiff: ParsableCommand {
+        static let configuration = CommandConfiguration(commandName: "experimental-api-diff",
+                                                        abstract: "Deprecated - use `swift package diagnose-api-breaking-changes` instead",
+                                                        shouldDisplay: false)
+
+        @Argument(parsing: .unconditionalRemaining)
+        var args: [String] = []
+
+        func run() throws {
+            print("`swift package experimental-api-diff` has been renamed to `swift package diagnose-api-breaking-changes`")
+            throw ExitCode.failure
+        }
+    }
     
     struct APIDiff: SwiftCommand {
         static let configuration = CommandConfiguration(
-            commandName: "experimental-api-diff",
+            commandName: "diagnose-api-breaking-changes",
             abstract: "Diagnose API-breaking changes to Swift modules in a package",
             discussion: """
-            The experimental-api-diff command can be used to compare the Swift API of \
+            The diagnose-api-breaking-changes command can be used to compare the Swift API of \
             a package to a baseline revision, diagnosing any breaking changes which have \
             been introduced. By default, it compares every Swift module from the baseline \
             revision which is part of a library product. For packages with many targets, this \
@@ -334,6 +349,10 @@ extension SwiftPackageTool {
             let apiDigesterPath = try swiftTool.getToolchain().getSwiftAPIDigester()
             let apiDigesterTool = SwiftAPIDigester(tool: apiDigesterPath)
 
+            let packageRoot = try swiftOptions.packagePath ?? swiftTool.getPackageRoot()
+            let repository = GitRepository(path: packageRoot)
+            let baselineRevision = try repository.resolveRevision(identifier: treeish)
+
             // We turn build manifest caching off because we need the build plan.
             let buildOp = try swiftTool.createBuildOperation(cacheBuildManifest: false)
 
@@ -347,7 +366,7 @@ extension SwiftPackageTool {
             // Dump JSON for the baseline package.
             let workspace = try swiftTool.getActiveWorkspace()
             let baselineDumper = try APIDigesterBaselineDumper(
-                baselineTreeish: treeish,
+                baselineRevision: baselineRevision,
                 packageRoot: swiftTool.getPackageRoot(),
                 buildParameters: buildOp.buildParameters,
                 manifestLoader: workspace.manifestLoader,

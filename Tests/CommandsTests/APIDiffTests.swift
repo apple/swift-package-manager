@@ -13,6 +13,7 @@ import Foundation
 import TSCBasic
 import Build
 import Commands
+import SourceControl
 import SPMTestSupport
 
 final class APIDiffTests: XCTestCase {
@@ -50,7 +51,7 @@ final class APIDiffTests: XCTestCase {
             try localFileSystem.writeFileContents(packageRoot.appending(component: "Foo.swift")) {
                 $0 <<< "public let foo = 42"
             }
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3"], packagePath: packageRoot)) { error in
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3"], packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
                     XCTFail("Unexpected error")
                     return
@@ -71,7 +72,7 @@ final class APIDiffTests: XCTestCase {
             try localFileSystem.writeFileContents(packageRoot.appending(components: "Sources", "Qux", "Qux.swift")) {
                 $0 <<< "public class Qux<T, U> { private let x = 1 }"
             }
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "-j", "2"], packagePath: packageRoot)) { error in
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3", "-j", "2"], packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
                     XCTFail("Unexpected error")
                     return
@@ -99,7 +100,7 @@ final class APIDiffTests: XCTestCase {
             try localFileSystem.writeFileContents(customAllowlistPath) {
                 $0 <<< "API breakage: class Qux has generic signature change from <T> to <T, U>\n"
             }
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "-j", "2",
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3", "-j", "2",
                                               "--breakage-allowlist-path", customAllowlistPath.pathString],
                                              packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
@@ -132,7 +133,7 @@ final class APIDiffTests: XCTestCase {
             try localFileSystem.writeFileContents(packageRoot.appending(components: "Sources", "Qux", "Qux.swift")) {
                 $0 <<< "public class Qux<T, U> { private let x = 1 }"
             }
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3"], packagePath: packageRoot)) { error in
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3"], packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
                     XCTFail("Unexpected error")
                     return
@@ -168,7 +169,7 @@ final class APIDiffTests: XCTestCase {
             try localFileSystem.writeFileContents(packageRoot.appending(components: "Sources", "Qux", "Qux.swift")) {
                 $0 <<< "public class Qux<T, U> { private let x = 1 }"
             }
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "--products", "One", "--targets", "Bar"],
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3", "--products", "One", "--targets", "Bar"],
                                              packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
                     XCTFail("Unexpected error")
@@ -188,7 +189,7 @@ final class APIDiffTests: XCTestCase {
             }
 
             // Diff a target which didn't have a baseline generated as part of the first invocation
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "--targets", "Baz"],
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3", "--targets", "Baz"],
                                              packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
                     XCTFail("Unexpected error")
@@ -208,7 +209,7 @@ final class APIDiffTests: XCTestCase {
             }
 
             // Test diagnostics
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "--targets", "NotATarget", "Exec",
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3", "--targets", "NotATarget", "Exec",
                                               "--products", "NotAProduct", "Exec"],
                                              packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: _, stderr: let stderr) = error else {
@@ -239,7 +240,7 @@ final class APIDiffTests: XCTestCase {
                 }
                 """
             }
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3"], packagePath: packageRoot)) { error in
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3"], packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
                     XCTFail("Unexpected error")
                     return
@@ -249,7 +250,7 @@ final class APIDiffTests: XCTestCase {
             }
 
             // Report an error if we explicitly ask to diff a C-family target
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "--targets", "Foo"], packagePath: packageRoot)) { error in
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3", "--targets", "Foo"], packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: _, stderr: let stderr) = error else {
                     XCTFail("Unexpected error")
                     return
@@ -268,7 +269,7 @@ final class APIDiffTests: XCTestCase {
             try localFileSystem.writeFileContents(packageRoot.appending(components: "Sources", "Baz", "Baz.swift")) {
                 $0 <<< "public func bar() -> Int { 100 }"
             }
-            let (output, _) = try execute(["experimental-api-diff", "1.2.3"], packagePath: packageRoot)
+            let (output, _) = try execute(["diagnose-api-breaking-changes", "1.2.3"], packagePath: packageRoot)
             XCTAssertTrue(output.contains("No breaking changes detected in Baz"))
             XCTAssertTrue(output.contains("No breaking changes detected in Qux"))
         }
@@ -301,7 +302,7 @@ final class APIDiffTests: XCTestCase {
                 )
                 """
             }
-            let (output, _) = try execute(["experimental-api-diff", "1.2.3"], packagePath: packageRoot)
+            let (output, _) = try execute(["diagnose-api-breaking-changes", "1.2.3"], packagePath: packageRoot)
             XCTAssertTrue(output.contains("No breaking changes detected in Baz"))
             XCTAssertTrue(output.contains("No breaking changes detected in Qux"))
             XCTAssertTrue(output.contains("Skipping Foo because it does not exist in the baseline"))
@@ -312,12 +313,50 @@ final class APIDiffTests: XCTestCase {
         try skipIfApiDigesterUnsupported()
         fixture(name: "Miscellaneous/APIDiff/") { prefix in
             let packageRoot = prefix.appending(component: "Foo")
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "7.8.9"], packagePath: packageRoot)) { error in
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "7.8.9"], packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: _, stderr: let stderr) = error else {
                     XCTFail("Unexpected error")
                     return
                 }
-                XCTAssertTrue(stderr.contains("error: Couldn’t check out revision ‘7.8.9’"))
+                XCTAssertTrue(stderr.contains("error: Couldn’t get revision"))
+            }
+        }
+    }
+
+    func testBranchUpdate() throws {
+        try skipIfApiDigesterUnsupported()
+        try withTemporaryDirectory { baselineDir in
+            fixture(name: "Miscellaneous/APIDiff/") { prefix in
+                let packageRoot = prefix.appending(component: "Foo")
+                let repo = GitRepository(path: packageRoot)
+                try repo.checkout(newBranch: "feature")
+                // Overwrite the existing decl.
+                try localFileSystem.writeFileContents(packageRoot.appending(component: "Foo.swift")) {
+                    $0 <<< "public let foo = 42"
+                }
+                try repo.stage(file: "Foo.swift")
+                try repo.commit(message: "Add foo")
+                XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "main", "--baseline-dir", baselineDir.pathString],
+                                                 packagePath: packageRoot)) { error in
+                    guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
+                        XCTFail("Unexpected error")
+                        return
+                    }
+                    XCTAssertTrue(output.contains("1 breaking change detected in Foo"))
+                    XCTAssertTrue(output.contains("💔 API breakage: func foo() has been removed"))
+                }
+
+                // Update `main` and ensure the baseline is regenerated.
+                try repo.checkout(revision: .init(identifier: "main"))
+                try localFileSystem.writeFileContents(packageRoot.appending(component: "Foo.swift")) {
+                    $0 <<< "public let foo = 42"
+                }
+                try repo.stage(file: "Foo.swift")
+                try repo.commit(message: "Add foo")
+                try repo.checkout(revision: .init(identifier: "feature"))
+                let (output, _) = try execute(["diagnose-api-breaking-changes", "main", "--baseline-dir", baselineDir.pathString],
+                                              packagePath: packageRoot)
+                XCTAssertTrue(output.contains("No breaking changes detected in Foo"))
             }
         }
     }
@@ -332,8 +371,10 @@ final class APIDiffTests: XCTestCase {
             }
 
             let baselineDir = prefix.appending(component: "Baselines")
+            let repo = GitRepository(path: packageRoot)
+            let revision = try repo.resolveRevision(identifier: "1.2.3")
 
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3",
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3",
                                               "--baseline-dir", baselineDir.pathString],
                                              packagePath: packageRoot)) { error in
                 guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
@@ -342,7 +383,7 @@ final class APIDiffTests: XCTestCase {
                 }
                 XCTAssertTrue(output.contains("1 breaking change detected in Foo"))
                 XCTAssertTrue(output.contains("💔 API breakage: func foo() has been removed"))
-                XCTAssertTrue(localFileSystem.exists(baselineDir.appending(components: "1.2.3", "Foo.json")))
+                XCTAssertTrue(localFileSystem.exists(baselineDir.appending(components: revision.identifier, "Foo.json")))
             }
         }
     }
@@ -356,15 +397,18 @@ final class APIDiffTests: XCTestCase {
                 $0 <<< "public let foo = 42"
             }
 
+            let repo = GitRepository(path: packageRoot)
+            let revision = try repo.resolveRevision(identifier: "1.2.3")
+
             let baselineDir = prefix.appending(component: "Baselines")
-            let fooBaselinePath = baselineDir.appending(components: "1.2.3", "Foo.json")
+            let fooBaselinePath = baselineDir.appending(components: revision.identifier, "Foo.json")
 
             try localFileSystem.createDirectory(fooBaselinePath.parentDirectory, recursive: true)
             try localFileSystem.writeFileContents(fooBaselinePath) {
                 $0 <<< "Old Baseline"
             }
 
-            XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3",
+            XCTAssertThrowsError(try execute(["diagnose-api-breaking-changes", "1.2.3",
                                               "--baseline-dir", baselineDir.pathString,
                                               "--regenerate-baseline"],
                                              packagePath: packageRoot)) { error in
@@ -377,6 +421,17 @@ final class APIDiffTests: XCTestCase {
                 XCTAssertTrue(localFileSystem.exists(fooBaselinePath))
                 XCTAssertNotEqual((try! localFileSystem.readFileContents(fooBaselinePath)).description, "Old Baseline")
             }
+        }
+    }
+
+    func testOldName() throws {
+        XCTAssertThrowsError(try execute(["experimental-api-diff", "1.2.3", "--regenerate-baseline"],
+                                         packagePath: nil)) { error in
+            guard case SwiftPMProductError.executionFailure(error: _, output: let output, stderr: _) = error else {
+                XCTFail("Unexpected error")
+                return
+            }
+            XCTAssertTrue(output.contains("`swift package experimental-api-diff` has been renamed to `swift package diagnose-api-breaking-changes`"))
         }
     }
 }
