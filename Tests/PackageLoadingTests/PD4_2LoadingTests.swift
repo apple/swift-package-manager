@@ -499,24 +499,31 @@ class PackageDescription4_2LoadingTests: PackageDescriptionLoadingTests {
         }
     }
 
-    func testURLContainsNotAbsolutePath() throws {
-        let stream = BufferedOutputByteStream()
-        stream <<< """
-        import PackageDescription
-        let package = Package(
-            name: "Trivial",
-            dependencies: [
-                .package(url: "file://../best", from: "1.0.0"),
-            ],
-            targets: [
-                .target(
-                    name: "foo",
-                    dependencies: []),
-            ]
-        )
-        """
+    func testFileURLsWithHostnames() throws {
+        let urls = [
+          "file://../best", // Possible attempt at a relative path.
+          "file://somehost/bar", // Obviously non-local.
+          "file://localhost/bar" // Local but non-trivial (e.g. on Windows, the path is a UNC path).
+        ]
+        for url in urls {
+            let stream = BufferedOutputByteStream()
+            stream <<< """
+            import PackageDescription
+            let package = Package(
+                name: "Trivial",
+                dependencies: [
+                    .package(url: "\(url)", from: "1.0.0"),
+                ],
+                targets: [
+                    .target(
+                        name: "foo",
+                        dependencies: []),
+                ]
+            )
+            """
 
-        XCTAssertManifestLoadThrows(ManifestParseError.invalidManifestFormat("file:// URLs cannot be relative, did you mean to use `.package(path:)`?", diagnosticFile: nil), stream.bytes)
+            XCTAssertManifestLoadThrows(ManifestParseError.invalidManifestFormat("file:// URLs with hostnames are not supported, are you missing a '/'?", diagnosticFile: nil), stream.bytes)
+        }
     }
 
     func testCacheInvalidationOnEnv() throws {
