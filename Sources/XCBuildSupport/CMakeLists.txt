@@ -22,3 +22,4 @@ target_link_libraries(XCBuildSupport PUBLIC
 
 set_target_properties(XCBuildSupport PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_Swift_MODULE_DIRECTORY})
+set_property(GLOBAL APPEND PROPERTY SwiftPM_EXPORTS XCBuildSupport)
