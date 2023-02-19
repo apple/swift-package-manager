@@ -55,7 +55,7 @@ private extension IndexStore.TestCaseClass.TestMethod {
     var allTestsEntry: String {
         let baseName = name.hasSuffix("()") ? String(name.dropLast(2)) : name
 
-        return "(\"\(baseName)\", \(isAsync ? "asyncTest(\(baseName))" : baseName ))"
+        return "(\"\(baseName)\", __testFunction__(\(baseName)))"
     }
 }
 
@@ -72,6 +72,21 @@ final class TestDiscoveryCommand: CustomLLBuildCommand, TestBuildCommand {
 
         stream <<< "import XCTest" <<< "\n"
         stream <<< "@testable import " <<< module <<< "\n"
+
+        // Inject an overloaded helper function, __testFunction__, to help us
+        // disambiguate between synchronous and asynchronous functions.
+        stream <<< """
+        typealias __TestFunction__<T: XCTestCase> = (T) -> () throws -> Void
+        typealias __AsyncTestFunction__<T: XCTestCase> = (T) -> () async throws -> Void
+
+        func __testFunction__<T: XCTestCase>(_ function: @escaping __TestFunction__<T>) -> __TestFunction__<T> {
+            return function
+        }
+
+        func __testFunction__<T: XCTestCase>(_ function: @escaping __AsyncTestFunction__<T>) -> __TestFunction__<T> {
+            return asyncTest(function)
+        }
+        """
 
         for iterator in testsByClassNames {
             let className = iterator.key
