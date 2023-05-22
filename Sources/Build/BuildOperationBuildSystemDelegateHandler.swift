@@ -23,7 +23,6 @@ import struct TSCBasic.Format
 import class TSCBasic.LocalFileOutputByteStream
 import protocol TSCBasic.OutputByteStream
 import enum TSCBasic.ProcessEnv
-import struct TSCBasic.RegEx
 import class TSCBasic.ThreadSafeOutputByteStream
 
 import class TSCUtility.IndexStore
@@ -933,11 +932,13 @@ final class BuildOperationBuildSystemDelegateHandler: LLBuildBuildSystemDelegate
                 // next we want to try and scoop out any errors from the output (if reasonable size, otherwise this
                 // will be very slow), so they can later be passed to the advice provider in case of failure.
                 if output.utf8.count < 1024 * 10 {
-                    let regex = try! RegEx(pattern: #".*(error:[^\n]*)\n.*"#, options: .dotMatchesLineSeparators)
-                    for match in regex.matchGroups(in: output) {
-                        self.errorMessagesByTarget[parser.targetName] = (
-                                self.errorMessagesByTarget[parser.targetName] ?? []
-                        ) + [match[0]]
+                    let regex = #/.*(?<error>error:[^\n]*)\n.*/#.dotMatchesNewlines()
+                    for match in output.matches(of: regex) {
+                        self
+                            .errorMessagesByTarget[parser.targetName] = (
+                                self
+                                    .errorMessagesByTarget[parser.targetName] ?? []
+                            ) + [String(match.error)]
                     }
                 }
             }

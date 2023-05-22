@@ -252,23 +252,11 @@ struct GitHubPackageMetadataProvider: PackageMetadataProvider, Closable {
 
     // FIXME: use URL instead of string
     internal static func apiURL(_ url: String) -> URL? {
-        do {
-            let regex = try NSRegularExpression(pattern: #"([^/@]+)[:/]([^:/]+)/([^/.]+)(\.git)?$"#, options: .caseInsensitive)
-            if let match = regex.firstMatch(in: url, options: [], range: NSRange(location: 0, length: url.count)) {
-                if let hostRange = Range(match.range(at: 1), in: url),
-                    let ownerRange = Range(match.range(at: 2), in: url),
-                    let repoRange = Range(match.range(at: 3), in: url) {
-                    let host = String(url[hostRange])
-                    let owner = String(url[ownerRange])
-                    let repo = String(url[repoRange])
-
-                    return URL(string: "https://\(Self.apiHostPrefix)\(host)/repos/\(owner)/\(repo)")
-                }
-            }
-            return nil
-        } catch {
+        let regex = #/(?<host>[^/@]+)[:/](?<owner>[^:/]+)/(?<repo>[^/.]+)(\.git)?$/#.ignoresCase()
+        guard let match = url.firstMatch(of: regex) else {
             return nil
         }
+        return URL(string: "https://\(Self.apiHostPrefix)\(match.host)/repos/\(match.owner)/\(match.repo)")
     }
 
     private func makeRequestOptions(validResponseCodes: [Int]) -> LegacyHTTPClientRequest.Options {

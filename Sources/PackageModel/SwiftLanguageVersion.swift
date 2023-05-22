@@ -12,8 +12,6 @@
 
 import Foundation
 
-import struct TSCBasic.RegEx
-
 import struct TSCUtility.Version
 
 /// Represents a Swift language version.
@@ -60,21 +58,31 @@ public struct SwiftLanguageVersion: Hashable, Sendable {
     }
 
     /// Regex for parsing the Swift language version.
-    private static let regex = try! RegEx(pattern: #"^(\d+)(?:\.(\d+))?(?:\.(\d+))?$"#)
+    private static let regex = #/^(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?$/#
 
     /// Create an instance of Swift language version from the given string.
     ///
     // The Swift language version is not officially fixed but we require it to
     // be a valid SemVer-like string.
     public init?(string: String) {
-        let parsedVersion = SwiftLanguageVersion.regex.matchGroups(in: string)
-        guard parsedVersion.count == 1, parsedVersion[0].count == 3 else {
+        let parsedVersions = string.matches(of: SwiftLanguageVersion.regex)
+        guard parsedVersions.count == 1 else {
             return nil
         }
-        let major = Int(parsedVersion[0][0])!
-        let minor = parsedVersion[0][1].isEmpty ? 0 : Int(parsedVersion[0][1])!
-        let patch = parsedVersion[0][2].isEmpty ? 0 : Int(parsedVersion[0][2])!
-
+        let parsedVersion = parsedVersions[0]
+        let major = Int(parsedVersion.major) ?? 0
+        let minor: Int
+        if let minorString = parsedVersion.minor {
+            minor = Int(minorString) ?? 0
+        } else {
+            minor = 0
+        }
+        let patch: Int
+        if let patchString = parsedVersion.patch {
+            patch = Int(patchString) ?? 0
+        } else {
+            patch = 0
+        }
         self.rawValue = string
         self._version = Version(major, minor, patch)
     }
