@@ -2158,7 +2158,7 @@ extension HTTPClientHeaders {
             return nil
         }
 
-        return parts[1].replacingOccurrences(of: "\"", with: "")
+        return parts[1].replacing("\"", with: "")
     }
 }
 

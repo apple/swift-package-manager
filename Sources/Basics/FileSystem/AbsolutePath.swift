@@ -321,7 +321,7 @@ extension AbsolutePath {
 
 extension AbsolutePath {
     public var escapedPathString: String {
-        self.pathString.replacingOccurrences(of: "\\", with: "\\\\")
+        self.pathString.replacing("\\", with: "\\\\")
     }
 }
 

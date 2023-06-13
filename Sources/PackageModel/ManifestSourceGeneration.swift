@@ -684,8 +684,8 @@ extension TargetBuildSettingDescription.Kind {
 extension String {
     fileprivate var quotedForPackageManifest: String {
         return "\"" + self
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacing("\\", with: "\\\\")
+            .replacing("\"", with: "\\\"")
             + "\""
     }
 }

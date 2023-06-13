@@ -133,7 +133,7 @@ public struct NetrcParser {
         var trimmedCommentsText = text
         matches.forEach {
             trimmedCommentsText = trimmedCommentsText
-                .replacingOccurrences(of: nsString.substring(with: $0.range), with: "")
+                .replacing(nsString.substring(with: $0.range), with: "")
         }
         return trimmedCommentsText
     }
