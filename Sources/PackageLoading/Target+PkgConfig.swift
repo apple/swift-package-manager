@@ -148,6 +148,8 @@ extension SystemPackageProviderDescription {
         switch self {
         case .brew(let packages):
             return "    brew install \(packages.joined(separator: " "))\n"
+        case .port(let packages):
+            return "    port install \(packages.joined(separator: " "))\n"
         case .apt(let packages):
             return "    apt-get install \(packages.joined(separator: " "))\n"
         case .yum(let packages):
@@ -162,6 +164,10 @@ extension SystemPackageProviderDescription {
         guard let platform = Platform.current else { return false }
         switch self {
         case .brew:
+            if case .darwin = platform {
+                return true
+            }
+        case .port:
             if case .darwin = platform {
                 return true
             }
@@ -209,6 +215,8 @@ extension SystemPackageProviderDescription {
                 }
             }
             return try packages.map({ try AbsolutePath(validating: brewPrefix).appending(components: "opt", $0, "lib", "pkgconfig") })
+        case .port:
+            return [try AbsolutePath(validating: "/opt/local/lib/pkgconfig")]
         case .apt:
             return []
         case .yum:

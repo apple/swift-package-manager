@@ -160,7 +160,7 @@ print(options)
 ```
 
 To `import Clibgit`, the package manager requires that the libgit2 library has
-been installed by a system packager (eg. `apt`, `brew`, `yum`, `nuget`, etc.). The
+been installed by a system packager (eg. `apt`, `brew`, `port`, `yum`, `nuget`, etc.). The
 following files from the libgit2 system-package are of interest:
 
     /usr/local/lib/libgit2.dylib      # .so on Linux

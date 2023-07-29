@@ -387,6 +387,7 @@ extension Serialization.SystemPackageProvider {
     init(_ provider: PackageDescription.SystemPackageProvider) {
         switch provider {
         case .brewItem(let values): self = .brew(values)
+        case .portItem(let values): self = .port(values)
         case .aptItem(let values): self = .apt(values)
         case .yumItem(let values): self = .yum(values)
         case .nugetItem(let values): self = .nuget(values)
