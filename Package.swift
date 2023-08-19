@@ -284,6 +284,17 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
+        
+        .target(
+            name: "PackagePublication",
+            dependencies: [
+                "Basics",
+                "PackageModel",
+                "PackageSigning",
+                "SourceControl",
+            ],
+            exclude: ["CMakeLists.txt"]
+        ),
 
         // MARK: Package Manager Functionality
 
@@ -379,6 +390,7 @@ let package = Package(
                 "Build",
                 "CoreCommands",
                 "PackageGraph",
+                "PackagePublication",
                 "SourceControl",
                 "Workspace",
                 "XCBuildSupport",
@@ -423,6 +435,7 @@ let package = Package(
                 "PackageGraph",
                 "PackageLoading",
                 "PackageModel",
+                "PackagePublication",
                 "PackageRegistry",
                 "PackageSigning",
                 "SourceControl",
@@ -608,6 +621,10 @@ let package = Package(
         .testTarget(
             name: "PackagePluginAPITests",
             dependencies: ["PackagePlugin", "SPMTestSupport"]
+        ),
+        .testTarget(
+            name: "PackagePublicationTests",
+            dependencies: ["SPMTestSupport", "PackagePublication"]
         ),
         .testTarget(
             name: "PackageRegistryTests",

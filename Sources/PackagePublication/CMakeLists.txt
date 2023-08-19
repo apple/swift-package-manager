@@ -6,24 +6,19 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-add_library(PackageSigning STATIC
-  embedded_resources.swift
-  CertificateStores.swift
-  SigningEntity/FilePackageSigningEntityStorage.swift
-  SigningEntity/PackageSigningEntityStorage.swift
-  SigningEntity/SigningEntity.swift
-  SignatureProvider.swift
-  SigningIdentity.swift
-  VerifierPolicies.swift
-  X509Extensions.swift)
-target_link_libraries(PackageSigning PUBLIC
+add_library(PackagePublication STATIC
+  ManifestSigner.swift
+  PackageArchiver.swift
+  PackagePublication.swift
+  PackageSigner.swift)
+target_link_libraries(PackagePublication PUBLIC
   $<$<NOT:$<PLATFORM_ID:Darwin>>:Foundation>
   Basics
-  Crypto
   PackageModel
+  PackageSigning
+  SourceControl
   TSCBasic
-  TSCUtility
-  X509)
+  TSCUtility)
 # NOTE(compnerd) workaround for CMake not setting up include flags yet
-set_target_properties(PackageSigning PROPERTIES
+set_target_properties(PackagePublication PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_Swift_MODULE_DIRECTORY})

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 import ArgumentParser
 import Basics
 import CoreCommands
-import SourceControl
+import PackagePublication
 
 extension SwiftPackageTool {
     struct ArchiveSource: SwiftCommand {
@@ -43,7 +43,7 @@ extension SwiftPackageTool {
                 archivePath = packageDirectory.appending("\(packageName).zip")
             }
 
-            try SwiftPackageTool.archiveSource(
+            try PackageArchiver.archiveSource(
                 at: packageDirectory,
                 to: archivePath,
                 fileSystem: localFileSystem,
@@ -55,24 +55,6 @@ extension SwiftPackageTool {
                 print("Created \(relativePath.pathString)")
             } else {
                 print("Created \(archivePath.pathString)")
-            }
-        }
-    }
-
-    public static func archiveSource(
-        at packageDirectory: AbsolutePath,
-        to archivePath: AbsolutePath,
-        fileSystem: FileSystem,
-        cancellator: Cancellator?
-    ) throws  {
-        let gitRepositoryProvider = GitRepositoryProvider()
-        if gitRepositoryProvider.repositoryExists(at: packageDirectory) {
-            let repository = GitRepository(path: packageDirectory, cancellator: cancellator)
-            try repository.archive(to: archivePath)
-        } else {
-            let zipArchiver = ZipArchiver(fileSystem: fileSystem, cancellator: cancellator)
-            try temp_await {
-                zipArchiver.compress(directory: packageDirectory, to: archivePath, completion: $0)
             }
         }
     }
