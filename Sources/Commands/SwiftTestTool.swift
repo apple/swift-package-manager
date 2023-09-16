@@ -35,6 +35,17 @@ import class TSCUtility.NinjaProgressAnimation
 import class TSCUtility.PercentProgressAnimation
 import protocol TSCUtility.ProgressAnimationProtocol
 
+#if os(Windows)
+import func CRT.fflush
+import let CRT.stdout
+#elseif canImport(Darwin)
+import func Darwin.fflush
+import let Darwin.stdout
+#elseif canImport(Glibc)
+import func Glibc.fflush
+import let Glibc.stdout
+#endif
+
 private enum TestError: Swift.Error {
     case invalidListTestJSONData(context: String, underlyingError: Error? = nil)
     case testsNotFound
@@ -291,6 +302,7 @@ public struct SwiftTestTool: SwiftCommand {
                 // command's result output goes on stdout
                 // ie "swift test" should output to stdout
                 print($0)
+                fflush(stdout)
             })
             if !ranSuccessfully {
                 swiftTool.executionStatus = .failure
