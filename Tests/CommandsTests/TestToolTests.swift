@@ -16,6 +16,12 @@ import PackageModel
 import SPMTestSupport
 import XCTest
 
+import struct TSCBasic.Lock
+import class TSCBasic.Process
+
+import Foundation
+import Dispatch
+
 final class TestToolTests: CommandsTestCase {
     
     private func execute(_ args: [String], packagePath: AbsolutePath? = nil) throws -> (stdout: String, stderr: String) {
@@ -253,6 +259,52 @@ final class TestToolTests: CommandsTestCase {
                 XCTAssertMatch(stdout, .contains("SimpleTests.SimpleTests/test_Example2"))
                 XCTAssertMatch(stdout, .contains("SimpleTests.SimpleTests/testThrowing"))
             }
+        }
+    }
+
+    func testOutputLineBuffering() async throws {
+        #if os(macOS)
+        // This test hangs on macOS on CI for an unknown reason, and only when running `swift test --parallel`,
+        // it does pass sequentially. Potentially could be a bug in the `TSC.Process` implementation, rdar://110021665.
+        try XCTSkipIf(true, "this test hangs on macOS")
+        #endif
+
+        try fixture(name: "Miscellaneous/HangingTest") { fixturePath in
+            // Pre-build tests so that `swift test` command takes as little time as possible to start the hanging test.
+            _ = try SwiftPM.Build.execute(["--build-tests"], packagePath: fixturePath)
+
+            let completeArgs = [SwiftPM.Test.path.pathString, "--package-path", fixturePath.pathString]
+
+            var output = [UInt8]()
+            let lock = NSLock()
+            let outputRedirection = TSCBasic.Process.OutputRedirection.stream(
+                stdout: { bytes in
+                    lock.withLock {
+                        output.append(contentsOf: bytes)
+                    }
+                },
+                stderr: { bytes in
+                    lock.withLock {
+                        output.append(contentsOf: bytes)
+                    }
+                }
+            )
+
+            let process = TSCBasic.Process(
+                arguments: completeArgs,
+                outputRedirection: outputRedirection
+            )
+            try process.launch()
+
+            // This time interval should be enough for the test to start and get its output into the pipe.
+            Thread.sleep(forTimeInterval: 10)
+
+            process.signal(9)
+
+            let outputString = lock.withLock {
+                String(bytes: output, encoding: .utf8)
+            }
+            XCTAssertMatch(outputString, .and(.contains("Test Suite"), .contains(" started at ")))
         }
     }
 }
