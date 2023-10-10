@@ -554,4 +554,23 @@ final class DestinationTests: XCTestCase {
             parsedDestinationV2Musl
         )
     }
+
+    func testDefaultSDKs() throws {
+        let hostSDK = try SwiftSDK.hostSwiftSDK("/prefix/bin")
+
+        #if os(macOS)
+        let iOSTriple = try Triple("arm64-apple-ios")
+        let iOS = try XCTUnwrap(SwiftSDK.defaultSwiftSDK(for: iOSTriple, hostSDK: hostSDK))
+        XCTAssertEqual(iOS.toolset.rootPaths, hostSDK.toolset.rootPaths)
+
+        let sdkPath = try XCTUnwrap(iOS.pathsConfiguration.sdkRootPath)
+        XCTAssertEqual(sdkPath.extension, "sdk")
+
+        let sdkName = try XCTUnwrap(sdkPath.components.last)
+        XCTAssert(sdkName.hasPrefix("iPhoneOS"))
+
+        let cFlags = iOS.toolset.knownTools[.cCompiler]?.extraCLIOptions ?? []
+        XCTAssertFalse(cFlags.contains { $0.lowercased().contains("macos") }, "Found macOS path in \(cFlags)")
+        #endif
+    }
 }

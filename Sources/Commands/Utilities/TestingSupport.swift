@@ -106,6 +106,15 @@ enum TestingSupport {
         // Run the correct tool.
         var args = [String]()
         #if os(macOS)
+        let targetTriple = try swiftTool.getTargetToolchain().targetTriple
+        guard targetTriple.darwinPlatform == .macOS else {
+            swiftTool.observabilityScope.emit(error: """
+            Attempting to run tests cross-compiled for non-macOS target '\(targetTriple)'; \
+            this is currently unsupported.
+            """)
+            return []
+        }
+
         let data: String = try withTemporaryFile { tempFile in
             args = [try Self.xctestHelperPath(swiftTool: swiftTool).pathString, path.pathString, tempFile.path.pathString]
             var env = try Self.constructTestEnvironment(
@@ -119,10 +128,11 @@ enum TestingSupport {
             )
 
             // Add the sdk platform path if we have it. If this is not present, we might always end up failing.
-            let sdkPlatformFrameworksPath = try SwiftSDK.sdkPlatformFrameworkPaths()
+            // Since XCTestHelper targets macOS, we need the macOS platform paths here.
+            let sdkPlatformPaths = try SwiftSDK.sdkPlatformPaths(for: .macOS)
             // appending since we prefer the user setting (if set) to the one we inject
-            env.appendPath("DYLD_FRAMEWORK_PATH", value: sdkPlatformFrameworksPath.fwk.pathString)
-            env.appendPath("DYLD_LIBRARY_PATH", value: sdkPlatformFrameworksPath.lib.pathString)
+            env.appendPath("DYLD_FRAMEWORK_PATH", value: sdkPlatformPaths.frameworks.pathString)
+            env.appendPath("DYLD_LIBRARY_PATH", value: sdkPlatformPaths.libraries.pathString)
 
             try TSCBasic.Process.checkNonZeroExit(arguments: args, environment: env)
             // Read the temporary file's content.

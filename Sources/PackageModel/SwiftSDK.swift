@@ -449,6 +449,23 @@ public struct SwiftSDK: Equatable {
         originalWorkingDirectory: AbsolutePath? = nil,
         environment: [String: String] = ProcessEnv.vars
     ) throws -> SwiftSDK {
+        try self.systemSwiftSDK(
+            binDir,
+            originalWorkingDirectory: originalWorkingDirectory,
+            environment: environment
+        )
+    }
+
+    /// A default Swift SDK on the host.
+    ///
+    /// Equivalent to `hostSwiftSDK`, except on macOS, where passing a non-nil `darwinPlatformOverride`
+    /// will result in the SDK for the corresponding Darwin platform.
+    private static func systemSwiftSDK(
+        _ binDir: AbsolutePath? = nil,
+        originalWorkingDirectory: AbsolutePath? = nil,
+        environment: [String: String] = ProcessEnv.vars,
+        darwinPlatformOverride: DarwinPlatform? = nil
+    ) throws -> SwiftSDK {
         let originalWorkingDirectory = originalWorkingDirectory ?? localFileSystem.currentWorkingDirectory
         // Select the correct binDir.
         if ProcessEnv.vars["SWIFTPM_CUSTOM_BINDIR"] != nil {
@@ -463,13 +480,14 @@ public struct SwiftSDK: Equatable {
 
         let sdkPath: AbsolutePath?
         #if os(macOS)
+        let darwinPlatform = darwinPlatformOverride ?? .macOS
         // Get the SDK.
         if let value = lookupExecutablePath(filename: ProcessEnv.vars["SDKROOT"]) {
             sdkPath = value
         } else {
             // No value in env, so search for it.
             let sdkPathStr = try TSCBasic.Process.checkNonZeroExit(
-                arguments: ["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-path"],
+                arguments: ["/usr/bin/xcrun", "--sdk", darwinPlatform.xcrunName, "--show-sdk-path"],
                 environment: environment
             ).spm_chomp()
             guard !sdkPathStr.isEmpty else {
@@ -485,11 +503,11 @@ public struct SwiftSDK: Equatable {
         var extraCCFlags: [String] = []
         var extraSwiftCFlags: [String] = []
         #if os(macOS)
-        let sdkPaths = try SwiftSDK.sdkPlatformFrameworkPaths(environment: environment)
-        extraCCFlags += ["-F", sdkPaths.fwk.pathString]
-        extraSwiftCFlags += ["-F", sdkPaths.fwk.pathString]
-        extraSwiftCFlags += ["-I", sdkPaths.lib.pathString]
-        extraSwiftCFlags += ["-L", sdkPaths.lib.pathString]
+        let sdkPaths = try SwiftSDK.sdkPlatformPaths(for: darwinPlatform, environment: environment)
+        extraCCFlags += ["-F", sdkPaths.frameworks.pathString]
+        extraSwiftCFlags += ["-F", sdkPaths.frameworks.pathString]
+        extraSwiftCFlags += ["-I", sdkPaths.libraries.pathString]
+        extraSwiftCFlags += ["-L", sdkPaths.libraries.pathString]
         #endif
 
         #if !os(Windows)
@@ -508,15 +526,38 @@ public struct SwiftSDK: Equatable {
         )
     }
 
+    /// Auxiliary platform frameworks and libraries.
+    ///
+    /// The referenced directories may contain, for example, test support utilities.
+    ///
+    /// - SeeAlso: ``sdkPlatformFrameworkPaths(for:environment:)``
+    public struct PlatformPaths {
+        /// Path to the directory containing auxiliary platform frameworks.
+        public var frameworks: AbsolutePath
+
+        /// Path to the directory containing auxiliary platform libraries.
+        public var libraries: AbsolutePath
+    }
+
     /// Returns `macosx` sdk platform framework path.
+    @available(*, deprecated, message: "use sdkPlatformPaths(for:) instead")
     public static func sdkPlatformFrameworkPaths(
         environment: EnvironmentVariables = .process()
     ) throws -> (fwk: AbsolutePath, lib: AbsolutePath) {
-        if let path = _sdkPlatformFrameworkPath {
+        let paths = try sdkPlatformPaths(for: .macOS, environment: environment)
+        return (fwk: paths.frameworks, lib: paths.libraries)
+    }
+
+    /// Returns ``SwiftSDK/PlatformPaths`` for the provided Darwin platform.
+    public static func sdkPlatformPaths(
+        for darwinPlatform: DarwinPlatform,
+        environment: EnvironmentVariables = .process()
+    ) throws -> PlatformPaths {
+        if let path = _sdkPlatformFrameworkPath[darwinPlatform] {
             return path
         }
         let platformPath = try TSCBasic.Process.checkNonZeroExit(
-            arguments: ["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-platform-path"],
+            arguments: ["/usr/bin/xcrun", "--sdk", darwinPlatform.platformName, "--show-sdk-platform-path"],
             environment: environment
         ).spm_chomp()
 
@@ -534,33 +575,26 @@ public struct SwiftSDK: Equatable {
             components: "Developer", "usr", "lib"
         )
 
-        let sdkPlatformFrameworkPath = (fwk, lib)
-        _sdkPlatformFrameworkPath = sdkPlatformFrameworkPath
+        let sdkPlatformFrameworkPath = PlatformPaths(frameworks: fwk, libraries: lib)
+        _sdkPlatformFrameworkPath[darwinPlatform] = sdkPlatformFrameworkPath
         return sdkPlatformFrameworkPath
     }
 
-    // FIXME: convert this from a tuple to a proper struct with documented properties
-    /// Cache storage for sdk platform path.
-    private static var _sdkPlatformFrameworkPath: (fwk: AbsolutePath, lib: AbsolutePath)? = nil
+    /// Cache storage for sdk platform paths.
+    private static var _sdkPlatformFrameworkPath: [DarwinPlatform: PlatformPaths] = [:]
 
     /// Returns a default Swift SDK for a given target environment
     @available(*, deprecated, renamed: "defaultSwiftSDK")
     public static func defaultDestination(for triple: Triple, host: SwiftSDK) -> SwiftSDK? {
-        if triple.isWASI() {
-            let wasiSysroot = host.toolset.rootPaths.first?
-                .parentDirectory // usr
-                .appending(components: "share", "wasi-sysroot")
-            return SwiftSDK(
-                targetTriple: triple,
-                toolset: host.toolset,
-                pathsConfiguration: .init(sdkRootPath: wasiSysroot)
-            )
-        }
-        return nil
+        defaultSwiftSDK(for: triple, hostSDK: host)
     }
 
     /// Returns a default Swift SDK of a given target environment.
-    public static func defaultSwiftSDK(for targetTriple: Triple, hostSDK: SwiftSDK) -> SwiftSDK? {
+    public static func defaultSwiftSDK(
+        for targetTriple: Triple,
+        hostSDK: SwiftSDK,
+        environment: [String: String] = ProcessEnv.vars
+    ) -> SwiftSDK? {
         if targetTriple.isWASI() {
             let wasiSysroot = hostSDK.toolset.rootPaths.first?
                 .parentDirectory // usr
@@ -571,6 +605,20 @@ public struct SwiftSDK: Equatable {
                 pathsConfiguration: .init(sdkRootPath: wasiSysroot)
             )
         }
+
+        #if os(macOS)
+        if let darwinPlatform = targetTriple.darwinPlatform {
+            // the Darwin SDKs are trivially available on macOS
+            var sdk = try? self.systemSwiftSDK(
+                hostSDK.toolset.rootPaths.first,
+                environment: environment,
+                darwinPlatformOverride: darwinPlatform
+            )
+            sdk?.targetTriple = targetTriple
+            return sdk
+        }
+        #endif
+
         return nil
     }
 
@@ -795,6 +843,18 @@ extension SwiftSDK {
                     toolsetPaths: self.pathsConfiguration.toolsetPaths?.map(\.pathString)
                 )
             )
+        }
+    }
+}
+
+extension DarwinPlatform {
+    /// The name xcrun uses to identify this platform.
+    fileprivate var xcrunName: String {
+        switch self {
+        case .iOS(.catalyst):
+            return "macosx"
+        default:
+            return platformName
         }
     }
 }
