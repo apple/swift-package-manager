@@ -547,7 +547,7 @@ public extension PluginTarget {
             // For a binary target we create a `vendedTool`.
             if let target = executableOrBinaryTarget as? BinaryTarget {
                 // TODO: Memoize this result for the host triple
-                let execInfos = try target.parseArtifactArchives(for: hostTriple, fileSystem: fileSystem)
+                let execInfos = try target.parseExecutableArtifactArchives(for: hostTriple, fileSystem: fileSystem)
                 return try execInfos.map{ .vendedTool(name: $0.name, path: $0.executablePath, supportedTriples: try $0.supportedTriples.map{ try $0.withoutVersion().tripleString }) }
             }
             // For an executable target we create a `builtTool`.

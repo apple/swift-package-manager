@@ -135,6 +135,8 @@ internal struct PluginContextSerializer {
             switch target.kind {
             case .artifactsArchive:
                 artifactKind = .artifactsArchive
+            case .libraryArchive:
+                artifactKind = .libraryArchive
             case .xcframework:
                 artifactKind = .xcframework
             case .unknown:

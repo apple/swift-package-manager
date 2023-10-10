@@ -349,6 +349,7 @@ public struct BinaryArtifactTarget: Target {
     public enum Kind {
         case xcframework
         case artifactsArchive
+        case libraryArchive
     }
     
     // Represents the original location of a binary artifact.

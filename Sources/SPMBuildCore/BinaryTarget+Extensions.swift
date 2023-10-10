@@ -22,6 +22,9 @@ public struct LibraryInfo: Equatable {
 
     /// The paths to the headers directories.
     public let headersPaths: [AbsolutePath]
+
+    /// The path to the module map of this library.
+    public let moduleMapPath: AbsolutePath?
 }
 
 /// Information about an executable from a binary dependency.
@@ -53,16 +56,20 @@ extension BinaryTarget {
         let libraryFile = try AbsolutePath(validating: library.libraryPath, relativeTo: libraryDir)
         let headersDirs = try library.headersPath
             .map { [try AbsolutePath(validating: $0, relativeTo: libraryDir)] } ?? [] + [libraryDir]
-        return [LibraryInfo(libraryPath: libraryFile, headersPaths: headersDirs)]
+        return [LibraryInfo(libraryPath: libraryFile, headersPaths: headersDirs, moduleMapPath: nil)]
     }
 
-    public func parseArtifactArchives(for triple: Triple, fileSystem: FileSystem) throws -> [ExecutableInfo] {
+    @available(*, deprecated, renamed: "parseExecutableArtifactArchives")
+    public func parseArtifactArchives(for triple: Triple, fileSystem: any FileSystem) throws -> [ExecutableInfo] {
+        try self.parseExecutableArtifactArchives(for: triple, fileSystem: fileSystem)
+    }
+
+    public func parseExecutableArtifactArchives(for triple: Triple, fileSystem: any FileSystem) throws -> [ExecutableInfo] {
         // The host triple might contain a version which we don't want to take into account here.
         let versionLessTriple = try triple.withoutVersion()
         // We return at most a single variant of each artifact.
         let metadata = try ArtifactsArchiveMetadata.parse(fileSystem: fileSystem, rootPath: self.artifactPath)
-        // Currently we filter out everything except executables.
-        // TODO: Add support for libraries
+        // Filter out everything except executables.
         let executables = metadata.artifacts.filter { $0.value.type == .executable }
         // Construct an ExecutableInfo for each matching variant.
         return try executables.flatMap { entry in
@@ -78,6 +85,21 @@ extension BinaryTarget {
                 )
             }
         }
+    }
+
+    public func parseLibraryArtifactArchives(for triple: Triple, fileSystem: any FileSystem) throws -> [LibraryInfo] {
+        try ArtifactsArchiveMetadata.parse(fileSystem: fileSystem, rootPath: self.artifactPath).artifacts
+            .filter { $0.value.type == .library }
+            .flatMap { entry in
+                // Construct a `LibraryInfo` for each matching variant.
+                entry.value.variants.map {
+                    LibraryInfo(
+                        libraryPath: self.artifactPath.appending($0.path),
+                        headersPaths: $0.libraryMetadata?.headerPaths.map { self.artifactPath.appending($0) } ?? [],
+                        moduleMapPath: $0.libraryMetadata?.moduleMapPath.map { self.artifactPath.appending($0) }
+                    )
+                }
+            }
     }
 }
 

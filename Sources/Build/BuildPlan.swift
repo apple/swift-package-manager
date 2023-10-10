@@ -219,10 +219,10 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
     /// Cache for pkgConfig flags.
     private var pkgConfigCache = [SystemLibraryTarget: (cFlags: [String], libs: [String])]()
 
-    /// Cache for  library information.
+    /// Cache for library information.
     private var externalLibrariesCache = [BinaryTarget: [LibraryInfo]]()
 
-    /// Cache for  tools information.
+    /// Cache for tools information.
     private var externalExecutablesCache = [BinaryTarget: [ExecutableInfo]]()
 
     /// The filesystem to operate on.
@@ -809,8 +809,15 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                             libraryBinaryPaths.insert(library.libraryPath)
                         }
                     case .artifactsArchive:
-                        let tools = try self.parseArtifactsArchive(for: binaryTarget)
-                        tools.forEach { availableTools[$0.name] = $0.executablePath  }
+                        let tools = try self.parseExecutableArtifactsArchive(for: binaryTarget)
+                        for tool in tools {
+                            availableTools[tool.name] = tool.executablePath
+                        }
+                    case .libraryArchive:
+                        let libraries = try self.parseLibraryArtifactsArchive(for: binaryTarget)
+                        for library in libraries {
+                            libraryBinaryPaths.insert(library.libraryPath)
+                        }
                     case.unknown:
                         throw InternalError("unknown binary target '\(target.name)' type")
                     }
@@ -843,7 +850,7 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
             case is SwiftTarget:
                 if case let .swift(dependencyTargetDescription)? = targetMap[dependency] {
                     if let moduleMap = dependencyTargetDescription.moduleMap {
-                        clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap.pathString)"]
+                        clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap)"]
                     }
                 }
 
@@ -854,14 +861,15 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                 // Add the modulemap of the dependency if it has one.
                 if case let .clang(dependencyTargetDescription)? = targetMap[dependency] {
                     if let moduleMap = dependencyTargetDescription.moduleMap {
-                        clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap.pathString)"]
+                        clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap)"]
                     }
                 }
             case let target as SystemLibraryTarget:
-                clangTarget.additionalFlags += ["-fmodule-map-file=\(target.moduleMapPath.pathString)"]
+                clangTarget.additionalFlags += ["-fmodule-map-file=\(target.moduleMapPath)"]
                 clangTarget.additionalFlags += try pkgConfig(for: target).cFlags
             case let target as BinaryTarget:
-                if case .xcframework = target.kind {
+                switch target.kind {
+                case .xcframework:
                     let libraries = try self.parseXCFramework(for: target)
                     for library in libraries {
                         library.headersPaths.forEach {
@@ -869,6 +877,23 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                         }
                         clangTarget.libraryBinaryPaths.insert(library.libraryPath)
                     }
+
+                case .libraryArchive:
+                    let libraries = try self.parseLibraryArtifactsArchive(for: target)
+                    for library in libraries {
+                        library.headersPaths.forEach {
+                            clangTarget.additionalFlags += ["-I", $0.pathString]
+                        }
+                        clangTarget.libraryBinaryPaths.insert(library.libraryPath)
+                        if let moduleMapPath = library.moduleMapPath {
+                            clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMapPath)"]
+                        }
+                    }
+
+                default:
+                    observabilityScope.emit(
+                        warning: "Kind \(target.kind) of binary target \(target.name) is not supported."
+                    )
                 }
             default: continue
             }
@@ -894,11 +919,14 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                     "-Xcc", "-fmodule-map-file=\(moduleMap.pathString)",
                     "-Xcc", "-I", "-Xcc", target.clangTarget.includeDir.pathString,
                 ]
+
             case let target as SystemLibraryTarget:
-                swiftTarget.additionalFlags += ["-Xcc", "-fmodule-map-file=\(target.moduleMapPath.pathString)"]
+                swiftTarget.additionalFlags += ["-Xcc", "-fmodule-map-file=\(target.moduleMapPath)"]
                 swiftTarget.additionalFlags += try pkgConfig(for: target).cFlags
+
             case let target as BinaryTarget:
-                if case .xcframework = target.kind {
+                switch target.kind {
+                case .xcframework:
                     let libraries = try self.parseXCFramework(for: target)
                     for library in libraries {
                         library.headersPaths.forEach {
@@ -906,7 +934,25 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                         }
                         swiftTarget.libraryBinaryPaths.insert(library.libraryPath)
                     }
+
+                case .libraryArchive:
+                    let libraries = try self.parseLibraryArtifactsArchive(for: target)
+                    for library in libraries {
+                        library.headersPaths.forEach {
+                            swiftTarget.additionalFlags += ["-I", $0.pathString, "-Xcc", "-I", "-Xcc", $0.pathString]
+                        }
+                        swiftTarget.libraryBinaryPaths.insert(library.libraryPath)
+                        if let moduleMapPath = library.moduleMapPath {
+                            swiftTarget.additionalFlags += ["-Xcc", "-fmodule-map-file=\(moduleMapPath)"]
+                        }
+                    }
+                    
+                default:
+                    observabilityScope.emit(
+                        warning: "Kind \(target.kind) of binary target \(target.name) is not supported."
+                    )
                 }
+
             default:
                 break
             }
@@ -1031,15 +1077,24 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
     /// Extracts the library information from an XCFramework.
     private func parseXCFramework(for target: BinaryTarget) throws -> [LibraryInfo] {
         try self.externalLibrariesCache.memoize(key: target) {
-            return try target.parseXCFrameworks(for: self.buildParameters.targetTriple, fileSystem: self.fileSystem)
+            try target.parseXCFrameworks(for: self.buildParameters.targetTriple, fileSystem: self.fileSystem)
         }
     }
 
-    /// Extracts the artifacts  from an artifactsArchive
-    private func parseArtifactsArchive(for target: BinaryTarget) throws -> [ExecutableInfo] {
+    /// Extracts the executable artifacts from an `.artifactbundle`.
+    private func parseExecutableArtifactsArchive(for target: BinaryTarget) throws -> [ExecutableInfo] {
         try self.externalExecutablesCache.memoize(key: target) {
-            let execInfos = try target.parseArtifactArchives(for: self.buildParameters.targetTriple, fileSystem: self.fileSystem)
-            return execInfos.filter{!$0.supportedTriples.isEmpty}
+            let execInfos = try target.parseExecutableArtifactArchives(
+                for: self.buildParameters.targetTriple,
+                fileSystem: self.fileSystem
+            )
+            return execInfos.filter { !$0.supportedTriples.isEmpty }
+        }
+    }
+
+    private func parseLibraryArtifactsArchive(for target: BinaryTarget) throws -> [LibraryInfo] {
+        try self.externalLibrariesCache.memoize(key: target) {
+            try target.parseLibraryArtifactArchives(for: self.buildParameters.targetTriple, fileSystem: self.fileSystem)
         }
     }
 }

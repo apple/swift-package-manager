@@ -139,6 +139,8 @@ internal struct PluginContextDeserializer {
             switch kind {
             case .artifactsArchive:
                 artifactKind = .artifactsArchive
+            case .libraryArchive:
+                artifactKind = .libraryArchive
             case .xcframework:
                 artifactKind = .xcframework
             }
