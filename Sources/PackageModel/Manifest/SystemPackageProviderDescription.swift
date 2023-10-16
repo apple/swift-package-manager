@@ -13,7 +13,7 @@
 /// Represents system package providers.
 public enum SystemPackageProviderDescription: Equatable, Codable, Sendable {
     case brew([String])
-    case port([String])
+    case macPort([String])
     case apt([String])
     case yum([String])
     case nuget([String])
@@ -21,7 +21,7 @@ public enum SystemPackageProviderDescription: Equatable, Codable, Sendable {
 
 extension SystemPackageProviderDescription {
     private enum CodingKeys: String, CodingKey {
-        case brew, port, apt, yum, nuget
+        case brew, macPort, apt, yum, nuget
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -30,8 +30,8 @@ extension SystemPackageProviderDescription {
         case let .brew(a1):
             var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .brew)
             try unkeyedContainer.encode(a1)
-        case let .port(a1):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .port)
+        case let .macPort(a1):
+            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .macPort)
             try unkeyedContainer.encode(a1)
         case let .apt(a1):
             var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .apt)
@@ -55,10 +55,10 @@ extension SystemPackageProviderDescription {
             var unkeyedValues = try values.nestedUnkeyedContainer(forKey: key)
             let a1 = try unkeyedValues.decode([String].self)
             self = .brew(a1)
-        case .port:
+        case .macPort:
             var unkeyedValues = try values.nestedUnkeyedContainer(forKey: key)
             let a1 = try unkeyedValues.decode([String].self)
-            self = .port(a1)
+            self = .macPort(a1)
         case .apt:
             var unkeyedValues = try values.nestedUnkeyedContainer(forKey: key)
             let a1 = try unkeyedValues.decode([String].self)

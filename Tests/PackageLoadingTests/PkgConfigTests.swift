@@ -51,7 +51,7 @@ class PkgConfigTests: XCTestCase {
                 pkgConfig: "Foo",
                 providers: [
                     .brew(["libFoo"]),
-                    .port(["libFoo"]),
+                    .macPort(["libFoo"]),
                     .apt(["libFoo-dev"]),
                     .yum(["libFoo-devel"]),
                     .nuget(["Foo"]),
@@ -68,7 +68,7 @@ class PkgConfigTests: XCTestCase {
                 switch result.provider {
                 case .brew(let names)?:
                     XCTAssertEqual(names, ["libFoo"])
-                case .port(let names)?:
+                case .macPort(let names)?:
                     XCTAssertEqual(names, ["libFoo"])
                 case .apt(let names)?:
                     XCTAssertEqual(names, ["libFoo-dev"])

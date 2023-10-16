@@ -5,6 +5,6 @@
 ### Providing Hints to Users of System Packages
 
 - ``brew(_:)``
-- ``port(_:)``
+- ``macPort(_:)``
 - ``apt(_:)``
 - ``yum(_:)``
