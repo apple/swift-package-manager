@@ -12,6 +12,7 @@
 
 import class PackageModel.BinaryTarget
 import class PackageModel.ClangTarget
+import class PackageModel.MixedTarget
 import class PackageModel.SwiftTarget
 import class PackageModel.SystemLibraryTarget
 
@@ -37,6 +38,22 @@ extension BuildPlan {
                         clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap.pathString)"]
                     }
                 }
+            case let target as MixedTarget where target.type == .library:
+                // Add the modulemap of the dependency.
+                if case let .mixed(dependencyTargetDescription)? = targetMap[dependency] {
+                    // Add the dependency's modulemap.
+                    clangTarget.additionalFlags.append(
+                        "-fmodule-map-file=\(dependencyTargetDescription.moduleMap.pathString)"
+                    )
+
+                    // Add the dependency's public headers.
+                    clangTarget.additionalFlags += [ "-I", dependencyTargetDescription.publicHeadersDir.pathString ]
+
+                    // Add the dependency's public VFS overlay.
+                    clangTarget.additionalFlags += [
+                        "-ivfsoverlay", dependencyTargetDescription.allProductHeadersOverlay.pathString
+                    ]
+                }
             case let target as SystemLibraryTarget:
                 clangTarget.additionalFlags += ["-fmodule-map-file=\(target.moduleMapPath.pathString)"]
                 clangTarget.additionalFlags += try pkgConfig(for: target).cFlags
@@ -54,5 +71,4 @@ extension BuildPlan {
             }
         }
     }
-
 }

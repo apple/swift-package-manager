@@ -46,9 +46,9 @@ public final class XcodeBuildSystem: SPMBuildCore.BuildSystem {
     public var builtTestProducts: [BuiltTestProduct] {
         do {
             let graph = try getPackageGraph()
-            
+
             var builtProducts: [BuiltTestProduct] = []
-            
+
             for package in graph.rootPackages {
                 for product in package.products where product.type == .test {
                     let binaryPath = try buildParameters.binaryPath(for: product)
@@ -62,7 +62,7 @@ public final class XcodeBuildSystem: SPMBuildCore.BuildSystem {
                     )
                 }
             }
-            
+
             return builtProducts
         } catch {
             self.observabilityScope.emit(error)

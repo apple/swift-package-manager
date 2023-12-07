@@ -17,6 +17,9 @@ import PackageModel
 /// Name of the module map file recognized by the Clang and Swift compilers.
 public let moduleMapFilename = "module.modulemap"
 
+/// Name of the auxilliary module map file used in the Clang VFS overlay sytem.
+public let unextendedModuleMapFilename = "unextended-module.modulemap"
+
 extension AbsolutePath {
   fileprivate var moduleEscapedPathString: String {
     return self.pathString.replacingOccurrences(of: "\\", with: "\\\\")
@@ -50,7 +53,7 @@ extension ClangTarget: ModuleMapProtocol {
     }
 }
 
-/// A module map generator for Clang targets.  Module map generation consists of two steps:
+/// A module map generator for Clang and Mixed language targets.  Module map generation consists of two steps:
 /// 1. Examining a target's public-headers directory to determine the appropriate module map type
 /// 2. Generating a module map for any target that doesn't have a custom module map file
 ///
@@ -122,6 +125,8 @@ public struct ModuleMapGenerator {
 
         // Filter out headers and directories at the top level of the public-headers directory.
         // FIXME: What about .hh files, or .hpp, etc?  We should centralize the detection of file types based on names (and ideally share with SwiftDriver).
+        // TODO(ncooke3): Per above FIXME and last line in function, public header
+        // directories with only C++ headers will default to umbrella directory.
         let headers = entries.filter({ fileSystem.isFile($0) && $0.suffix == ".h" })
         let directories = entries.filter({ fileSystem.isDirectory($0) })
 
@@ -173,14 +178,19 @@ public struct ModuleMapGenerator {
         return .umbrellaDirectory(publicHeadersDir)
     }
 
-    /// Generates a module map based of the specified type, throwing an error if anything goes wrong.  Any diagnostics are added to the receiver's diagnostics engine.
-    public func generateModuleMap(type: GeneratedModuleMapType, at path: AbsolutePath) throws {
+    /// Generates a module map based of the specified type, throwing an error if anything goes wrong. Any diagnostics are added to the receiver's diagnostics engine.
+    public func generateModuleMap(
+        type: GeneratedModuleMapType?,
+        at path: AbsolutePath
+    ) throws {
         var moduleMap = "module \(moduleName) {\n"
-        switch type {
-        case .umbrellaHeader(let hdr):
-            moduleMap.append("    umbrella header \"\(hdr.moduleEscapedPathString)\"\n")
-        case .umbrellaDirectory(let dir):
-            moduleMap.append("    umbrella \"\(dir.moduleEscapedPathString)\"\n")
+        if let type = type {
+            switch type {
+            case .umbrellaHeader(let hdr):
+                moduleMap.append("    umbrella header \"\(hdr.moduleEscapedPathString)\"\n")
+            case .umbrellaDirectory(let dir):
+                moduleMap.append("    umbrella \"\(dir.moduleEscapedPathString)\"\n")
+            }
         }
         moduleMap.append(
             """
@@ -190,15 +200,9 @@ public struct ModuleMapGenerator {
             """
         )
 
-        // FIXME: This doesn't belong here.
-        try fileSystem.createDirectory(path.parentDirectory, recursive: true)
-
         // If the file exists with the identical contents, we don't need to rewrite it.
         // Otherwise, compiler will recompile even if nothing else has changed.
-        if let contents = try? fileSystem.readFileContents(path).validDescription, contents == moduleMap {
-            return
-        }
-        try fileSystem.writeFileContents(path, string: moduleMap)
+        try fileSystem.writeFileContentsIfNeeded(path, string: moduleMap)
     }
 }
 

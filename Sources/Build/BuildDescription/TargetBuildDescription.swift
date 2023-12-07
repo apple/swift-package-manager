@@ -23,6 +23,9 @@ public enum TargetBuildDescription {
     /// Clang target description.
     case clang(ClangTargetBuildDescription)
 
+    /// Mixed (Swift + Clang) target description.
+    case mixed(MixedTargetBuildDescription)
+
     /// The objects in this target.
     var objects: [AbsolutePath] {
         get throws {
@@ -30,6 +33,8 @@ public enum TargetBuildDescription {
             case .swift(let target):
                 return try target.objects
             case .clang(let target):
+                return try target.objects
+            case .mixed(let target):
                 return try target.objects
             }
         }
@@ -42,6 +47,8 @@ public enum TargetBuildDescription {
             return target.resources
         case .clang(let target):
             return target.resources
+        case .mixed(let target):
+            return target.resources
         }
     }
 
@@ -52,6 +59,8 @@ public enum TargetBuildDescription {
             return target.bundlePath
         case .clang(let target):
             return target.bundlePath
+        case .mixed(let target):
+            return target.bundlePath
         }
     }
 
@@ -60,6 +69,8 @@ public enum TargetBuildDescription {
         case .swift(let target):
             return target.target
         case .clang(let target):
+            return target.target
+        case .mixed(let target):
             return target.target
         }
     }
@@ -71,6 +82,8 @@ public enum TargetBuildDescription {
             return target.libraryBinaryPaths
         case .clang(let target):
             return target.libraryBinaryPaths
+        case .mixed(let target):
+            return target.libraryBinaryPaths
         }
     }
 
@@ -80,6 +93,8 @@ public enum TargetBuildDescription {
             return target.resourceBundleInfoPlistPath
         case .clang(let target):
             return target.resourceBundleInfoPlistPath
+        case .mixed(let target):
+            return target.resourceBundleInfoPlistPath
         }
     }
 
@@ -88,6 +103,8 @@ public enum TargetBuildDescription {
         case .swift(let target):
             return target.buildToolPluginInvocationResults
         case .clang(let target):
+            return target.buildToolPluginInvocationResults
+        case .mixed(let target):
             return target.buildToolPluginInvocationResults
         }
     }

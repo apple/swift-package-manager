@@ -1,0 +1,5 @@
+module MixedTargetWithNestedPublicHeadersAndCustomModuleMap {
+    header "Driver/Driver.h"
+    header "OldCar.h"
+    export *
+}

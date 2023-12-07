@@ -1,0 +1,4 @@
+module MixedTargetWithCustomModuleMapAndResources {
+    umbrella header "MixedTargetWithCustomModuleMapAndResources.h"
+    export *
+}

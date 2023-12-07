@@ -1,0 +1,11 @@
+module MixedTargetWithCXXPublicAPIAndCustomModuleMap {
+    header "XYZObjcCalculator.h"
+
+    module PublicCXXAPI {
+        header "XYZCxxSumFinder.hpp"
+        requires !swift
+        export *
+    }
+
+    export *
+}

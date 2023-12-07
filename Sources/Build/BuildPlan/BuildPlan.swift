@@ -173,7 +173,7 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
             switch self {
             case .noBuildableTarget:
                 return """
-                The package does not contain a buildable target. 
+                The package does not contain a buildable target.
                 Add at least one `.target` or `.executableTarget` to your `Package.swift`.
                 """
             }
@@ -345,6 +345,18 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                     fileSystem: fileSystem,
                     observabilityScope: observabilityScope)
                 )
+            // TODO(ncooke3): I guess pass in `shouldGenerateTestObservation: generateTestObservation`?
+            case is MixedTarget:
+                guard let package = graph.package(for: target) else {
+                    throw InternalError("package not found for \(target)")
+                }
+                targetMap[target] = try .mixed(MixedTargetBuildDescription(
+                    package: package,
+                    target: target,
+                    toolsVersion: toolsVersion,
+                    buildParameters: buildParameters,
+                    fileSystem: fileSystem,
+                    observabilityScope: observabilityScope))
             case is PluginTarget:
                 guard let package = graph.package(for: target) else {
                     throw InternalError("package not found for \(target)")
@@ -434,6 +446,8 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                 try self.plan(swiftTarget: target)
             case .clang(let target):
                 try self.plan(clangTarget: target)
+            case .mixed(let target):
+                try self.plan(mixedTarget: target)
             }
         }
 
@@ -444,6 +458,13 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
         // FIXME: We need to find out if any product has a target on which it depends
         // both static and dynamically and then issue a suitable diagnostic or auto
         // handle that situation.
+    }
+
+    // TODO(ncooke3): Post-merge–– move to own file.
+    /// Plan a Mixed target.
+    private func plan(mixedTarget: MixedTargetBuildDescription) throws {
+        try plan(swiftTarget: mixedTarget.swiftTargetBuildDescription)
+        try plan(clangTarget: mixedTarget.clangTargetBuildDescription)
     }
 
     public func createAPIToolCommonArgs(includeLibrarySearchPaths: Bool) throws -> [String] {
@@ -476,6 +497,9 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                 if let includeDir = targetDescription.moduleMap?.parentDirectory {
                     arguments += ["-I", includeDir.pathString]
                 }
+            case .mixed(let targetDescription):
+                let includeDir = targetDescription.moduleMap.parentDirectory
+                arguments += ["-I", includeDir.pathString]
             }
         }
 
@@ -512,6 +536,9 @@ public class BuildPlan: SPMBuildCore.BuildPlan {
                 if let includeDir = targetDescription.moduleMap?.parentDirectory {
                     arguments += ["-I\(includeDir.pathString)"]
                 }
+            case .mixed(let targetDescription):
+                let includeDir = targetDescription.moduleMap.parentDirectory
+                arguments += ["-I\(includeDir.pathString)"]
             }
         }
 

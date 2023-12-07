@@ -205,7 +205,9 @@ extension Target.Error: CustomStringConvertible {
         case .invalidName(let path, let problem):
             return "invalid target name at '\(path)'; \(problem)"
         case .mixedSources(let path):
-            return "target at '\(path)' contains mixed language source files; feature not supported"
+            // FIXME(ncooke3): Update error message with support version.
+            return "target at '\(path)' contains mixed language source " +
+                    "files; feature not supported until tools version XX"
         }
     }
 }
@@ -955,7 +957,48 @@ public final class PackageBuilder {
         }
 
         // Create and return the right kind of target depending on what kind of sources we found.
-        if sources.hasSwiftSources {
+        if sources.hasSwiftSources && sources.hasClangSources {
+
+            let mixedTargetPublicHeadersPath: AbsolutePath
+            let moduleMapType: ModuleMapType
+            // Mixed test targets use the target's root as an umbrella
+            // directory to expose all headers to the Swift portion of the test
+            // target. This enables the sharing of test utility files.
+            if targetType == .test {
+                mixedTargetPublicHeadersPath = potentialModule.path
+                moduleMapType = .umbrellaDirectory(potentialModule.path)
+            } else {
+                mixedTargetPublicHeadersPath = publicHeadersPath
+                moduleMapType = findModuleMapType(
+                    for: potentialModule,
+                    targetType: targetType,
+                    publicHeadersPath: publicHeadersPath
+                )
+            }
+
+            return try MixedTarget(
+                name: potentialModule.name,
+                potentialBundleName: potentialBundleName,
+                cLanguageStandard: manifest.cLanguageStandard,
+                cxxLanguageStandard: manifest.cxxLanguageStandard,
+                includeDir: mixedTargetPublicHeadersPath,
+                moduleMapType: moduleMapType,
+                headers: headers,
+                type: targetType,
+                path: potentialModule.path,
+                sources: sources,
+                resources: resources,
+                ignored: ignored,
+                others: others,
+                dependencies: dependencies,
+                packageAccess: potentialModule.packageAccess,
+                swiftVersion: try swiftVersion(),
+                buildSettings: buildSettings,
+                usesUnsafeFlags: manifestTarget.usesUnsafeFlags
+
+            )
+
+        } else if sources.hasSwiftSources {
             return SwiftTarget(
                 name: potentialModule.name,
                 potentialBundleName: potentialBundleName,
@@ -972,28 +1015,21 @@ public final class PackageBuilder {
                 usesUnsafeFlags: manifestTarget.usesUnsafeFlags
             )
         } else {
-            // It's not a Swift target, so it's a Clang target (those are the only two types of source target currently supported).
+            // It's not a Mixed or Swift target, so it's a Clang target.
 
-            // First determine the type of module map that will be appropriate for the target based on its header layout.
-            let moduleMapType: ModuleMapType
-
-            if self.fileSystem.exists(publicHeadersPath) {
-                let moduleMapGenerator = ModuleMapGenerator(
-                    targetName: potentialModule.name,
-                    moduleName: potentialModule.name.spm_mangledToC99ExtendedIdentifier(),
-                    publicHeadersDir: publicHeadersPath,
-                    fileSystem: self.fileSystem
-                )
-                moduleMapType = moduleMapGenerator.determineModuleMapType(observabilityScope: self.observabilityScope)
-            } else if targetType == .library, self.manifest.toolsVersion >= .v5_5 {
-                // If this clang target is a library, it must contain "include" directory.
-                throw ModuleError.invalidPublicHeadersDirectory(potentialModule.name)
-            } else {
-                moduleMapType = .none
-            }
+            let moduleMapType = findModuleMapType(
+                for: potentialModule,
+                targetType: targetType,
+                publicHeadersPath: publicHeadersPath
+            )
 
             if resources.contains(where: { $0.rule == .embedInCode }) {
                 throw ModuleError.embedInCodeNotSupported(target: potentialModule.name)
+            }
+
+            if moduleMapType == .none, targetType == .library, manifest.toolsVersion >= .v5_5 {
+                // If this clang target is a library, it must contain "include" directory.
+                throw ModuleError.invalidPublicHeadersDirectory(potentialModule.name)
             }
 
             return try ClangTarget(
@@ -1208,6 +1244,25 @@ public final class PackageBuilder {
         if !overlappingSources.isEmpty {
             throw ModuleError.overlappingSources(target: target, sources: Array(overlappingSources))
         }
+    }
+
+    /// Determines the type of module map that will be appropriate for a potential target based on its header layout.
+    private func findModuleMapType(
+        for potentialModule: PotentialModule,
+        targetType: Target.Kind,
+        publicHeadersPath: AbsolutePath
+    ) -> ModuleMapType {
+        guard fileSystem.exists(publicHeadersPath) else {
+            return .none
+        }
+
+        let moduleMapGenerator = ModuleMapGenerator(
+            targetName: potentialModule.name,
+            moduleName: potentialModule.name.spm_mangledToC99ExtendedIdentifier(),
+            publicHeadersDir: publicHeadersPath,
+            fileSystem: fileSystem
+        )
+        return moduleMapGenerator.determineModuleMapType(observabilityScope: self.observabilityScope)
     }
 
     /// Find the test entry point file for the package.

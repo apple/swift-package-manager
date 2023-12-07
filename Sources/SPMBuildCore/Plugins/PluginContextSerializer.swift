@@ -101,6 +101,18 @@ internal struct PluginContextSerializer {
                 linkedLibraries: scope.evaluate(.LINK_LIBRARIES),
                 linkedFrameworks: scope.evaluate(.LINK_FRAMEWORKS))
 
+        case let target as MixedTarget:
+            targetInfo = .mixedSourceModuleInfo(
+                moduleName: target.c99name,
+                kind: try .init(target.type),
+                sourceFiles: targetFiles,
+                compilationConditions: scope.evaluate(.SWIFT_ACTIVE_COMPILATION_CONDITIONS),
+                preprocessorDefinitions: scope.evaluate(.GCC_PREPROCESSOR_DEFINITIONS),
+                headerSearchPaths: scope.evaluate(.HEADER_SEARCH_PATHS),
+                publicHeadersDirId: try serialize(path: target.clangTarget.includeDir),
+                linkedLibraries: scope.evaluate(.LINK_LIBRARIES),
+                linkedFrameworks: scope.evaluate(.LINK_FRAMEWORKS))
+
         case let target as SystemLibraryTarget:
             var cFlags: [String] = []
             var ldFlags: [String] = []

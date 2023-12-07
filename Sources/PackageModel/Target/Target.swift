@@ -19,6 +19,7 @@ public class Target: PolymorphicCodableProtocol {
     public static var implementations: [PolymorphicCodableProtocol.Type] = [
         SwiftTarget.self,
         ClangTarget.self,
+        MixedTarget.self,
         SystemLibraryTarget.self,
         BinaryTarget.self,
         PluginTarget.self,

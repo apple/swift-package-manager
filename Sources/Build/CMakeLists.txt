@@ -12,6 +12,7 @@ add_library(Build
   BuildDescription/ProductBuildDescription.swift
   BuildDescription/SharedTargetBuildDescription.swift
   BuildDescription/SwiftTargetBuildDescription.swift
+  BuildDescription/MixedTargetBuildDescription.swift
   BuildDescription/TargetBuildDescription.swift
   BuildManifest/LLBuildManifestBuilder.swift
   BuildManifest/LLBuildManifestBuilder+Clang.swift

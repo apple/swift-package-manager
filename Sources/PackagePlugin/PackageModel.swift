@@ -318,6 +318,70 @@ public struct ClangSourceModuleTarget: SourceModuleTarget {
     public let linkedFrameworks: [String]
 }
 
+/// Represents a target consisting of a source code module containing both Swift and C-family language sources.
+public struct MixedSourceModuleTarget: SourceModuleTarget {
+
+    /// Describes attributes specific to the target's Swift sources.
+    public struct SwiftSourceAttributes {
+        /// Any custom compilation conditions specified for the target's Swift sources.
+        public let compilationConditions: [String]
+    }
+
+    /// Describes settings specific to the target's C-family language sources.
+    public struct ClangSourceAttributes {
+        /// Any preprocessor definitions specified for the Clang target.
+        public let preprocessorDefinitions: [String]
+
+        /// Any custom header search paths specified for the Clang target.
+        public let headerSearchPaths: [String]
+
+        /// The directory containing public C headers, if applicable. This will
+        /// only be set for targets that have a directory of a public headers.
+        public let publicHeadersDirectory: Path?
+    }
+
+    /// Unique identifier for the target.
+    public let id: ID
+
+    /// The name of the target, as defined in the package manifest. This name
+    /// is unique among the targets of the package in which it is defined.
+    public let name: String
+
+    /// The kind of module, describing whether it contains unit tests, contains
+    /// the main entry point of an executable, or neither.
+    public let kind: ModuleKind
+
+    /// The absolute path of the target directory in the local file system.
+    public let directory: Path
+
+    /// Any other targets on which this target depends, in the same order as
+    /// they are specified in the package manifest. Conditional dependencies
+    /// that do not apply have already been filtered out.
+    public let dependencies: [TargetDependency]
+
+    /// The name of the module produced by the target (derived from the target
+    /// name, though future SwiftPM versions may allow this to be customized).
+    public let moduleName: String
+
+    /// The source files that are associated with this target (any files that
+    /// have been excluded in the manifest have already been filtered out).
+    public let sourceFiles: FileList
+
+    /// Attributes specific to the target's Swift sources.
+    public let swift: SwiftSourceAttributes
+
+    /// Attributes specific to the target's Clang sources.
+    public let clang: ClangSourceAttributes
+
+    /// Any custom linked libraries required by the module, as specified in the
+    /// package manifest.
+    public let linkedLibraries: [String]
+
+    /// Any custom linked frameworks required by the module, as specified in the
+    /// package manifest.
+    public let linkedFrameworks: [String]
+}
+
 /// Represents a target describing an artifact (e.g. a library or executable)
 /// that is distributed as a binary.
 public struct BinaryArtifactTarget: Target {

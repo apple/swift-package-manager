@@ -13,6 +13,7 @@
 import struct Basics.InternalError
 import class PackageModel.BinaryTarget
 import class PackageModel.ClangTarget
+import class PackageModel.MixedTarget
 import class PackageModel.SystemLibraryTarget
 
 extension BuildPlan {
@@ -30,10 +31,10 @@ extension BuildPlan {
                 // one. However, in that case it will not be importable in Swift targets. We may want to emit a warning
                 // in that case from here.
                 guard let moduleMap = target.moduleMap else { break }
-                swiftTarget.additionalFlags += [
-                    "-Xcc", "-fmodule-map-file=\(moduleMap.pathString)",
-                    "-Xcc", "-I", "-Xcc", target.clangTarget.includeDir.pathString,
-                ]
+                swiftTarget.appendClangFlags(
+                    "-fmodule-map-file=\(moduleMap.pathString)",
+                    "-I", target.clangTarget.includeDir.pathString
+                )
             case let target as SystemLibraryTarget:
                 swiftTarget.additionalFlags += ["-Xcc", "-fmodule-map-file=\(target.moduleMapPath.pathString)"]
                 swiftTarget.additionalFlags += try pkgConfig(for: target).cFlags
@@ -47,10 +48,21 @@ extension BuildPlan {
                         swiftTarget.libraryBinaryPaths.insert(library.libraryPath)
                     }
                 }
+            case let underlyingTarget as MixedTarget where underlyingTarget.type == .library:
+                guard case let .mixed(target)? = targetMap[dependency] else {
+                    throw InternalError("unexpected mixed target \(underlyingTarget)")
+                }
+
+                // Add the dependency's modulemap.
+                swiftTarget.appendClangFlags(
+                    "-fmodule-map-file=\(target.moduleMap.pathString)"
+                )
+
+                // Add the dependency's public headers.
+                swiftTarget.appendClangFlags("-I", target.publicHeadersDir.pathString)
             default:
                 break
             }
         }
     }
-
 }

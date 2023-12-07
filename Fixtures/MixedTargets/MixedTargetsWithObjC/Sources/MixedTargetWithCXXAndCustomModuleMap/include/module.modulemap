@@ -1,0 +1,4 @@
+module MixedTargetWithCXXAndCustomModuleMap {
+    header "Calculator.h"
+    export *
+}

@@ -40,23 +40,113 @@ final class PackageBuilderTests: XCTestCase {
         }
     }
 
+    func testMixedSourcesWhenUnsupportedToolsVersion() throws {
+        let foo: AbsolutePath = AbsolutePath("/Sources/foo")
+
+        let fs = InMemoryFileSystem(emptyFiles:
+            foo.appending(components: "Foo.swift").pathString,
+            foo.appending(components: "bar.c").pathString
+        )
+
+        let manifest = Manifest.createRootManifest(
+            displayName: "pkg",
+            path: .root,
+            // Use older tools version where mixed targets are not supported.
+            toolsVersion: .v5,
+            targets: [
+                try TargetDescription(name: "foo"),
+            ]
+        )
+        PackageBuilderTester(manifest, in: fs) { _, diagnostics in
+            // FIXME(ncooke3): Update error message with support version.
+            diagnostics.check(
+                diagnostic: "target at '\(foo)' contains mixed language source files; feature not supported until tools version XX",
+                severity: .error
+            )
+        }
+    }
+
     func testMixedSources() throws {
         let foo: AbsolutePath = "/Sources/foo"
 
         let fs = InMemoryFileSystem(emptyFiles:
-            foo.appending(components: "main.swift").pathString,
+            foo.appending(components: "Foo.swift").pathString,
+            foo.appending(components: "include", "Bar.h").pathString,
+            foo.appending(components: "Bar.m").pathString,
+            foo.appending(components: "include", "baz.h").pathString,
+            foo.appending(components: "baz.c").pathString
+        )
+
+        let manifest = Manifest.createRootManifest(
+            displayName: "pkg",
+            path: .root,
+            // FIXME(ncooke3): Update with next version of SPM.
+            toolsVersion: .vNext,
+            targets: [
+                try TargetDescription(name: "foo"),
+            ]
+        )
+        PackageBuilderTester(manifest, in: fs) { package, _ in
+            package.checkModule("foo") { module in
+                module.check(c99name: "foo", type: .library)
+                module.checkSources(root: foo.pathString, paths: "Foo.swift", "Bar.m", "baz.c")
+                module.check(includeDir: foo.appending(component: "include").pathString)
+                module.check(moduleMapType: .umbrellaDirectory(foo.appending(component: "include")))
+            }
+        }
+    }
+
+    func testMixedSourcesWithCustomModuleMap() throws {
+        let foo: AbsolutePath = AbsolutePath("/Sources/foo")
+
+        let fs = InMemoryFileSystem(emptyFiles:
+            foo.appending(components: "Foo.swift").pathString,
+            foo.appending(components: "include", "Bar.h").pathString,
+            foo.appending(components: "Bar.m").pathString,
+            foo.appending(components: "include", "module.modulemap").pathString
+        )
+
+        let manifest = Manifest.createRootManifest(
+            displayName: "pkg",
+            path: .root,
+            // FIXME(ncooke3): Update with next version of SPM.
+            toolsVersion: .vNext,
+            targets: [
+                try TargetDescription(name: "foo"),
+            ]
+        )
+        PackageBuilderTester(manifest, in: fs) { package, _ in
+            package.checkModule("foo") { module in
+                module.check(c99name: "foo", type: .library)
+                module.checkSources(root: foo.pathString, paths: "Foo.swift", "Bar.m")
+                module.check(includeDir: foo.appending(component: "include").pathString)
+                module.check(moduleMapType: .custom(foo.appending(components: "include", "module.modulemap")))
+            }
+        }
+    }
+
+    func testMixedTargetsDoNotSupportExecutables() throws {
+        let foo: AbsolutePath = AbsolutePath("/Sources/foo")
+
+        let fs = InMemoryFileSystem(emptyFiles:
+            foo.appending(components: "Foo.swift").pathString,
             foo.appending(components: "main.c").pathString
         )
 
         let manifest = Manifest.createRootManifest(
             displayName: "pkg",
             path: .root,
+            // FIXME(ncooke3): Update with next version of SPM.
+            toolsVersion: .vNext,
             targets: [
-                try TargetDescription(name: "foo"),
+                try TargetDescription(name: "foo", type: .executable),
             ]
         )
         PackageBuilderTester(manifest, in: fs) { _, diagnostics in
-            diagnostics.check(diagnostic: "target at '\(foo)' contains mixed language source files; feature not supported", severity: .error)
+            diagnostics.check(
+                diagnostic: "Target with mixed sources at '\(foo)' is a \(Target.Kind.executable) target; targets with mixed language sources are only supported for library and test targets.",
+                severity: .error
+            )
         }
     }
 
@@ -3134,17 +3224,23 @@ final class PackageBuilderTester {
         }
 
         func check(includeDir: String, file: StaticString = #file, line: UInt = #line) {
-            guard case let target as ClangTarget = target else {
-                return XCTFail("Include directory is being checked on a non clang target", file: file, line: line)
+            if case let target as ClangTarget = target {
+                XCTAssertEqual(target.includeDir.pathString, includeDir, file: file, line: line)
+            } else if case let target as MixedTarget = target {
+                XCTAssertEqual(target.clangTarget.includeDir.pathString, includeDir, file: file, line: line)
+            } else {
+                return XCTFail("Include directory is being checked on a non-clang or mixed target", file: file, line: line)
             }
-            XCTAssertEqual(target.includeDir.pathString, includeDir, file: file, line: line)
         }
 
         func check(moduleMapType: ModuleMapType, file: StaticString = #file, line: UInt = #line) {
-            guard case let target as ClangTarget = target else {
-                return XCTFail("Module map type is being checked on a non-Clang target", file: file, line: line)
+            if case let target as ClangTarget = target {
+                XCTAssertEqual(target.moduleMapType, moduleMapType, file: file, line: line)
+            } else if case let target as MixedTarget = target {
+                XCTAssertEqual(target.clangTarget.moduleMapType, moduleMapType, file: file, line: line)
+            } else {
+                return XCTFail("Module map type is being checked on a non-clang or mixed target", file: file, line: line)
             }
-            XCTAssertEqual(target.moduleMapType, moduleMapType, file: file, line: line)
         }
 
         func check(c99name: String? = nil, type: PackageModel.Target.Kind? = nil, file: StaticString = #file, line: UInt = #line) {

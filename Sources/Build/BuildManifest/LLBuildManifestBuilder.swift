@@ -113,6 +113,8 @@ public class LLBuildManifestBuilder {
                     try self.createSwiftCompileCommand(desc)
                 case .clang(let desc):
                     try self.createClangCompileCommand(desc)
+                case .mixed(let desc):
+                    try self.createMixedCompileCommand(desc)
                 }
             }
         }

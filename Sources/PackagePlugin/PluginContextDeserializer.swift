@@ -133,6 +133,41 @@ internal struct PluginContextDeserializer {
                 linkedLibraries: linkedLibraries,
                 linkedFrameworks: linkedFrameworks)
 
+
+        case let .mixedSourceModuleInfo(moduleName, kind, sourceFiles, compilationConditions, preprocessorDefinitions, headerSearchPaths, publicHeadersDirId, linkedLibraries, linkedFrameworks):
+            let publicHeadersDir = try publicHeadersDirId.map { try self.path(for: $0) }
+            let sourceFiles = FileList(try sourceFiles.map {
+                let path = try self.path(for: $0.basePathId).appending($0.name)
+                let type: FileType
+                switch $0.type {
+                case .source:
+                    type = .source
+                case .header:
+                    type = .header
+                case .resource:
+                    type = .resource
+                case .unknown:
+                    type = .unknown
+                }
+                return File(path: path, type: type)
+            })
+            target = MixedSourceModuleTarget(
+                id: String(id),
+                name: wireTarget.name,
+                kind: .init(kind),
+                directory: directory,
+                dependencies: dependencies,
+                moduleName: moduleName,
+                sourceFiles: sourceFiles,
+                swift: .init(compilationConditions: compilationConditions),
+                clang: .init(
+                    preprocessorDefinitions: preprocessorDefinitions,
+                    headerSearchPaths: headerSearchPaths,
+                    publicHeadersDirectory: publicHeadersDir),
+                linkedLibraries: linkedLibraries,
+                linkedFrameworks: linkedFrameworks
+            )
+
         case let .binaryArtifactInfo(kind, origin, artifactId):
             let artifact = try self.path(for: artifactId)
             let artifactKind: BinaryArtifactTarget.Kind

@@ -660,14 +660,10 @@ class PluginTests: XCTestCase {
             XCTAssertNoDiagnostics(observability.diagnostics)
             XCTAssert(packageGraph.packages.count == 1, "\(packageGraph.packages)")
             XCTAssert(packageGraph.rootPackages.count == 1, "\(packageGraph.rootPackages)")
-            let package: ResolvedPackage = try XCTUnwrap(packageGraph.rootPackages.first)
+            let package = try XCTUnwrap(packageGraph.rootPackages.first)
             
             // Find the regular target in our test package.
-            let libraryTarget = try XCTUnwrap(
-                package.targets
-                    .map(\.underlyingTarget)
-                    .first{ $0.name == "MyLibrary" } as? SwiftTarget
-            )
+            let libraryTarget = try XCTUnwrap(package.targets.map(\.underlyingTarget).first{ $0.name == "MyLibrary" } as? SwiftTarget)
             XCTAssertEqual(libraryTarget.type, .library)
             
             // Set up a delegate to handle callbacks from the command plugin.  In particular we want to know the process identifier.

@@ -33,10 +33,12 @@ import SwiftDriver
 import PackageModel
 
 extension LLBuildManifestBuilder {
-    /// Create a llbuild target for a Swift target description.
+    /// Create a llbuild target for a Swift target description and returns the Swift target's outputs.
+    @discardableResult
     func createSwiftCompileCommand(
-        _ target: SwiftTargetBuildDescription
-    ) throws {
+        _ target: SwiftTargetBuildDescription,
+        addTargetCmd: Bool = true
+    ) throws -> [Node] {
         // Inputs.
         let inputs = try self.computeSwiftCompileCmdInputs(target)
 
@@ -55,8 +57,16 @@ extension LLBuildManifestBuilder {
             try self.addCmdWithBuiltinSwiftTool(target, inputs: inputs, cmdOutputs: cmdOutputs)
         }
 
-        self.addTargetCmd(target, cmdOutputs: cmdOutputs)
+        if addTargetCmd {
+            self.addTargetCmd(
+                target: target.target,
+                isTestTarget: target.isTestTarget,
+                inputs: cmdOutputs
+            )
+        }
         try self.addModuleWrapCmd(target)
+
+        return cmdOutputs
     }
 
     private func addSwiftCmdsViaIntegratedDriver(
@@ -237,6 +247,8 @@ extension LLBuildManifestBuilder {
                 )
             case .clang(let desc):
                 try self.createClangCompileCommand(desc)
+            case .mixed(let desc):
+                try self.createMixedCompileCommand(desc)
             }
         }
     }
@@ -262,7 +274,11 @@ extension LLBuildManifestBuilder {
             explicitDependencyJobTracker: explicitDependencyJobTracker
         )
 
-        self.addTargetCmd(description, cmdOutputs: cmdOutputs)
+        self.addTargetCmd(
+            target: description.target,
+            isTestTarget: description.isTestTarget,
+            inputs: cmdOutputs
+        )
         try self.addModuleWrapCmd(description)
     }
 
@@ -438,6 +454,12 @@ extension LLBuildManifestBuilder {
                 for object in try target.objects {
                     inputs.append(file: object)
                 }
+            case .mixed(let target)?:
+                inputs.append(file: target.swiftTargetBuildDescription.moduleOutputPath)
+
+                for object in try target.clangTargetBuildDescription.objects {
+                    inputs.append(file: object)
+                }
             case nil:
                 throw InternalError("unexpected: target \(target) not in target map \(self.plan.targetMap)")
             }
@@ -489,20 +511,24 @@ extension LLBuildManifestBuilder {
     }
 
     /// Adds a top-level phony command that builds the entire target.
-    private func addTargetCmd(_ target: SwiftTargetBuildDescription, cmdOutputs: [Node]) {
+    func addTargetCmd(
+        target: ResolvedTarget,
+        isTestTarget: Bool,
+        inputs: [Node]
+    ) {
         // Create a phony node to represent the entire target.
-        let targetName = target.target.getLLBuildTargetName(config: self.buildConfig)
+        let targetName = target.getLLBuildTargetName(config: self.buildConfig)
         let targetOutput: Node = .virtual(targetName)
 
         self.manifest.addNode(targetOutput, toTarget: targetName)
         self.manifest.addPhonyCmd(
             name: targetOutput.name,
-            inputs: cmdOutputs,
+            inputs: inputs,
             outputs: [targetOutput]
         )
-        if self.plan.graph.isInRootPackages(target.target, satisfying: self.buildEnvironment) {
-            if !target.isTestTarget {
-                self.addNode(targetOutput, toTarget: .main)
+        if plan.graph.isInRootPackages(target, satisfying: self.buildEnvironment) {
+            if !isTestTarget {
+                addNode(targetOutput, toTarget: .main)
             }
             self.addNode(targetOutput, toTarget: .test)
         }
@@ -566,6 +592,29 @@ private class UniqueExplicitDependencyJobTracker {
         let jobUniqueID = soleOutput.file.basename.hashValue
         let (new, _) = self.uniqueDependencyModuleIDSet.insert(jobUniqueID)
         return new
+    }
+}
+
+// MARK: - Compile Mixed Languages
+
+// TODO(ncooke3): Post-merge move to other file?
+extension LLBuildManifestBuilder {
+    /// Create a llbuild target for a mixed target description.
+    func createMixedCompileCommand(
+        _ target: MixedTargetBuildDescription
+    ) throws {
+        let swiftOutputs = try createSwiftCompileCommand(target.swiftTargetBuildDescription, addTargetCmd: false)
+        let clangOutputs = try createClangCompileCommand(
+            target.clangTargetBuildDescription,
+            addTargetCmd: false,
+            // This forces the Swift sub-target to build first. This is needed
+            // since the Clang sub-target depends on build artifacts from the
+            // Swift sub-target (e.g. generated Swift header).
+            inputs: swiftOutputs,
+            // The Swift compile command already created the resource bundle.
+            createResourceBundle: false
+        )
+        self.addTargetCmd(target: target.target, isTestTarget: target.isTestTarget, inputs: swiftOutputs + clangOutputs)
     }
 }
 

@@ -81,10 +81,10 @@ extension SwiftPM {
             packagePath: packagePath,
             env: env
         )
-        
+
         let stdout = try result.utf8Output()
         let stderr = try result.utf8stderrOutput()
-        
+
         if result.exitStatus == .terminated(code: 0) {
             return (stdout: stdout, stderr: stderr)
         }
@@ -94,7 +94,7 @@ extension SwiftPM {
             stderr: stderr
         )
     }
-    
+
     private func executeProcess(
         _ args: [String],
         packagePath: AbsolutePath? = nil,
@@ -117,16 +117,16 @@ extension SwiftPM {
 #if !os(Windows)
         environment["SDKROOT"] = nil
 #endif
-        
+
         // Unset the internal env variable that allows skipping certain tests.
         environment["_SWIFTPM_SKIP_TESTS_LIST"] = nil
-        
+
         var completeArgs = [xctestBinaryPath.pathString]
         if let packagePath = packagePath {
             completeArgs += ["--package-path", packagePath.pathString]
         }
         completeArgs += args
-        
+
         return try Process.popen(arguments: completeArgs, environment: environment)
     }
 }

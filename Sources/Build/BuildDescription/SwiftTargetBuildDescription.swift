@@ -137,6 +137,11 @@ public final class SwiftTargetBuildDescription {
     /// Any addition flags to be added. These flags are expected to be computed during build planning.
     var additionalFlags: [String] = []
 
+    /// Whether or not the target belongs to a mixed language target.
+    ///
+    /// Mixed language targets consist of an underlying Swift and Clang target.
+    private let isWithinMixedTarget: Bool
+
     /// The swift version for this target.
     var swiftVersion: SwiftLanguageVersion {
         (self.target.underlyingTarget as! SwiftTarget).swiftVersion
@@ -251,7 +256,8 @@ public final class SwiftTargetBuildDescription {
         testTargetRole: TestTargetRole? = nil,
         shouldGenerateTestObservation: Bool = false,
         fileSystem: FileSystem,
-        observabilityScope: ObservabilityScope
+        observabilityScope: ObservabilityScope,
+        isWithinMixedTarget: Bool = false
     ) throws {
         guard target.underlyingTarget is SwiftTarget else {
             throw InternalError("underlying target type mismatch \(target)")
@@ -278,6 +284,7 @@ public final class SwiftTargetBuildDescription {
         self.shouldGenerateTestObservation = shouldGenerateTestObservation
         self.fileSystem = fileSystem
         self.observabilityScope = observabilityScope
+        self.isWithinMixedTarget = isWithinMixedTarget
 
         (self.pluginDerivedSources, self.pluginDerivedResources) = SharedTargetBuildDescription.computePluginGeneratedFiles(
             target: target,
@@ -289,7 +296,10 @@ public final class SwiftTargetBuildDescription {
             observabilityScope: observabilityScope
         )
 
-        if self.shouldEmitObjCCompatibilityHeader {
+        // If building for a mixed target, the mixed target build
+        // description will create the module map and include the Swift
+        // interoptability header.
+        if self.shouldEmitObjCCompatibilityHeader, !isWithinMixedTarget {
             self.moduleMap = try self.generateModuleMap()
         }
 
@@ -418,7 +428,7 @@ public final class SwiftTargetBuildDescription {
             if packageAccess {
                 let pkgID = pkg.identity.description.spm_mangledToC99ExtendedIdentifier()
                 return [flag, pkgID]
-            } 
+            }
         }
         return []
     }
@@ -592,7 +602,7 @@ public final class SwiftTargetBuildDescription {
 
         args += self.packageNameArgumentIfSupported(with: self.package, packageAccess: self.target.packageAccess)
         args += try self.macroArguments()
-        
+
         // rdar://117578677
         // Pass -fno-omit-frame-pointer to support backtraces
         // this can be removed once the backtracer uses DWARF instead of frame pointers
@@ -647,9 +657,19 @@ public final class SwiftTargetBuildDescription {
         return result
     }
 
+    func appendClangFlags(_ flags: String...) {
+        flags.forEach { flag in
+            additionalFlags.append("-Xcc")
+            additionalFlags.append(flag)
+        }
+    }
+
     /// Returns true if ObjC compatibility header should be emitted.
     private var shouldEmitObjCCompatibilityHeader: Bool {
-        self.buildParameters.targetTriple.isDarwin() && self.target.type == .library
+        // Emitting the interop header for mixed test targets enables the
+        // sharing of Objective-C compatible Swift test helpers between
+        // Swift and Objective-C test files.
+        self.target.type == .library || self.target.type == .test && self.isWithinMixedTarget
     }
 
     func writeOutputFileMap() throws -> AbsolutePath {
@@ -741,6 +761,7 @@ public final class SwiftTargetBuildDescription {
     private func generateModuleMap() throws -> AbsolutePath {
         let path = self.tempsPath.appending(component: moduleMapFilename)
 
+        // TODO(ncooke3): Is the `requires objc` an issue for C++ interop?
         let bytes = ByteString(
             #"""
             module \#(self.target.c99name) {

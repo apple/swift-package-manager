@@ -17,28 +17,36 @@ import class PackageGraph.ResolvedTarget
 import PackageModel
 
 extension LLBuildManifestBuilder {
-    /// Create a llbuild target for a Clang target description.
+    /// Create a llbuild target for a Clang target description and returns the Clang target's outputs.
+    @discardableResult
     func createClangCompileCommand(
-        _ target: ClangTargetBuildDescription
-    ) throws {
+        _ target: ClangTargetBuildDescription,
+        addTargetCmd: Bool = true,
+        inputs: [Node] = [],
+        createResourceBundle: Bool = true
+    ) throws -> [Node] {
         let standards = [
             (target.clangTarget.cxxLanguageStandard, SupportedLanguageExtension.cppExtensions),
             (target.clangTarget.cLanguageStandard, SupportedLanguageExtension.cExtensions),
         ]
 
-        var inputs: [Node] = []
+        var inputs: [Node] = inputs
 
-        // Add resources node as the input to the target. This isn't great because we
-        // don't need to block building of a module until its resources are assembled but
-        // we don't currently have a good way to express that resources should be built
-        // whenever a module is being built.
-        if let resourcesNode = try self.createResourcesBundle(for: .clang(target)) {
-            inputs.append(resourcesNode)
+        if createResourceBundle {
+            // Add resources node as the input to the target. This isn't great because we
+            // don't need to block building of a module until its resources are assembled but
+            // we don't currently have a good way to express that resources should be built
+            // whenever a module is being built.
+            if let resourcesNode = try self.createResourcesBundle(for: .clang(target)) {
+                inputs.append(resourcesNode)
+            }
         }
 
         func addStaticTargetInputs(_ target: ResolvedTarget) {
             if case .swift(let desc)? = self.plan.targetMap[target], target.type == .library {
                 inputs.append(file: desc.moduleOutputPath)
+            } else if case .mixed(let desc)? = plan.targetMap[target], target.type == .library {
+                inputs.append(file: desc.swiftTargetBuildDescription.moduleOutputPath)
             }
         }
 
@@ -115,22 +123,14 @@ extension LLBuildManifestBuilder {
 
         try addBuildToolPlugins(.clang(target))
 
-        // Create a phony node to represent the entire target.
-        let targetName = target.target.getLLBuildTargetName(config: self.buildConfig)
-        let output: Node = .virtual(targetName)
-
-        self.manifest.addNode(output, toTarget: targetName)
-        self.manifest.addPhonyCmd(
-            name: output.name,
-            inputs: objectFileNodes,
-            outputs: [output]
-        )
-
-        if self.plan.graph.isInRootPackages(target.target, satisfying: self.buildEnvironment) {
-            if !target.isTestTarget {
-                self.addNode(output, toTarget: .main)
-            }
-            self.addNode(output, toTarget: .test)
+        if addTargetCmd {
+            self.addTargetCmd(
+                target: target.target,
+                isTestTarget: target.isTestTarget,
+                inputs: objectFileNodes
+            )
         }
+
+        return objectFileNodes
     }
 }

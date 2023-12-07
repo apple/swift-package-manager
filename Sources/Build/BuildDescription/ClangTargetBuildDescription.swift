@@ -117,6 +117,7 @@ public final class ClangTargetBuildDescription {
         buildToolPluginInvocationResults: [BuildToolPluginInvocationResult] = [],
         prebuildCommandResults: [PrebuildCommandResult] = [],
         fileSystem: FileSystem,
+        isWithinMixedTarget: Bool = false,
         observabilityScope: ObservabilityScope
     ) throws {
         guard target.underlyingTarget is ClangTarget else {
@@ -149,8 +150,10 @@ public final class ClangTargetBuildDescription {
             self.pluginDerivedResources = []
         }
 
-        // Try computing modulemap path for a C library.  This also creates the file in the file system, if needed.
-        if target.type == .library {
+        // Try computing the modulemap path, creating a module map in the
+        // file system if necessary. If building for a mixed target, the mixed
+        // target build description handle the module map.
+        if target.type == .library, !isWithinMixedTarget {
             // If there's a custom module map, use it as given.
             if case .custom(let path) = clangTarget.moduleMapType {
                 self.moduleMap = path

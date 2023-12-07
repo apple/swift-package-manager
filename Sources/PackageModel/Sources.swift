@@ -41,7 +41,7 @@ public struct Sources: Codable {
         })
     }
 
-    /// Returns true if the sources contain C++ files.
+    /// Returns true if the sources contain Objective-C files.
     public var containsObjcFiles: Bool {
         return paths.contains(where: {
             guard let ext = $0.extension else {

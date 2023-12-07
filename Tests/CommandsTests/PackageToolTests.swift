@@ -2970,4 +2970,149 @@ final class PackageToolTests: CommandsTestCase {
             XCTAssertNoDiagnostics(observability.diagnostics)
         }
     }
+
+    func testPluginsOnMixedLanguageTargets() throws {
+        // Only run the test if the environment in which we're running actually supports Swift concurrency (which the plugin APIs require).
+        try XCTSkipIf(!UserToolchain.default.supportsSwiftConcurrency(), "skipping because test environment doesn't support concurrency")
+
+        try testWithTemporaryDirectory { tmpPath in
+            // Create a sample package with a library target and a plugin.
+            let packageDir = tmpPath.appending(components: "MyPackage")
+            // FIXME(ncooke3): Update with next version of SPM.
+            try localFileSystem.writeFileContents(packageDir.appending("Package.swift"), string:
+                """
+                // swift-tools-version: 999.0
+                import PackageDescription
+                let package = Package(
+                    name: "MyPackage",
+                    targets: [
+                        .target(
+                            name: "MyLibrary",
+                            plugins: [
+                                "MyPlugin",
+                            ]
+                        ),
+                        .plugin(
+                            name: "MyPlugin",
+                            capability: .buildTool()
+                        ),
+                        .plugin(
+                            name: "CmdPlugin",
+                            capability: .command(intent: .custom(verb: "mycmd", description: "Determine if a target has mixed language sources."))
+                        )
+                    ]
+                )
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Sources", "MyLibrary", "Foo.swift"), string:
+                """
+                // a file with a filename suffix handled by the plugin
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Sources", "MyLibrary", "include", "Bar.h"), string:
+                """
+                // a file with a filename suffix handled by the plugin
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Sources", "MyLibrary", "Bar.m"), string:
+                """
+                // a file with a filename suffix handled by the plugin
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Sources", "MyLibrary", "library.foo"), string:
+                """
+                a file with a filename suffix handled by the plugin
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Sources", "MyLibrary", "library.bar"), string:
+                """
+                a file with a filename suffix not handled by the plugin
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Plugins", "MyPlugin", "plugin.swift"), string:
+                """
+                import PackagePlugin
+                import Foundation
+                @main
+                struct MyBuildToolPlugin: BuildToolPlugin {
+                    func createBuildCommands(
+                        context: PackagePlugin.PluginContext,
+                        target: PackagePlugin.Target
+                    ) async throws -> [PackagePlugin.Command] {
+                        // Expect the initial working directory for build tool plugins is the package directory.
+                        guard FileManager.default.currentDirectoryPath == context.package.directory.string else {
+                            throw "expected initial working directory ‘\\(FileManager.default.currentDirectoryPath)’"
+                        }
+
+                        // Check that the package display name is what we expect.
+                        guard context.package.displayName == "MyPackage" else {
+                            throw "expected display name to be ‘MyPackage’ but found ‘\\(context.package.displayName)’"
+                        }
+
+                        guard let mixedTarget = target as? MixedSourceModuleTarget else {
+                            throw "target \\(target.name) is not a Mixed Language target"
+                        }
+
+                        // Create and return a build command that uses all the `.baz` files in the target as inputs, so they get counted as having been handled.
+                        let fooFiles = mixedTarget.sourceFiles.compactMap { $0.path.extension == "foo" ? $0.path : nil }
+                        return [ .buildCommand(displayName: "A command", executable: Path("/bin/echo"), arguments: fooFiles, inputFiles: fooFiles) ]
+                    }
+                }
+
+                extension String : Error {}
+                """
+            )
+            try localFileSystem.writeFileContents(packageDir.appending(components: "Plugins", "CmdPlugin", "CmdPlugin.swift"), string:
+                """
+                import PackagePlugin
+                import Foundation
+
+                @main
+                struct CmdPlugin: CommandPlugin {
+                    func performCommand(context: PackagePlugin.PluginContext, arguments: [String]) async throws {
+                        var argExtractor = ArgumentExtractor(arguments)
+                        let targetNames = argExtractor.extractOption(named: "target")
+                        guard targetNames.count == 1 else {
+                            throw "Only one target may be specified."
+                        }
+
+                        let targets = try context.package.targets(named: targetNames)
+                        guard targets.count == 1 else {
+                            throw "Multiple targets named \\(targetNames[0]) exist."
+                        }
+
+                        let target = targets[0]
+
+                        guard let rootURL = URL(string: target.directory.string) else {
+                            throw "Could not create URL from \\(target.directory.string)"
+                        }
+                        let subpaths = try FileManager.default.subpathsOfDirectory(atPath: rootURL.absoluteString)
+                        let extensionsSet = Set(subpaths.compactMap { Path($0).extension })
+
+                        if extensionsSet.contains("swift") && extensionsSet.contains("m") {
+                            print("This target contains mixed language sources.")
+                        }
+                    }
+                }
+
+                extension String : Error {}
+                """
+            )
+
+            // Test build plugin...
+            // Invoke it, and check the results.
+            let (stdout_build, stderr) = try SwiftPM.Build.execute(packagePath: packageDir)
+            XCTAssert(stdout_build.contains("Build complete!"))
+
+            // We expect a warning about `library.bar` but not about `library.foo`.
+            XCTAssertMatch(stderr, .contains("found 1 file(s) which are unhandled"))
+            XCTAssertNoMatch(stderr, .contains("Sources/MyLibrary/library.foo"))
+            XCTAssertMatch(stderr, .contains("Sources/MyLibrary/library.bar"))
+
+            // Test command plugin...
+            // Invoke it, and check the results.
+            let (stdout_cmd, _) = try SwiftPM.Package.execute(["mycmd", "--target", "MyLibrary"], packagePath: packageDir)
+            XCTAssertMatch(stdout_cmd, .contains("This target contains mixed language sources."))
+        }
+    }
 }
