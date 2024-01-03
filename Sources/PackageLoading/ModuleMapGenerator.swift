@@ -19,7 +19,7 @@ public let moduleMapFilename = "module.modulemap"
 
 extension AbsolutePath {
   fileprivate var moduleEscapedPathString: String {
-    return self.pathString.replacingOccurrences(of: "\\", with: "\\\\")
+    return self.pathString.replacing("\\", with: "\\\\")
   }
 }
 

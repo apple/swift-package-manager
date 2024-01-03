@@ -999,7 +999,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
 
                         var environment = ProcessEnv.vars
                         #if os(Windows)
-                        let windowsPathComponent = runtimePath.pathString.replacingOccurrences(of: "/", with: "\\")
+                        let windowsPathComponent = runtimePath.pathString.replacing("/", with: "\\")
                         environment["Path"] = "\(windowsPathComponent);\(environment["Path"] ?? "")"
                         #endif
 

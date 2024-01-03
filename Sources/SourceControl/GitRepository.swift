@@ -770,7 +770,7 @@ public final class GitRepository: Repository, WorkingCheckout {
             }
 
             return stringPaths.map(output.split(separator: "\n").map {
-                let string = String($0).replacingOccurrences(of: "\\\\", with: "\\")
+                let string = String($0).replacing("\\\\", with: "\\")
                 if string.utf8.first == UInt8(ascii: "\"") {
                     return String(string.dropFirst(1).dropLast(1))
                 }

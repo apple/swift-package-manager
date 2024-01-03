@@ -231,8 +231,8 @@ extension AbsolutePath {
     /// Private computed property that returns a version of the path as a string quoted for use as a subpath in a .sb sandbox profile.
     fileprivate var quotedAsSubpathForSandboxProfile: String {
         "\"" + self.pathString
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacing("\\", with: "\\\\")
+            .replacing("\"", with: "\\\"")
             + "\""
     }
 }

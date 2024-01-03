@@ -20,7 +20,7 @@ extension AbsolutePath {
         return URL(fileURLWithPath: self.pathString).withUnsafeFileSystemRepresentation {
             let repr = String(cString: $0!)
             if escaped {
-                return repr.replacingOccurrences(of: "\\", with: "\\\\")
+                return repr.replacing("\\", with: "\\\\")
             }
             return repr
         }
