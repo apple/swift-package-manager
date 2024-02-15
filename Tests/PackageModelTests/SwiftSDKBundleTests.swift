@@ -113,11 +113,11 @@ private func generateTestFileSystem(bundleArtifacts: [MockArtifact]) throws -> (
 private let arm64Triple = try! Triple("arm64-apple-macosx13.0")
 private let i686Triple = try! Triple("i686-apple-macosx13.0")
 
-private let fixtureArchivePath = try! AbsolutePath(validating: #file)
+private let fixtureSDKsPath = try! AbsolutePath(validating: #file)
     .parentDirectory
     .parentDirectory
     .parentDirectory
-    .appending(components: ["Fixtures", "SwiftSDKs", "test-sdk.artifactbundle.tar.gz"])
+    .appending(components: ["Fixtures", "SwiftSDKs"])
 
 final class SwiftSDKBundleTests: XCTestCase {
     func testInstallRemote() async throws {
@@ -126,43 +126,51 @@ final class SwiftSDKBundleTests: XCTestCase {
         #endif
 
         let system = ObservabilitySystem.makeForTesting()
-        var output = [SwiftSDKBundleStore.Output]()
         let observabilityScope = system.topScope
         let cancellator = Cancellator(observabilityScope: observabilityScope)
         let archiver = UniversalArchiver(localFileSystem, cancellator)
 
-        let httpClient = HTTPClient { request, _ in
-            guard case let .download(_, downloadPath) = request.kind else {
-                XCTFail("Unexpected HTTPClient.Request.Kind")
-                return .init(statusCode: 400)
-            }
-            try localFileSystem.copy(from: fixtureArchivePath, to: downloadPath)
-            return .init(statusCode: 200)
-        }
+        let fixtureAndURLs: [(url: String, fixture: String)] = [
+            ("https://localhost/archive?test=foo", "test-sdk.artifactbundle.tar.gz"),
+            ("https://localhost/archive.tar.gz", "test-sdk.artifactbundle.tar.gz"),
+            ("https://localhost/archive.zip", "test-sdk.artifactbundle.zip"),
+        ]
 
-        try await withTemporaryDirectory(fileSystem: localFileSystem, removeTreeOnDeinit: true) { tmpDir in
-            let store = SwiftSDKBundleStore(
-                swiftSDKsDirectory: tmpDir,
-                fileSystem: localFileSystem,
-                observabilityScope: observabilityScope,
-                outputHandler: {
-                    output.append($0)
+        for (bundleURLString, fixture) in fixtureAndURLs {
+            let httpClient = HTTPClient { request, _ in
+                guard case let .download(_, downloadPath) = request.kind else {
+                    XCTFail("Unexpected HTTPClient.Request.Kind")
+                    return .init(statusCode: 400)
                 }
-            )
-            let bundleURLString = "https://localhost/archive?test=foo"
-            try await store.install(bundlePathOrURL: bundleURLString, archiver, httpClient)
-            
-            let bundleURL = URL(string: bundleURLString)!
-            XCTAssertEqual(output, [
-                .downloadStarted(bundleURL),
-                .downloadFinishedSuccessfully(bundleURL),
-                .unpackingArchive(bundlePathOrURL: bundleURLString),
-                .installationSuccessful(
-                    bundlePathOrURL: bundleURLString,
-                    bundleName: "test-sdk.artifactbundle"
-                ),
-            ])
-        }.value
+                let fixturePath = fixtureSDKsPath.appending(component: fixture)
+                try localFileSystem.copy(from: fixturePath, to: downloadPath)
+                return .init(statusCode: 200)
+            }
+
+            try await withTemporaryDirectory(fileSystem: localFileSystem, removeTreeOnDeinit: true) { tmpDir in
+                var output = [SwiftSDKBundleStore.Output]()
+                let store = SwiftSDKBundleStore(
+                    swiftSDKsDirectory: tmpDir,
+                    fileSystem: localFileSystem,
+                    observabilityScope: observabilityScope,
+                    outputHandler: {
+                        output.append($0)
+                    }
+                )
+                try await store.install(bundlePathOrURL: bundleURLString, archiver, httpClient)
+
+                let bundleURL = URL(string: bundleURLString)!
+                XCTAssertEqual(output, [
+                    .downloadStarted(bundleURL),
+                    .downloadFinishedSuccessfully(bundleURL),
+                    .unpackingArchive(bundlePathOrURL: bundleURLString),
+                    .installationSuccessful(
+                        bundlePathOrURL: bundleURLString,
+                        bundleName: "test-sdk.artifactbundle"
+                    ),
+                ])
+            }.value
+        }
     }
 
     func testInstall() async throws {

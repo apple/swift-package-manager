@@ -151,9 +151,10 @@ public final class SwiftSDKBundleStore {
             {
                 let bundleName: String
                 let fileNameComponent = bundleURL.lastPathComponent
-                if fileNameComponent.hasSuffix(".tar.gz") {
+                if archiver.supportedExtensions.contains(where: { fileNameComponent.hasSuffix($0) }) {
                     bundleName = fileNameComponent
                 } else {
+                    // Assume that the bundle is a tarball if it doesn't have a recognized extension.
                     bundleName = "bundle.tar.gz"
                 }
                 let downloadedBundlePath = temporaryDirectory.appending(component: bundleName)
