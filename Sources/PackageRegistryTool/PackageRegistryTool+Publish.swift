@@ -437,9 +437,9 @@ enum PackageArchiveSigner {
         }
         manifests.append(Manifest.filename)
 
-        let regex = try RegEx(pattern: #"^Package@swift-(\d+)(?:\.(\d+))?(?:\.(\d+))?.swift$"#)
+        let regex = #/^Package@swift-(\d+)(?:\.(\d+))?(?:\.(\d+))?.swift$/#
         let versionSpecificManifests: [String] = packageContents.filter { file in
-            let matchGroups = regex.matchGroups(in: file)
+            let matchGroups = file.matches(of: regex)
             return !matchGroups.isEmpty
         }
         manifests.append(contentsOf: versionSpecificManifests)

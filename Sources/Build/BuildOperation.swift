@@ -27,7 +27,6 @@ import class TSCBasic.DiagnosticsEngine
 import protocol TSCBasic.OutputByteStream
 import class TSCBasic.Process
 import enum TSCBasic.ProcessEnv
-import struct TSCBasic.RegEx
 
 import enum TSCUtility.Diagnostics
 
@@ -792,7 +791,7 @@ public final class BuildOperation: PackageStructureDelegate, SPMBuildCore.BuildS
         guard let _ = self._buildPlan?.targets.first(where: { $0.target.name == target }) else { return nil }
 
         // Check for cases involving modules that cannot be found.
-        if let importedModule = try? RegEx(pattern: "no such module '(.+)'").matchGroups(in: message).first?.first {
+        if let importedModule = message.firstMatch(of: #/no such module '(?<module>.+)'/#)?.module {
             // A target is importing a module that can't be found.  We take a look at the build plan and see if can offer any advice.
 
             // Look for a target with the same module name as the one that's being imported.

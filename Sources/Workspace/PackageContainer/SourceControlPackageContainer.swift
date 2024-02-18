@@ -19,8 +19,6 @@ import PackageLoading
 import PackageModel
 import SourceControl
 
-import struct TSCBasic.RegEx
-
 import enum TSCUtility.Git
 import struct TSCUtility.Version
 
@@ -287,8 +285,8 @@ internal final class SourceControlPackageContainer: PackageContainer, CustomStri
                     )
                 } else {
                     // Revision does not exist, so we customize the error.
-                    let sha1RegEx = try! RegEx(pattern: #"\A[:xdigit:]{40}\Z"#)
-                    let isBranchRev = sha1RegEx.matchGroups(in: revision).compactMap { $0 }.isEmpty
+                    let sha1RegEx = #/\A[:xdigit:]{40}\Z/#
+                    let isBranchRev = revision.matches(of: sha1RegEx).isEmpty
                     let errorMessage = "could not find " + (isBranchRev ? "a branch named ‘\(revision)’" : "the commit \(revision)")
                     let mainBranchExists = (try? repository.resolveRevision(identifier: "main")) != nil
                     let suggestion = (revision == "master" && mainBranchExists) ? "did you mean ‘main’?" : nil
