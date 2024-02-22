@@ -99,15 +99,14 @@ extension SwiftPackageTool {
 
         func run(_ swiftTool: SwiftTool) throws {
             // See if have a possible plugin command.
-            guard let command = remaining.first else {
+            guard let command = remaining.first,
+                !["", "-h", "--help", "-help"].contains(command) else {
                 print(SwiftPackageTool.helpMessage())
                 return
             }
 
             // Check for edge cases and unknown options to match the behavior in the absence of plugins.
-            if command.isEmpty {
-                throw ValidationError("Unknown argument '\(command)'")
-            } else if command.starts(with: "-") {
+            guard !command.starts(with: "-") else {
                 throw ValidationError("Unknown option '\(command)'")
             }
 
