@@ -1539,10 +1539,10 @@ public final class RegistryClient: Cancellable {
             return completion(.failure(RegistryError.invalidURL(registryURL)))
         }
 
-        // TODO: don't load the entire file in memory
-        guard let packageArchiveContent: Data = try? fileSystem.readFileContents(packageArchive) else {
+        guard let packageArchiveContent: Data = fileSystem.readFileInChunks(path: packageArchive) else {
             return completion(.failure(RegistryError.failedLoadingPackageArchive(packageArchive)))
         }
+
         var metadataContent: String? = .none
         if let packageMetadata {
             do {
@@ -2633,5 +2633,37 @@ private struct RegistryClientSignatureValidationDelegate: SignatureValidation.De
 extension URLComponents {
     fileprivate mutating func appendPathComponents(_ components: String...) {
         path += (path.last == "/" ? "" : "/") + components.joined(separator: "/")
+    }
+}
+
+extension FileSystem {
+    /// Get the contents of a file without loading all of it in memory
+    ///
+    /// - Returns: The file contents as Data, or nil if missing
+    func readFileInChunks(path: AbsolutePath, bufferSize: Int = 1024) -> Data? {
+        guard localFileSystem.exists(path) else {
+            return nil
+        }
+        guard let inputStream = InputStream(fileAtPath: path.pathString) else {
+            return nil
+        }
+        inputStream.open()
+        defer { inputStream.close() }
+
+        var data = Data()
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        while inputStream.hasBytesAvailable {
+            let read = inputStream.read(buffer, maxLength: bufferSize)
+            if read < 0 {
+                return nil
+            } else if read == 0 {
+                break
+            } else {
+                data.append(buffer, count: read)
+            }
+        }
+        buffer.deallocate()
+
+        return data
     }
 }
