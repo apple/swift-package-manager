@@ -137,17 +137,33 @@ public struct SwiftBuildCommand: AsyncSwiftCommand {
         guard let subset = options.buildSubset(observabilityScope: swiftCommandState.observabilityScope) else {
             throw ExitCode.failure
         }
-        let buildSystem = try swiftCommandState.createBuildSystem(
-            explicitProduct: options.product,
-            shouldLinkStaticSwiftStdlib: options.shouldLinkStaticSwiftStdlib,
-            // command result output goes on stdout
-            // ie "swift build" should output to stdout
-            outputStream: TSCBasic.stdoutStream
-        )
-        do {
-            try buildSystem.build(subset: subset)
-        } catch _ as Diagnostics {
-            throw ExitCode.failure
+
+        if self.globalOptions.build.buildSystem == .experimentalAsync {
+            let buildSystem = try swiftCommandState.createAsyncBuildSystem(
+                explicitProduct: options.product,
+                shouldLinkStaticSwiftStdlib: options.shouldLinkStaticSwiftStdlib,
+                // command result output goes on stdout
+                // ie "swift build" should output to stdout
+                outputStream: TSCBasic.stdoutStream
+            )
+            do {
+                try await buildSystem.build(subset: subset)
+            } catch _ as Diagnostics {
+                throw ExitCode.failure
+            }
+        } else {
+            let buildSystem = try swiftCommandState.createBuildSystem(
+                explicitProduct: options.product,
+                shouldLinkStaticSwiftStdlib: options.shouldLinkStaticSwiftStdlib,
+                // command result output goes on stdout
+                // ie "swift build" should output to stdout
+                outputStream: TSCBasic.stdoutStream
+            )
+            do {
+                try buildSystem.build(subset: subset)
+            } catch _ as Diagnostics {
+                throw ExitCode.failure
+            }
         }
     }
 

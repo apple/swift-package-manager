@@ -14,9 +14,11 @@ add_library(SPMBuildCore
   BuildParameters/BuildParameters+Linking.swift
   BuildParameters/BuildParameters+Output.swift
   BuildParameters/BuildParameters+Testing.swift
+  BuildSystem/AsyncBuildSystem.swift
   BuildSystem/BuildSystem.swift
   BuildSystem/BuildSystemCommand.swift
   BuildSystem/BuildSystemDelegate.swift
+  BuildSystem/BuildSystemEvent.swift
   BuiltTestProduct.swift
   Plugins/PluginContextSerializer.swift
   Plugins/PluginInvocation.swift

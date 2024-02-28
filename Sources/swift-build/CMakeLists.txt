@@ -10,7 +10,6 @@ add_executable(swift-build
     Entrypoint.swift)
 target_link_libraries(swift-build PRIVATE
     Commands)
-
 target_compile_options(swift-build PRIVATE
   -parse-as-library)
 

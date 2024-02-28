@@ -7,6 +7,8 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 add_library(Build
+  AsyncBuildOperation.swift
+  AsyncLLBuildDelegate.swift
   BuildDescription/ClangTargetBuildDescription.swift
   BuildDescription/PluginDescription.swift
   BuildDescription/ProductBuildDescription.swift
@@ -17,6 +19,7 @@ add_library(Build
   BuildManifest/LLBuildManifestBuilder+Product.swift
   BuildManifest/LLBuildManifestBuilder+Resources.swift
   BuildManifest/LLBuildManifestBuilder+Swift.swift
+  BuildExecutionContext.swift
   BuildOperationBuildSystemDelegateHandler.swift
   BuildOperation.swift
   BuildPlan/BuildPlan.swift
@@ -25,6 +28,7 @@ add_library(Build
   BuildPlan/BuildPlan+Swift.swift
   BuildPlan/BuildPlan+Test.swift
   ClangSupport.swift
+  PluginConfiguration.swift
   SwiftCompilerOutputParser.swift
   TestObservation.swift)
 target_link_libraries(Build PUBLIC

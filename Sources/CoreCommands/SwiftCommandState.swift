@@ -10,8 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import _Concurrency
 import ArgumentParser
 import Basics
+
+@_spi(SwiftPMInternal)
+import Build
+
 import Dispatch
 import class Foundation.NSLock
 import class Foundation.ProcessInfo
@@ -699,7 +704,7 @@ public final class SwiftCommandState {
         outputStream: OutputByteStream? = .none,
         logLevel: Basics.Diagnostic.Severity? = .none,
         observabilityScope: ObservabilityScope? = .none
-    ) throws -> BuildSystem {
+    ) throws -> any BuildSystem {
         guard let buildSystemProvider else {
             fatalError("build system provider not initialized")
         }
@@ -722,6 +727,60 @@ public final class SwiftCommandState {
         // register the build system with the cancellation handler
         self.cancellator.register(name: "build system", handler: buildSystem.cancel)
         return buildSystem
+    }
+
+    // note: do not customize the OutputStream unless absolutely necessary
+    // "customOutputStream" is designed to support build output redirection
+    // but it is only expected to be used when invoking builds from "swift build" command.
+    // in all other cases, the build output should go to the default which is stderr
+    @_spi(SwiftPMInternal)
+    public func createAsyncBuildSystem(
+        explicitProduct: String? = .none,
+        cacheBuildManifest: Bool = true,
+        shouldLinkStaticSwiftStdlib: Bool = false,
+        productsBuildParameters: BuildParameters? = .none,
+        toolsBuildParameters: BuildParameters? = .none,
+        packageGraphLoader: (() throws -> ModulesGraph)? = .none,
+        outputStream: OutputByteStream? = .none,
+        logLevel: Basics.Diagnostic.Severity? = .none,
+        observabilityScope: ObservabilityScope? = .none
+    ) throws -> any AsyncBuildSystem {
+        guard let buildSystemProvider else {
+            fatalError("build system provider not initialized")
+        }
+
+        var productsParameters = try productsBuildParameters ?? self.productsBuildParameters
+        productsParameters.linkingParameters.shouldLinkStaticSwiftStdlib = shouldLinkStaticSwiftStdlib
+
+        let rootPackageInfo = try self.getRootPackageInformation()
+        let testEntryPointPath = productsBuildParameters?.testingParameters.testProductStyle.explicitlySpecifiedEntryPointPath
+        let (stream, continuation) = AsyncStream.makeStream(of: BuildSystemEvent.self)
+
+        return try AsyncBuildOperation(
+            productsBuildParameters: try productsBuildParameters ?? self.productsBuildParameters,
+            toolsBuildParameters: try toolsBuildParameters ?? self.toolsBuildParameters,
+            cacheBuildManifest: cacheBuildManifest && self.canUseCachedBuildManifest(),
+            packageGraphLoader: packageGraphLoader ?? {
+                try self.loadPackageGraph(
+                    explicitProduct: explicitProduct,
+                    testEntryPointPath: testEntryPointPath
+                )
+            },
+            pluginConfiguration: .init(
+                scriptRunner: self.getPluginScriptRunner(),
+                workDirectory: try self.getActiveWorkspace().location.pluginWorkingDirectory,
+                disableSandbox: self.shouldDisableSandbox
+            ),
+            additionalFileRules: FileRuleDescription.swiftpmFileTypes,
+            pkgConfigDirectories: self.options.locations.pkgConfigDirectories,
+            dependenciesByRootPackageIdentity: rootPackageInfo.dependecies,
+            targetsByRootPackageIdentity: rootPackageInfo.targets,
+            eventsContinuation: continuation,
+            outputStream: outputStream ?? self.outputStream,
+            logLevel: logLevel ?? self.logLevel,
+            fileSystem: self.fileSystem,
+            observabilityScope: observabilityScope ?? self.observabilityScope
+        )
     }
 
     static let entitlementsMacOSWarning = """

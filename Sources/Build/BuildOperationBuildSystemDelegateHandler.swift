@@ -308,7 +308,7 @@ final class TestEntryPointCommand: CustomLLBuildCommand, TestBuildCommand {
 
 private protocol TestBuildCommand {}
 
-private final class InProcessTool: Tool {
+final class InProcessTool: Tool {
     let context: BuildExecutionContext
     let type: CustomLLBuildCommand.Type
 
@@ -440,84 +440,6 @@ public protocol BuildErrorAdviceProvider {
     /// Invoked after a command fails and an error message is detected in the output. Should return a string containing
     /// advice or additional information, if any, based on the build plan.
     func provideBuildErrorAdvice(for target: String, command: String, message: String) -> String?
-}
-
-/// The context available during build execution.
-public final class BuildExecutionContext {
-    /// Build parameters for products.
-    let productsBuildParameters: BuildParameters
-
-    /// Build parameters for build tools.
-    let toolsBuildParameters: BuildParameters
-
-    /// The build description.
-    ///
-    /// This is optional because we might not have a valid build description when performing the
-    /// build for PackageStructure target.
-    let buildDescription: BuildDescription?
-
-    /// The package structure delegate.
-    let packageStructureDelegate: PackageStructureDelegate
-
-    /// Optional provider of build error resolution advice.
-    let buildErrorAdviceProvider: BuildErrorAdviceProvider?
-
-    let fileSystem: Basics.FileSystem
-
-    let observabilityScope: ObservabilityScope
-
-    public init(
-        productsBuildParameters: BuildParameters,
-        toolsBuildParameters: BuildParameters,
-        buildDescription: BuildDescription? = nil,
-        fileSystem: Basics.FileSystem,
-        observabilityScope: ObservabilityScope,
-        packageStructureDelegate: PackageStructureDelegate,
-        buildErrorAdviceProvider: BuildErrorAdviceProvider? = nil
-    ) {
-        self.productsBuildParameters = productsBuildParameters
-        self.toolsBuildParameters = toolsBuildParameters
-        self.buildDescription = buildDescription
-        self.fileSystem = fileSystem
-        self.observabilityScope = observabilityScope
-        self.packageStructureDelegate = packageStructureDelegate
-        self.buildErrorAdviceProvider = buildErrorAdviceProvider
-    }
-
-    // MARK: - Private
-
-    private var indexStoreAPICache = ThreadSafeBox<Result<IndexStoreAPI, Error>>()
-
-    /// Reference to the index store API.
-    var indexStoreAPI: Result<IndexStoreAPI, Error> {
-        self.indexStoreAPICache.memoize {
-            do {
-                #if os(Windows)
-                // The library's runtime component is in the `bin` directory on
-                // Windows rather than the `lib` directory as on Unix.  The `lib`
-                // directory contains the import library (and possibly static
-                // archives) which are used for linking.  The runtime component is
-                // not (necessarily) part of the SDK distributions.
-                //
-                // NOTE: the library name here `libIndexStore.dll` is technically
-                // incorrect as per the Windows naming convention.  However, the
-                // library is currently installed as `libIndexStore.dll` rather than
-                // `IndexStore.dll`.  In the future, this may require a fallback
-                // search, preferring `IndexStore.dll` over `libIndexStore.dll`.
-                let indexStoreLib = toolsBuildParameters.toolchain.swiftCompilerPath
-                    .parentDirectory
-                    .appending("libIndexStore.dll")
-                #else
-                let ext = toolsBuildParameters.triple.dynamicLibraryExtension
-                let indexStoreLib = try toolsBuildParameters.toolchain.toolchainLibDir
-                    .appending("libIndexStore" + ext)
-                #endif
-                return try .success(IndexStoreAPI(dylib: TSCAbsolutePath(indexStoreLib)))
-            } catch {
-                return .failure(error)
-            }
-        }
-    }
 }
 
 final class WriteAuxiliaryFileCommand: CustomLLBuildCommand {
@@ -1001,7 +923,7 @@ final class BuildOperationBuildSystemDelegateHandler: LLBuildBuildSystemDelegate
 }
 
 /// Tracks tasks based on command status and swift compiler output.
-private struct CommandTaskTracker {
+struct CommandTaskTracker {
     private(set) var totalCount = 0
     private(set) var finishedCount = 0
     private var swiftTaskProgressTexts: [Int: String] = [:]
@@ -1108,7 +1030,7 @@ private struct CommandTaskTracker {
 }
 
 extension SwiftCompilerMessage {
-    fileprivate var verboseProgressText: String? {
+    var verboseProgressText: String? {
         switch kind {
         case .began(let info):
             return ([info.commandExecutable] + info.commandArguments).joined(separator: " ")
@@ -1117,7 +1039,7 @@ extension SwiftCompilerMessage {
         }
     }
 
-    fileprivate var standardOutput: String? {
+    var standardOutput: String? {
         switch kind {
         case .finished(let info),
              .signalled(let info):
@@ -1131,31 +1053,31 @@ extension SwiftCompilerMessage {
 }
 
 extension Basics.Diagnostic {
-    fileprivate static func cycleError(rules: [BuildKey]) -> Self {
+    static func cycleError(rules: [BuildKey]) -> Self {
         .error("build cycle detected: " + rules.map(\.key).joined(separator: ", "))
     }
 
-    fileprivate static func missingInputs(output: BuildKey, inputs: [BuildKey]) -> Self {
+    static func missingInputs(output: BuildKey, inputs: [BuildKey]) -> Self {
         let missingInputs = inputs.map(\.key).joined(separator: ", ")
         return .error("couldn't build \(output.key) because of missing inputs: \(missingInputs)")
     }
 
-    fileprivate static func multipleProducers(output: BuildKey, commands: [SPMLLBuild.Command]) -> Self {
+    static func multipleProducers(output: BuildKey, commands: [SPMLLBuild.Command]) -> Self {
         let producers = commands.map(\.description).joined(separator: ", ")
         return .error("couldn't build \(output.key) because of multiple producers: \(producers)")
     }
 
-    fileprivate static func commandError(command: SPMLLBuild.Command, message: String) -> Self {
+    static func commandError(command: SPMLLBuild.Command, message: String) -> Self {
         .error("command \(command.description) failed: \(message)")
     }
 
-    fileprivate static func swiftCompilerOutputParsingError(_ error: String) -> Self {
+    static func swiftCompilerOutputParsingError(_ error: String) -> Self {
         .error("failed parsing the Swift compiler output: \(error)")
     }
 }
 
 extension BuildSystemCommand {
-    fileprivate init(_ command: SPMLLBuild.Command) {
+    init(_ command: SPMLLBuild.Command) {
         self.init(
             name: command.name,
             description: command.description,

@@ -344,6 +344,8 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
                     fileSystem: self.fileSystem,
                     observabilityScope: self.observabilityScope
                 )
+            case .experimentalAsync:
+                throw InternalError("Experimental async build system can't be created in this codepath.")
             }
         }
 
