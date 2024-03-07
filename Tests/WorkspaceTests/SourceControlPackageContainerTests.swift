@@ -196,7 +196,7 @@ class SourceControlPackageContainerTests: XCTestCase {
     func testVprefixVersions() async throws {
         let fs = InMemoryFileSystem()
 
-        let repoPath = AbsolutePath.root
+        let repoPath = AbsolutePath.root.appending("SourceCache")
         let filePath = repoPath.appending("Package.swift")
 
         let specifier = RepositorySpecifier(path: repoPath)
@@ -238,7 +238,7 @@ class SourceControlPackageContainerTests: XCTestCase {
     func testVersions() async throws {
         let fs = InMemoryFileSystem()
 
-        let repoPath = AbsolutePath.root
+        let repoPath = AbsolutePath.root.appending("SourceCache")
         let filePath = repoPath.appending("Package.swift")
 
         let specifier = RepositorySpecifier(path: repoPath)
@@ -331,7 +331,10 @@ class SourceControlPackageContainerTests: XCTestCase {
     func testPreReleaseVersions() async throws {
         let fs = InMemoryFileSystem()
 
-        let repoPath = AbsolutePath.root
+        // Insert an arc in the path prior to the repository root to prevent
+        // `\Package.swift` being the path that is used.  The
+        // intermediate arc allows processing the tools versions.
+        let repoPath = AbsolutePath.root.appending("SourceCache")
         let filePath = repoPath.appending("Package.swift")
 
         let specifier = RepositorySpecifier(path: repoPath)
@@ -375,7 +378,7 @@ class SourceControlPackageContainerTests: XCTestCase {
     func testSimultaneousVersions() async throws {
         let fs = InMemoryFileSystem()
 
-        let repoPath = AbsolutePath.root
+        let repoPath = AbsolutePath.root.appending("SourceCache")
         let filePath = repoPath.appending("Package.swift")
 
         let specifier = RepositorySpecifier(path: repoPath)
