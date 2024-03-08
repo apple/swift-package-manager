@@ -357,7 +357,12 @@ package final class SwiftTargetBuildDescription {
             let variableName = $0.path.basename.spm_mangledToC99ExtendedIdentifier()
             let fileContent = try Data(contentsOf: URL(fileURLWithPath: $0.path.pathString)).map { String($0) }.joined(separator: ",")
 
-            content += "static let \(variableName): [UInt8] = [\(fileContent)]\n"
+            /// Typical array literal requires complicated type inference, therefore slow to parse.
+            /// This slows down compilation greatly if source file size is > 100KB.
+            /// - With typical array syntax, compilation of 300KB file on M1 machine took 20 seconds.
+            /// - With this certain syntax, compilation of 300KB file on M1 machine took 2-3 seconds.
+            /// - Reference: https://forums.swift.org/t/why-is-swift-so-slow-timeout-in-compiling-this-code/61382/23
+            content += "static let \(variableName) = [UInt8](arrayLiteral: \(fileContent))\n"
         }
 
         content += "}"
