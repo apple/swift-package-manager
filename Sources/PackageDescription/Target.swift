@@ -1023,7 +1023,7 @@ public final class Target {
     ///
     /// Use system library targets to adapt a library installed on the system to
     /// work with Swift packages. Such libraries are generally installed by
-    /// system package managers (such as Homebrew and apt-get) and exposed to
+    /// system package managers (such as Homebrew, MacPorts and apt-get) and exposed to
     /// Swift packages by providing a `modulemap` file along with other metadata
     /// such as the library's `pkgConfig` name.
     ///
