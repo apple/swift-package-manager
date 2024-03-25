@@ -84,8 +84,8 @@ public final class SQLiteBackedCache<Value: Codable>: Closable {
         }
     }
 
-    public func put(
-        key: Key,
+    private func put(
+        rawKey key: SQLite.SQLiteValue,
         value: Value,
         replace: Bool = false,
         observabilityScope: ObservabilityScope? = nil
@@ -95,7 +95,7 @@ public final class SQLiteBackedCache<Value: Codable>: Closable {
             try self.executeStatement(query) { statement in
                 let data = try self.jsonEncoder.encode(value)
                 let bindings: [SQLite.SQLiteValue] = [
-                    .string(key),
+                    key,
                     .blob(data),
                 ]
                 try statement.bind(bindings)
@@ -107,21 +107,54 @@ public final class SQLiteBackedCache<Value: Codable>: Closable {
             }
             observabilityScope?
                 .emit(
-                    warning: "truncating \(self.tableName) cache database since it reached max size of \(self.configuration.maxSizeInBytes ?? 0) bytes"
+                    warning: """
+                    truncating \(self.tableName) cache database since it reached max size of \(
+                        self.configuration.maxSizeInBytes ?? 0
+                    ) bytes
+                    """
                 )
             try self.executeStatement("DELETE FROM \(self.tableName);") { statement in
                 try statement.step()
             }
-            try self.put(key: key, value: value, replace: replace, observabilityScope: observabilityScope)
+            try self.put(rawKey: key, value: value, replace: replace, observabilityScope: observabilityScope)
         } catch {
             throw error
         }
+    }
+
+    public func put(
+        blobKey key: some Sequence<UInt8>,
+        value: Value,
+        replace: Bool = false,
+        observabilityScope: ObservabilityScope? = nil
+    ) throws {
+        try self.put(rawKey: .blob(Data(key)), value: value, observabilityScope: observabilityScope)
+    }
+
+    public func put(
+        key: Key,
+        value: Value,
+        replace: Bool = false,
+        observabilityScope: ObservabilityScope? = nil
+    ) throws {
+        try self.put(rawKey: .string(key), value: value, replace: replace, observabilityScope: observabilityScope)
     }
 
     public func get(key: Key) throws -> Value? {
         let query = "SELECT value FROM \(self.tableName) WHERE key = ? LIMIT 1;"
         return try self.executeStatement(query) { statement -> Value? in
             try statement.bind([.string(key)])
+            let data = try statement.step()?.blob(at: 0)
+            return try data.flatMap {
+                try self.jsonDecoder.decode(Value.self, from: $0)
+            }
+        }
+    }
+
+    public func get(blobKey key: some Sequence<UInt8>) throws -> Value? {
+        let query = "SELECT value FROM \(self.tableName) WHERE key = ? LIMIT 1;"
+        return try self.executeStatement(query) { statement -> Value? in
+            try statement.bind([.blob(Data(key))])
             let data = try statement.step()?.blob(at: 0)
             return try data.flatMap {
                 try self.jsonDecoder.decode(Value.self, from: $0)
@@ -143,7 +176,7 @@ public final class SQLiteBackedCache<Value: Codable>: Closable {
             let result: Result<T, Error>
             let statement = try db.prepare(query: query)
             do {
-                result = .success(try body(statement))
+                result = try .success(body(statement))
             } catch {
                 result = .failure(error)
             }
