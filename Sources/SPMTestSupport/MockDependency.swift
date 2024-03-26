@@ -74,7 +74,8 @@ package struct MockDependency {
                 return .registry(
                     identity: identity,
                     requirement: requirement,
-                    productFilter: self.products
+                    productFilter: self.products,
+                    traits: .init(enabledTraits: .init())
                 )
 
             } else {
@@ -95,7 +96,8 @@ package struct MockDependency {
                 return .registry(
                     identity: identity,
                     requirement: _requirement,
-                    productFilter: self.products
+                    productFilter: self.products,
+                    traits: .init(enabledTraits: .init())
                 )
             } else {
                 let mappedURL = SourceControlURL(mappedLocation)

@@ -22,6 +22,9 @@ package struct MockPackage {
     package let products: [MockProduct]
     package let dependencies: [MockDependency]
     package let versions: [String?]
+    package let traits: Set<TraitDescription>
+    package let defaultTraits: Set<String>
+
     /// Provides revision identifier for the given version. A random identifier might be assigned if this is nil.
     package let revisionProvider: ((String) -> String)?
     // FIXME: This should be per-version.
@@ -34,6 +37,8 @@ package struct MockPackage {
         targets: [MockTarget],
         products: [MockProduct] = [],
         dependencies: [MockDependency] = [],
+        traits: Set<TraitDescription> = [],
+        defaultTraits: Set<String> = [],
         versions: [String?] = [],
         revisionProvider: ((String) -> String)? = nil,
         toolsVersion: ToolsVersion? = nil
@@ -45,6 +50,8 @@ package struct MockPackage {
         self.targets = targets
         self.products = products
         self.dependencies = dependencies
+        self.traits = traits
+        self.defaultTraits = defaultTraits
         self.versions = versions
         self.revisionProvider = revisionProvider
         self.toolsVersion = toolsVersion
@@ -57,6 +64,8 @@ package struct MockPackage {
         targets: [MockTarget],
         products: [MockProduct],
         dependencies: [MockDependency] = [],
+        traits: Set<TraitDescription> = [],
+        defaultTraits: Set<String> = [],
         versions: [String?] = [],
         revisionProvider: ((String) -> String)? = nil,
         toolsVersion: ToolsVersion? = nil
@@ -67,6 +76,8 @@ package struct MockPackage {
         self.targets = targets
         self.products = products
         self.dependencies = dependencies
+        self.traits = traits
+        self.defaultTraits = defaultTraits
         self.versions = versions
         self.revisionProvider = revisionProvider
         self.toolsVersion = toolsVersion
@@ -81,6 +92,8 @@ package struct MockPackage {
         targets: [MockTarget],
         products: [MockProduct],
         dependencies: [MockDependency] = [],
+        traits: Set<TraitDescription> = [],
+        defaultTraits: Set<String> = [],
         versions: [String?] = [],
         revisionProvider: ((String) -> String)? = nil,
         toolsVersion: ToolsVersion? = nil
@@ -95,6 +108,8 @@ package struct MockPackage {
         self.targets = targets
         self.products = products
         self.dependencies = dependencies
+        self.traits = traits
+        self.defaultTraits = defaultTraits
         self.versions = versions
         self.revisionProvider = revisionProvider
         self.toolsVersion = toolsVersion

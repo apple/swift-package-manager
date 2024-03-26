@@ -209,22 +209,26 @@ extension Workspace {
             }
 
             var inputIdentities: OrderedCollections.OrderedSet<PackageReference> = []
-            let inputNodes: [GraphLoadingNode] = root.packages.map { identity, package in
+            let inputNodes: [GraphLoadingNode] = try root.packages.map { identity, package in
                 inputIdentities.append(package.reference)
-                let node = GraphLoadingNode(
+                let node = try GraphLoadingNode(
                     identity: identity,
                     manifest: package.manifest,
-                    productFilter: .everything
+                    productFilter: .everything,
+                    enabledTraits: Set(package.manifest.traits.map { $0.name }), // TODO(franz): Fix me
+                    disableDefaultTraits: false
                 )
                 return node
             } + root.dependencies.compactMap { dependency in
                 let package = dependency.packageRef
                 inputIdentities.append(package)
-                return manifestsMap[dependency.identity].map { manifest in
-                    GraphLoadingNode(
+                return try manifestsMap[dependency.identity].map { manifest in
+                    try GraphLoadingNode(
                         identity: dependency.identity,
                         manifest: manifest,
-                        productFilter: dependency.productFilter
+                        productFilter: dependency.productFilter,
+                        enabledTraits: Set(manifest.traits.map { $0.name }), // TODO(franz): Fix me
+                        disableDefaultTraits: false
                     )
                 }
             }
@@ -232,8 +236,12 @@ extension Workspace {
             let topLevelDependencies = root.packages.flatMap { $1.manifest.dependencies.map(\.packageRef) }
 
             var requiredIdentities: OrderedCollections.OrderedSet<PackageReference> = []
-            _ = transitiveClosure(inputNodes) { node in
-                node.manifest.dependenciesRequired(for: node.productFilter).compactMap { dependency in
+            _ = try transitiveClosure(inputNodes) { node in
+                // TODO(franz): What traits should we pass here?
+                try node.manifest.dependenciesRequired(
+                    for: node.productFilter,
+                    enabledTraits: node.enabledTraits
+                ).compactMap { dependency in
                     let package = dependency.packageRef
                     let (inserted, index) = requiredIdentities.append(package)
                     if !inserted {
@@ -274,11 +282,13 @@ extension Workspace {
                             """)
                         }
                     }
-                    return manifestsMap[dependency.identity].map { manifest in
-                        GraphLoadingNode(
+                    return try manifestsMap[dependency.identity].map { manifest in
+                        try GraphLoadingNode(
                             identity: dependency.identity,
                             manifest: manifest,
-                            productFilter: dependency.productFilter
+                            productFilter: dependency.productFilter,
+                            enabledTraits: Set(manifest.traits.map { $0.name }), // TODO(franz): Fix me
+                            disableDefaultTraits: false
                         )
                     }
                 }
@@ -517,7 +527,11 @@ extension Workspace {
         ) }
         let topologicalSortSuccessors: (KeyedPair<Manifest, Key>) throws -> [KeyedPair<Manifest, Key>] = { pair in
             // optimization: preload manifest we know about in parallel
-            let dependenciesRequired = pair.item.dependenciesRequired(for: pair.key.productFilter)
+            // TODO(franz): What traits should we pass here?
+            let dependenciesRequired = pair.item.dependenciesRequired(
+                for: pair.key.productFilter,
+                enabledTraits: Set(pair.item.traits.map { $0.name })
+            )
             let dependenciesToLoad = dependenciesRequired.map(\.packageRef)
                 .filter { !loadedManifests.keys.contains($0.identity) }
             try prepopulateManagedDependencies(dependenciesToLoad)

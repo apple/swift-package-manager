@@ -3070,7 +3070,8 @@ final class PackageBuilderTester {
                 warnAboutImplicitExecutableTargets: true,
                 createREPLProduct: createREPLProduct,
                 fileSystem: fs,
-                observabilityScope: observability.topScope
+                observabilityScope: observability.topScope,
+                enabledTraits: []
             )
             let loadedPackage = try builder.construct()
             self.result = .package(loadedPackage)

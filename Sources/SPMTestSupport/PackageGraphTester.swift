@@ -110,7 +110,19 @@ package final class PackageGraphResult {
         body(ResolvedProductResult(target))
     }
 
-    package func check(testModules: String..., file: StaticString = #file, line: UInt = #line) {
+    package func checkPackage(
+        _ name: String,
+        file: StaticString = #file,
+        line: UInt = #line,
+        body: (ResolvedPackage) -> Void
+    ) {
+        guard let package = find(package: .init(stringLiteral: name)) else {
+            return XCTFail("Product \(name) not found", file: file, line: line)
+        }
+        body(package)
+    }
+
+    public func check(testModules: String..., file: StaticString = #file, line: UInt = #line) {
         XCTAssertEqual(
             graph.allTargets
                 .filter{ $0.type == .test }
@@ -196,6 +208,20 @@ package final class ResolvedTargetResult {
     package func checkDerivedPlatformOptions(_ platform: PackageModel.Platform, options: [String], file: StaticString = #file, line: UInt = #line) {
         let platform = target.getSupportedPlatform(for: platform, usingXCTest: target.type == .test)
         XCTAssertEqual(platform.options, options, file: file, line: line)
+    }
+
+    package func checkBuildSetting(
+        declaration: BuildSettings.Declaration,
+        assignments: Set<BuildSettings.Assignment>?,
+        file: StaticString = #file,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            target.underlying.buildSettings.assignments[declaration].flatMap { Set($0) },
+            assignments,
+            file: file,
+            line: line
+        )
     }
 }
 

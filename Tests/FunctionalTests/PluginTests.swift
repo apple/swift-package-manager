@@ -444,6 +444,7 @@ class PluginTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: nil,
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )
@@ -631,6 +632,7 @@ class PluginTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: nil,
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )
@@ -729,6 +731,7 @@ class PluginTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: nil,
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )
@@ -1045,6 +1048,7 @@ class PluginTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: nil,
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )

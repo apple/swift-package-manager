@@ -20,6 +20,17 @@ import PackageModel
 ///
 /// - SeeAlso: ``DependencyResolutionNode``
 public struct GraphLoadingNode: Equatable, Hashable {
+    /// A struct representing the ID of this node used for sorting.
+    ///
+    /// This struct contains the enabled tratis since we might have multiple nodes for the same package identity but with
+    /// different traits enabled.
+    public struct ID: Hashable {
+        /// The package identity.
+        public var identity: PackageIdentity
+
+        /// The enabled traits for this package.
+        public var enabledTraits: Set<String>
+    }
     /// The package identity.
     public let identity: PackageIdentity
 
@@ -29,15 +40,57 @@ public struct GraphLoadingNode: Equatable, Hashable {
     /// The product filter applied to the package.
     public let productFilter: ProductFilter
 
-    public init(identity: PackageIdentity, manifest: Manifest, productFilter: ProductFilter) {
+    /// The enabled traits for this package.
+    public let enabledTraits: Set<String>
+
+    public init(
+        identity: PackageIdentity,
+        manifest: Manifest,
+        productFilter: ProductFilter,
+        enabledTraits: Set<String>,
+        disableDefaultTraits: Bool
+    ) throws {
         self.identity = identity
         self.manifest = manifest
         self.productFilter = productFilter
+
+        // We are going to calculate which traits are actually enabled for a node here. To do this
+        // we have to check if default traits should be used and then flatten all the enabled traits.
+        for trait in enabledTraits {
+            if self.manifest.traits.first(where: { $0.name == trait }) == nil {
+                // The enabled trait is invalid
+                throw ModuleError.invalidTrait(package: identity, trait: trait)
+            }
+        }
+
+        // This the point where we flatten the enabled traits and resolve the recursive traits
+        var recursiveEnabledTraits = enabledTraits
+        
+        if !disableDefaultTraits {
+            recursiveEnabledTraits.formUnion(self.manifest.defaultTraits)
+        }
+
+        while true {
+            let flattendEnabledTraits = Set(self.manifest.traits
+                .lazy
+                .filter { recursiveEnabledTraits.contains($0.name) }
+                .map { $0.enabledTraits }
+                .joined()
+            )
+            let newRecursiveEnabledTraits = recursiveEnabledTraits.union(flattendEnabledTraits)
+            if newRecursiveEnabledTraits.count == recursiveEnabledTraits.count {
+                break
+            } else {
+                recursiveEnabledTraits = newRecursiveEnabledTraits
+            }
+        }
+
+        self.enabledTraits = recursiveEnabledTraits
     }
 
     /// Returns the dependencies required by this node.
     internal var requiredDependencies: [PackageDependency] {
-        return self.manifest.dependenciesRequired(for: self.productFilter)
+        return self.manifest.dependenciesRequired(for: self.productFilter, enabledTraits: self.enabledTraits)
     }
 }
 
@@ -53,5 +106,5 @@ extension GraphLoadingNode: CustomStringConvertible {
 }
 
 extension GraphLoadingNode: Identifiable {
-    public var id: PackageIdentity { self.identity }
+    public var id: ID { .init(identity: self.identity, enabledTraits: self.enabledTraits) }
 }

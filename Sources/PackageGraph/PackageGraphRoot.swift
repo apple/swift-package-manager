@@ -103,8 +103,15 @@ public struct PackageGraphRoot {
         var adjustedDependencies = input.dependencies
         if let explicitProduct {
             // FIXME: `dependenciesRequired` modifies manifests and prevents conversion of `Manifest` to a value type
-            for dependency in manifests.values.lazy.map({ $0.dependenciesRequired(for: .everything) }).joined() {
-                adjustedDependencies.append(dependency.filtered(by: .specific([explicitProduct])))
+            manifests.values.lazy.map { manifest in
+                // We are passing all traits as enabled here since traits are evaluated later when
+                // the module graph is constructed.
+                let enabledTraits = Set(manifest.traits.map { $0.name })
+                return manifest.dependenciesRequired(for: .everything, enabledTraits: enabledTraits)
+            }
+            .joined()
+            .forEach { dependency in
+                adjustedDependencies.append(dependency.filtered(by: .specific(Set([explicitProduct]))))
             }
         }
 

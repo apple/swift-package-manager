@@ -233,7 +233,8 @@ package final class MockWorkspace {
                     toolsVersion: packageToolsVersion,
                     dependencies: package.dependencies.map { try $0.convert(baseURL: packagesDir, identityResolver: self.identityResolver) },
                     products: package.products.map { try ProductDescription(name: $0.name, type: .library(.automatic), targets: $0.targets) },
-                    targets: try package.targets.map { try $0.convert(identityResolver: self.identityResolver) }
+                    targets: try package.targets.map { try $0.convert(identityResolver: self.identityResolver) },
+                    traits: package.traits
                 )
             }
 
@@ -466,6 +467,7 @@ package final class MockWorkspace {
         do {
             let graph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 forceResolvedVersions: forceResolvedVersions,
                 availableLibraries: [], // assume no provided libraries for testing.
                 expectedSigningEntities: expectedSigningEntities,
@@ -505,6 +507,7 @@ package final class MockWorkspace {
             let workspace = try self.getOrCreateWorkspace()
             try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 forceResolvedVersions: forceResolvedVersions,
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope

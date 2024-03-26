@@ -366,7 +366,8 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
             // Compute the transitive closure of available dependencies.
             let input = loadedManifests.map { identity, manifest in KeyedPair(manifest, key: identity) }
             _ = try topologicalSort(input) { pair in
-                let dependenciesRequired = pair.item.dependenciesRequired(for: .everything)
+                // We are enabling all traits when building via the bootstrap tool
+                let dependenciesRequired = pair.item.dependenciesRequired(for: .everything, enabledTraits: Set(pair.item.traits.map { $0.name }))
                 let dependenciesToLoad = dependenciesRequired.map{ $0.packageRef }.filter { !loadedManifests.keys.contains($0.identity) }
                 let dependenciesManifests = try temp_await { self.loadManifests(manifestLoader: manifestLoader, packages: dependenciesToLoad, completion: $0) }
                 dependenciesManifests.forEach { loadedManifests[$0.key] = $0.value }
@@ -385,6 +386,7 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
 
             return try ModulesGraph.load(
                 root: packageGraphRoot,
+                enabledTraits: nil,
                 identityResolver: identityResolver,
                 externalManifests: loadedManifests.reduce(into: OrderedCollections.OrderedDictionary<PackageIdentity, (manifest: Manifest, fs: FileSystem)>()) { partial, item in
                     partial[item.key] = (manifest: item.value, fs: self.fileSystem)

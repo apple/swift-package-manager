@@ -874,6 +874,9 @@ extension Workspace {
     public func loadPackageGraph(
         rootInput root: PackageGraphRootInput,
         explicitProduct: String? = nil,
+        enabledTraits: Set<String>?,
+        enableAllTraits: Bool = false,
+        disableDefaultTraits: Bool = false,
         forceResolvedVersions: Bool = false,
         customXCTestMinimumDeploymentTargets: [PackageModel.Platform: PlatformVersion]? = .none,
         testEntryPointPath: AbsolutePath? = nil,
@@ -892,6 +895,8 @@ extension Workspace {
         // state
         // such hosts processes call loadPackageGraph to make sure the workspace state is correct
         try self.state.reload()
+
+        
 
         // Perform dependency resolution, if required.
         let manifests = try self._resolve(
@@ -914,6 +919,9 @@ extension Workspace {
         // Load the graph.
         let packageGraph = try ModulesGraph.load(
             root: manifests.root,
+            enabledTraits: enabledTraits,
+            enableAllTraits: enableAllTraits,
+            disableDefaultTraits: disableDefaultTraits,
             identityResolver: self.identityResolver,
             additionalFileRules: self.configuration.additionalFileRules,
             externalManifests: manifests.allDependencyManifests,
@@ -946,6 +954,7 @@ extension Workspace {
         try self.loadPackageGraph(
             rootInput: PackageGraphRootInput(packages: [rootPath]),
             explicitProduct: explicitProduct,
+            enabledTraits: [], // TODO(franz): Check what to pass here
             availableLibraries: self.providedLibraries,
             observabilityScope: observabilityScope
         )
@@ -1101,7 +1110,8 @@ extension Workspace {
                     additionalFileRules: [],
                     binaryArtifacts: binaryArtifacts,
                     fileSystem: self.fileSystem,
-                    observabilityScope: observabilityScope
+                    observabilityScope: observabilityScope,
+                    enabledTraits: Set(manifest.traits.map { $0.name }) // TODO(franz): Fix me
                 )
                 return try builder.construct()
             }
@@ -1181,7 +1191,8 @@ extension Workspace {
                     shouldCreateMultipleTestProducts: self.configuration.shouldCreateMultipleTestProducts,
                     createREPLProduct: self.configuration.createREPLProduct,
                     fileSystem: self.fileSystem,
-                    observabilityScope: observabilityScope
+                    observabilityScope: observabilityScope,
+                    enabledTraits: Set(manifest.traits.map { $0.name }) // TODO(franz): Fix me
                 )
                 return try builder.construct()
             }

@@ -106,6 +106,12 @@ public final class Package {
     /// The list of products that this package vends and that clients can use.
     public var products: [Product]
 
+    /// The set of traits of this package.
+    public var traits: Set<Trait>
+
+    /// The set of traits enabled by default when this package is used as a dependency.
+    public var defaultTraits: Set<String>
+
     /// The list of package dependencies.
     public var dependencies: [Dependency]
 
@@ -151,6 +157,8 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
+        self.traits = []
+        self.defaultTraits = []
         self.swiftLanguageVersions = swiftLanguageVersions.map{ $0.map{ .version("\($0)") } }
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
@@ -189,6 +197,8 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
+        self.traits = []
+        self.defaultTraits = []
         self.swiftLanguageVersions = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
@@ -230,6 +240,8 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
+        self.traits = []
+        self.defaultTraits = []
         self.swiftLanguageVersions = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
@@ -271,6 +283,57 @@ public final class Package {
         self.pkgConfig = pkgConfig
         self.providers = providers
         self.products = products
+        self.dependencies = dependencies
+        self.targets = targets
+        self.traits = []
+        self.defaultTraits = []
+        self.swiftLanguageVersions = swiftLanguageVersions
+        self.cLanguageStandard = cLanguageStandard
+        self.cxxLanguageStandard = cxxLanguageStandard
+        registerExitHandler()
+    }
+
+    /// Initializes a Swift package with configuration options you provide.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the Swift package, or `nil` to use the package's Git URL to deduce the name.
+    ///   - defaultLocalization: The default localization for resources.
+    ///   - platforms: The list of supported platforms with a custom deployment target.
+    ///   - pkgConfig: The name to use for C modules. If present, Swift Package Manager searches for a
+    ///   `<name>.pc` file to get the additional flags required for a system target.
+    ///   - providers: The package providers for a system target.
+    ///   - products: The list of products that this package makes available for clients to use.
+    ///   - traits: The set of traits of this package.
+    ///   - defaultTraits: The set of traits enabled by default when this package is used as a dependency.
+    ///   - dependencies: The list of package dependencies.
+    ///   - targets: The list of targets that are part of this package.
+    ///   - swiftLanguageVersions: The list of Swift versions with which this package is compatible.
+    ///   - cLanguageStandard: The C language standard to use for all C targets in this package.
+    ///   - cxxLanguageStandard: The C++ language standard to use for all C++ targets in this package.
+    @available(_PackageDescription, introduced: 6.0)
+    public init(
+        name: String,
+        defaultLocalization: LanguageTag? = nil,
+        platforms: [SupportedPlatform]? = nil,
+        pkgConfig: String? = nil,
+        providers: [SystemPackageProvider]? = nil,
+        products: [Product] = [],
+        traits: Set<Trait> = [],
+        defaultTraits: Set<String> = [],
+        dependencies: [Dependency] = [],
+        targets: [Target] = [],
+        swiftLanguageVersions: [SwiftVersion]? = nil,
+        cLanguageStandard: CLanguageStandard? = nil,
+        cxxLanguageStandard: CXXLanguageStandard? = nil
+    ) {
+        self.name = name
+        self.defaultLocalization = defaultLocalization
+        self.platforms = platforms
+        self.pkgConfig = pkgConfig
+        self.providers = providers
+        self.products = products
+        self.traits = traits
+        self.defaultTraits = defaultTraits
         self.dependencies = dependencies
         self.targets = targets
         self.swiftLanguageVersions = swiftLanguageVersions

@@ -117,6 +117,9 @@ extension BuildPlan {
 package protocol BuildSystemFactory {
     func makeBuildSystem(
         explicitProduct: String?,
+        enabledTraits: Set<String>?,
+        enableAllTraits: Bool,
+        disableDefaultTraits: Bool,
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
@@ -143,6 +146,9 @@ package struct BuildSystemProvider {
     public func createBuildSystem(
         kind: Kind,
         explicitProduct: String? = .none,
+        enabledTraits: Set<String>? = nil,
+        enableAllTraits: Bool = false,
+        disableDefaultTraits: Bool = false,
         cacheBuildManifest: Bool = true,
         productsBuildParameters: BuildParameters? = .none,
         toolsBuildParameters: BuildParameters? = .none,
@@ -156,6 +162,9 @@ package struct BuildSystemProvider {
         }
         return try buildSystemFactory.makeBuildSystem(
             explicitProduct: explicitProduct,
+            enabledTraits: enabledTraits,
+            enableAllTraits: enableAllTraits,
+            disableDefaultTraits: disableDefaultTraits,
             cacheBuildManifest: cacheBuildManifest,
             productsBuildParameters: productsBuildParameters,
             toolsBuildParameters: toolsBuildParameters,

@@ -91,6 +91,7 @@ final class PackageGraphPerfTests: XCTestCasePerf {
                     manifests: [rootManifest.path: rootManifest],
                     observabilityScope: observability.topScope
                 ),
+                enabledTraits: nil,
                 identityResolver: identityResolver,
                 externalManifests: externalManifests,
                 binaryArtifacts: [:],

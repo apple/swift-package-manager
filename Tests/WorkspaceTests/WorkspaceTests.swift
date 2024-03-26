@@ -2790,7 +2790,8 @@ final class WorkspaceTests: XCTestCase {
                 nameForTargetDependencyResolutionOnly: settings.nameForTargetDependencyResolutionOnly,
                 location: settings.location,
                 requirement: .exact("1.5.0"),
-                productFilter: settings.productFilter
+                productFilter: settings.productFilter,
+                traits: .init(enabledTraits: [])
             )
 
             workspace.manifestLoader.manifests[fooKey] = Manifest.createManifest(

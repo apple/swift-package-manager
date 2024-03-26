@@ -87,7 +87,13 @@ struct APIDiff: SwiftCommand {
         let baselineRevision = try repository.resolveRevision(identifier: treeish)
 
         // We turn build manifest caching off because we need the build plan.
-        let buildSystem = try swiftCommandState.createBuildSystem(explicitBuildSystem: .native, cacheBuildManifest: false)
+        let buildSystem = try swiftCommandState.createBuildSystem(
+            explicitBuildSystem: .native,
+            enabledTraits: self.globalOptions.traits.traits.flatMap { Set($0.components(separatedBy: ",")) },
+            enableAllTraits: self.globalOptions.traits.enableAllTraits,
+            disableDefaultTraits: self.globalOptions.traits.disableDefaultTraits,
+            cacheBuildManifest: false
+        )
 
         let packageGraph = try buildSystem.getPackageGraph()
         let modulesToDiff = try determineModulesToDiff(

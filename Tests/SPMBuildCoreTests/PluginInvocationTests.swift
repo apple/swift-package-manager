@@ -296,6 +296,7 @@ class PluginInvocationTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )
@@ -677,6 +678,7 @@ class PluginInvocationTests: XCTestCase {
             // Load the package graph.
             XCTAssertThrowsError(try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )) { error in
@@ -757,6 +759,7 @@ class PluginInvocationTests: XCTestCase {
             // Load the package graph.
             XCTAssertThrowsError(try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope)) { error in
                 var diagnosed = false
@@ -867,6 +870,7 @@ class PluginInvocationTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )
@@ -1051,6 +1055,7 @@ class PluginInvocationTests: XCTestCase {
 
             let graph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )
@@ -1200,6 +1205,7 @@ class PluginInvocationTests: XCTestCase {
             // Load the package graph.
             let packageGraph = try workspace.loadPackageGraph(
                 rootInput: rootInput,
+                enabledTraits: [],
                 availableLibraries: [], // assume no provided libraries for testing.
                 observabilityScope: observability.topScope
             )

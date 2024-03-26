@@ -356,6 +356,7 @@ package func loadModulesGraph(
     shouldCreateMultipleTestProducts: Bool = false,
     createREPLProduct: Bool = false,
     useXCBuildFileRules: Bool = false,
+    enabledTraits: Set<String> = [],
     customXCTestMinimumDeploymentTargets: [PackageModel.Platform: PlatformVersion]? = .none,
     observabilityScope: ObservabilityScope
 ) throws -> ModulesGraph {
@@ -379,6 +380,7 @@ package func loadModulesGraph(
 
     return try ModulesGraph.load(
         root: graphRoot,
+        enabledTraits: enabledTraits,
         identityResolver: identityResolver,
         additionalFileRules: useXCBuildFileRules ? FileRuleDescription.xcbuildFileTypes : FileRuleDescription
             .swiftpmFileTypes,

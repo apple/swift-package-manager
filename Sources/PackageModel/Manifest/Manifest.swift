@@ -80,6 +80,12 @@ public final class Manifest: Sendable {
     /// The products declared in the manifest.
     public let products: [ProductDescription]
 
+    /// The set of traits of this package.
+    public let traits: Set<TraitDescription>
+
+    /// The set of traits enabled by default when this package is used as a dependency.
+    public let defaultTraits: Set<String>
+
     /// The C language standard flag.
     public let cLanguageStandard: String?
 
@@ -99,7 +105,7 @@ public final class Manifest: Sendable {
     private let _requiredTargets = ThreadSafeKeyValueStore<ProductFilter, [TargetDescription]>()
 
     /// Dependencies required for building particular product filters.
-    private let _requiredDependencies = ThreadSafeKeyValueStore<ProductFilter, [PackageDependency]>()
+    private let _requiredDependencies = ThreadSafeKeyValueStore<Set<String>, [PackageDependency]>()
 
     public init(
         displayName: String,
@@ -118,7 +124,9 @@ public final class Manifest: Sendable {
         swiftLanguageVersions: [SwiftLanguageVersion]?,
         dependencies: [PackageDependency] = [],
         products: [ProductDescription] = [],
-        targets: [TargetDescription] = []
+        targets: [TargetDescription] = [],
+        traits: Set<TraitDescription>,
+        defaultTraits: Set<String>
     ) {
         self.displayName = displayName
         self.path = path
@@ -138,6 +146,8 @@ public final class Manifest: Sendable {
         self.products = products
         self.targets = targets
         self.targetMap = Dictionary(targets.lazy.map { ($0.name, $0) }, uniquingKeysWith: { $1 })
+        self.traits = traits
+        self.defaultTraits = defaultTraits
     }
 
     /// Returns the targets required for a particular product filter.
@@ -173,8 +183,8 @@ public final class Manifest: Sendable {
     }
 
     /// Returns the package dependencies required for a particular products filter.
-    public func dependenciesRequired(for productFilter: ProductFilter) -> [PackageDependency] {
-        #if ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION
+    public func dependenciesRequired(for productFilter: ProductFilter, enabledTraits: Set<String>) -> [PackageDependency] {
+#if ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION
         // If we have already calculated it, returned the cached value.
         if let dependencies = self._requiredDependencies[productFilter] {
             return dependencies
@@ -184,18 +194,32 @@ public final class Manifest: Sendable {
             self._requiredDependencies[productFilter] = dependencies
             return dependencies
         }
-        #else
-        guard self.toolsVersion >= .v5_2 && !self.packageKind.isRoot else {
+#else
+        guard self.toolsVersion >= .v5_2 else {
+            return self.dependencies
+        }
+
+        // If we are a root package and no traits are defined we can just return all dependencies
+        if self.packageKind.isRoot && self.traits.isEmpty {
             return self.dependencies
         }
 
         // using .nothing as cache key while ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION is false
-        if let dependencies = self._requiredDependencies[.nothing] {
+        if let dependencies = self._requiredDependencies[enabledTraits] {
             return dependencies
         } else {
             var requiredDependencies: Set<PackageIdentity> = []
-            for target in self.targetsRequired(for: self.products) {
+            // If we are a root package we have to use all targets whereas for dependencies we only
+            // need to use all products since targets aren't reachable.
+            let targets = self.packageKind.isRoot ? self.targets : self.targetsRequired(for: self.products)
+            for target in targets {
                 for targetDependency in target.dependencies {
+                    if let dependencyConditionTraits = targetDependency.condition?.traits {
+                        if dependencyConditionTraits.intersection(enabledTraits).isEmpty {
+                            continue
+                        }
+                    }
+
                     if let dependency = self.packageDependency(referencedBy: targetDependency) {
                         requiredDependencies.insert(dependency.identity)
                     }
@@ -210,7 +234,7 @@ public final class Manifest: Sendable {
 
             let dependencies = self.dependencies.filter { requiredDependencies.contains($0.identity) }
             // using .nothing as cache key while ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION is false
-            self._requiredDependencies[.nothing] = dependencies
+            self._requiredDependencies[enabledTraits] = dependencies
             return dependencies
         }
         #endif

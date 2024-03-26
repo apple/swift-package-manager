@@ -447,9 +447,9 @@ final class PackageDescription5_3LoadingTests: PackageDescriptionLoadingTests {
 
         let dependencies = manifest.targets[0].dependencies
         XCTAssertEqual(dependencies[0], .target(name: "Biz"))
-        XCTAssertEqual(dependencies[1], .target(name: "Bar", condition: .init(platformNames: ["linux"], config: nil)))
-        XCTAssertEqual(dependencies[2], .product(name: "Baz", package: "Baz", condition: .init(platformNames: ["macos"])))
-        XCTAssertEqual(dependencies[3], .byName(name: "Bar", condition: .init(platformNames: ["watchos", "ios"])))
+        XCTAssertEqual(dependencies[1], .target(name: "Bar", condition: .init(platformNames: ["linux"], config: nil, traits: [])))
+        XCTAssertEqual(dependencies[2], .product(name: "Baz", package: "Baz", condition: .init(platformNames: ["macos"], traits: [])))
+        XCTAssertEqual(dependencies[3], .byName(name: "Bar", condition: .init(platformNames: ["watchos", "ios"], traits: [])))
     }
 
     func testDefaultLocalization() async throws {

@@ -195,7 +195,12 @@ package struct SwiftRunCommand: AsyncSwiftCommand {
             }
 
             do {
-                let buildSystem = try swiftCommandState.createBuildSystem(explicitProduct: options.executable)
+                let buildSystem = try swiftCommandState.createBuildSystem(
+                    explicitProduct: options.executable,
+                    enabledTraits: self.globalOptions.traits.traits.flatMap { Set($0.components(separatedBy: ",")) },
+                    enableAllTraits: self.globalOptions.traits.enableAllTraits,
+                    disableDefaultTraits: self.globalOptions.traits.disableDefaultTraits
+                )
                 let productName = try findProductName(in: buildSystem.getPackageGraph())
                 if options.shouldBuildTests {
                     try buildSystem.build(subset: .allIncludingTests)

@@ -56,9 +56,10 @@ public enum BuildSettings {
 
         private var _conditions: [PackageConditionWrapper]
 
-        public init() {
+        public init(values: [String] = [], conditions: [PackageCondition] = []) {
             self._conditions = []
-            self.values = []
+            self.values = values
+            self.conditions = conditions
         }
     }
 

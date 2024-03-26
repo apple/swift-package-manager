@@ -39,6 +39,7 @@ public struct ManifestValidator {
         diagnostics += self.validateTargets()
         diagnostics += self.validateProducts()
         diagnostics += self.validateDependencies()
+        diagnostics += self.validateTraits()
 
         // Checks reserved for tools version 5.2 features
         if self.manifest.toolsVersion >= .v5_2 {
@@ -86,6 +87,60 @@ public struct ManifestValidator {
                     diagnostics.append(.invalidBinaryProductType(productName: product.name))
                 }
             }
+        }
+
+        return diagnostics
+    }
+
+    private func validateTraits() -> [Basics.Diagnostic] {
+        var diagnostics = [Basics.Diagnostic]()
+
+        if self.manifest.traits.count > 300 {
+            // We limit the number of traits to 300 for now
+            diagnostics.append(.tooManyTraits())
+        }
+
+        for trait in self.manifest.traits {
+            let traitName = trait.name
+            guard traitName.count > 0 else {
+                diagnostics.append(.emptyTraitName())
+                continue
+            }
+
+            guard traitName.lowercased() != "default" && traitName.lowercased() != "defaults" else {
+                diagnostics.append(.defaultTraitName())
+                continue
+            }
+
+            for (index, unicodeScalar) in traitName.unicodeScalars.enumerated() {
+                let properties = unicodeScalar.properties
+
+                if index == 0 {
+                    if !(properties.isIDStart || properties.isASCIIHexDigit || unicodeScalar == "_") {
+                        diagnostics.append(.invalidFirstCharacterInTrait(firstCharater: unicodeScalar, trait: trait.name))
+                    }
+                } else {
+                    if !(properties.isXIDContinue || unicodeScalar == "_" || unicodeScalar == "+") {
+                        diagnostics.append(.invalidCharacterInTrait(character: unicodeScalar, trait: trait.name))
+                    }
+                }
+            }
+        }
+
+        let traitKeys = Set(self.manifest.traits.map { $0.name })
+
+        for trait in self.manifest.traits {
+            for otherTrait in trait.enabledTraits {
+                if !traitKeys.contains(otherTrait) {
+                    // The trait is not contained in the other trait.
+                    // This means they reference a trait that this package doesn't define.
+                    diagnostics.append(.invalidEnabledTrait(trait: otherTrait, enabledBy: trait.name))
+                }
+            }
+        }
+
+        for defaultTrait in self.manifest.defaultTraits where !traitKeys.contains(defaultTrait) {
+            diagnostics.append(.invalidDefaultTrait(defaultTrait: defaultTrait))
         }
 
         return diagnostics
@@ -309,6 +364,34 @@ extension Basics.Diagnostic {
 
     static func invalidSourceControlDirectory(_ path: AbsolutePath, underlyingError: Error? = nil) -> Self {
         .error("cannot clone from local directory \(path)\nPlease git init or use \"path:\" for \(path)\(errorSuffix(underlyingError))")
+    }
+
+    static func tooManyTraits() -> Self {
+        .error("A package can define a maximum of 300 traits")
+    }
+
+    static func emptyTraitName() -> Self {
+        .error("Empty strings are not allowed as trait names")
+    }
+
+    static func defaultTraitName() -> Self {
+        .error("Traits are not allowed to be named 'default' or 'defaults' to avoid confusion with default traits")
+    }
+
+    static func invalidFirstCharacterInTrait(firstCharater: UnicodeScalar, trait: String) -> Self {
+        .error("Invalid first character (\(firstCharater)) in trait \(trait). The first character must be a Unicode XID start character (most letters), a digit, or _.")
+    }
+
+    static func invalidCharacterInTrait(character: UnicodeScalar, trait: String) -> Self {
+        .error("Invalid character \(character) in trait \(trait). Characters must be a Unicode XID continue character (a digit, _, or most letters), -, or +")
+    }
+
+    static func invalidEnabledTrait(trait: String, enabledBy enablerTrait: String) -> Self {
+        .error("Trait \(enablerTrait) enables \(trait) which is not defined in the package")
+    }
+
+    static func invalidDefaultTrait(defaultTrait: String) -> Self {
+        .error("Default trait \(defaultTrait) is not defined in the package")
     }
 }
 

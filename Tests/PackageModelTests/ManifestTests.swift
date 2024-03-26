@@ -92,7 +92,8 @@ class ManifestTests: XCTestCase {
                 targets: targets
             )
 
-            XCTAssertEqual(manifest.dependenciesRequired(for: .everything).map({ $0.identity.description }).sorted(), [
+            XCTAssertEqual(manifest.dependenciesRequired(for: .everything,
+                                                         enabledTraits: []).map({ $0.identity.description }).sorted(), [
                 "bar1",
                 "bar2",
                 "bar3",
@@ -109,7 +110,8 @@ class ManifestTests: XCTestCase {
                 targets: targets
             )
 
-            XCTAssertEqual(manifest.dependenciesRequired(for: .specific(["Foo"])).map({ $0.identity.description }).sorted(), [
+            XCTAssertEqual(manifest.dependenciesRequired(for: .specific(["Foo"]),
+                                                         enabledTraits: []).map({ $0.identity.description }).sorted(), [
                 "bar1", // Foo → Foo1 → Bar1
                 "bar2", // Foo → Foo1 → Foo2 → Bar2
                 "bar3", // Foo → Foo1 → Bar1 → could be from any package due to pre‐5.2 tools version.
@@ -126,7 +128,8 @@ class ManifestTests: XCTestCase {
                 targets: targets
             )
 
-            XCTAssertEqual(manifest.dependenciesRequired(for: .everything).map({ $0.identity.description }).sorted(), [
+            XCTAssertEqual(manifest.dependenciesRequired(for: .everything,
+                                                         enabledTraits: []).map({ $0.identity.description }).sorted(), [
                 "bar1",
                 "bar2",
                 "bar3",
@@ -151,5 +154,57 @@ class ManifestTests: XCTestCase {
             ])
             #endif
         }
+    }
+
+    func testRequiredDependencies_whenTraitsEnabled() throws {
+        let dependencies: [PackageDependency] = [
+            .localSourceControl(path: "/Bar1", requirement: .upToNextMajor(from: "1.0.0")),
+        ]
+
+        let products = [
+            try ProductDescription(name: "Foo", type: .library(.automatic), targets: ["Foo1"])
+        ]
+
+        let targets = [
+            try TargetDescription(name: "Foo1", dependencies: [.product(name: "Bar1", package: "Bar1", condition: .init(traits: ["Trait1", "Trait3"]))]),
+        ]
+
+        let manifest = Manifest.createManifest(
+            displayName: "Foo",
+            path: "/Foo",
+            packageKind: .remoteSourceControl(.init("https://github.com/foo/foo")),
+            toolsVersion: .v6_0,
+            dependencies: dependencies,
+            products: products,
+            targets: targets,
+            traits: [
+                .init(name: "Trait1"),
+                .init(name: "Trait2", enabledTraits: ["Trait3"]),
+                .init(name: "Trait3")
+            ]
+        )
+
+        XCTAssertEqual(
+            manifest.dependenciesRequired(
+                for: .everything,
+                enabledTraits: []
+            ).map({ $0.identity.description }).sorted(), [
+        ])
+
+        XCTAssertEqual(
+            manifest.dependenciesRequired(
+                for: .everything,
+                enabledTraits: ["Trait1"]
+            ).map({ $0.identity.description }).sorted(), [
+            "bar1"
+        ])
+
+        XCTAssertEqual(
+            manifest.dependenciesRequired(
+                for: .everything,
+                enabledTraits: ["Trait3"]
+            ).map({ $0.identity.description }).sorted(), [
+            "bar1"
+        ])
     }
 }

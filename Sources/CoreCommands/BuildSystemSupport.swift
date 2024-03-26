@@ -26,6 +26,9 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
 
     func makeBuildSystem(
         explicitProduct: String?,
+        enabledTraits: Set<String>?,
+        enableAllTraits: Bool,
+        disableDefaultTraits: Bool,
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
@@ -43,6 +46,9 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
             packageGraphLoader: packageGraphLoader ?? {
                 try self.swiftCommandState.loadPackageGraph(
                     explicitProduct: explicitProduct,
+                    enabledTraits: enabledTraits,
+                    enableAllTraits: enableAllTraits,
+                    disableDefaultTraits: disableDefaultTraits,
                     testEntryPointPath: testEntryPointPath
                 )
             },
@@ -51,6 +57,7 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
                 workDirectory: try self.swiftCommandState.getActiveWorkspace().location.pluginWorkingDirectory,
                 disableSandbox: self.swiftCommandState.shouldDisableSandbox
             ),
+            traitConfiguration: .init(enabledTraits: enabledTraits, enableAllTraits: enableAllTraits, disableDefaulTraits: disableDefaultTraits),
             additionalFileRules: FileRuleDescription.swiftpmFileTypes,
             pkgConfigDirectories: self.swiftCommandState.options.locations.pkgConfigDirectories,
             dependenciesByRootPackageIdentity: rootPackageInfo.dependecies,
@@ -67,6 +74,9 @@ private struct XcodeBuildSystemFactory: BuildSystemFactory {
 
     func makeBuildSystem(
         explicitProduct: String?,
+        enabledTraits: Set<String>?,
+        enableAllTraits: Bool,
+        disableDefaultTraits: Bool,
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
@@ -79,7 +89,10 @@ private struct XcodeBuildSystemFactory: BuildSystemFactory {
             buildParameters: productsBuildParameters ?? self.swiftCommandState.productsBuildParameters,
             packageGraphLoader: packageGraphLoader ?? {
                 try self.swiftCommandState.loadPackageGraph(
-                    explicitProduct: explicitProduct
+                    explicitProduct: explicitProduct,
+                    enabledTraits: enabledTraits,
+                    enableAllTraits: enableAllTraits,
+                    disableDefaultTraits: disableDefaultTraits
                 )
             },
             outputStream: outputStream ?? self.swiftCommandState.outputStream,

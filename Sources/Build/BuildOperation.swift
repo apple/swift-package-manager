@@ -12,8 +12,6 @@
 
 import Basics
 
-import Build
-
 import LLBuildManifest
 import PackageGraph
 import PackageLoading
@@ -55,6 +53,9 @@ package final class BuildOperation: PackageStructureDelegate, SPMBuildCore.Build
 
     /// the plugin configuration for build plugins
     let pluginConfiguration: PluginConfiguration?
+
+    /// The trait configuration for this build operation.
+    private let traitConfiguration: TraitConfiguration?
 
     /// The llbuild build delegate reference.
     private var buildSystemDelegate: BuildOperationBuildSystemDelegateHandler?
@@ -118,6 +119,7 @@ package final class BuildOperation: PackageStructureDelegate, SPMBuildCore.Build
         cacheBuildManifest: Bool,
         packageGraphLoader: @escaping () throws -> ModulesGraph,
         pluginConfiguration: PluginConfiguration? = .none,
+        traitConfiguration: TraitConfiguration? = nil,
         additionalFileRules: [FileRuleDescription],
         pkgConfigDirectories: [AbsolutePath],
         dependenciesByRootPackageIdentity: [PackageIdentity: [PackageIdentity]],
@@ -140,6 +142,7 @@ package final class BuildOperation: PackageStructureDelegate, SPMBuildCore.Build
         self.packageGraphLoader = packageGraphLoader
         self.additionalFileRules = additionalFileRules
         self.pluginConfiguration = pluginConfiguration
+        self.traitConfiguration = traitConfiguration
         self.pkgConfigDirectories = pkgConfigDirectories
         self.dependenciesByRootPackageIdentity = dependenciesByRootPackageIdentity
         self.rootPackageIdentityByTargetName = (try? Dictionary<String, PackageIdentity>(throwingUniqueKeysWithValues: targetsByRootPackageIdentity.lazy.flatMap { e in e.value.map { ($0, e.key) } })) ?? [:]
@@ -172,7 +175,11 @@ package final class BuildOperation: PackageStructureDelegate, SPMBuildCore.Build
                             throw InternalError("could not find build descriptor at \(buildDescriptionPath)")
                         }
                         // return the build description that's on disk.
-                        return try BuildDescription.load(fileSystem: self.fileSystem, path: buildDescriptionPath)
+                        let buildDescription = try BuildDescription.load(fileSystem: self.fileSystem, path: buildDescriptionPath)
+
+                        if buildDescription.traitConfiguration == self.traitConfiguration {
+                            return buildDescription
+                        }
                     }
                 } catch {
                     // since caching is an optimization, warn about failing to load the cached version
@@ -553,6 +560,7 @@ package final class BuildOperation: PackageStructureDelegate, SPMBuildCore.Build
                 toolsBuildParameters: pluginsBuildParameters,
                 cacheBuildManifest: false,
                 packageGraphLoader: { return graph },
+                traitConfiguration: self.traitConfiguration,
                 additionalFileRules: self.additionalFileRules,
                 pkgConfigDirectories: self.pkgConfigDirectories,
                 dependenciesByRootPackageIdentity: [:],
@@ -674,6 +682,7 @@ package final class BuildOperation: PackageStructureDelegate, SPMBuildCore.Build
 
         let (buildDescription, buildManifest) = try BuildDescription.create(
             with: plan,
+            traitConfiguration: self.traitConfiguration,
             disableSandboxForPluginCommands: self.pluginConfiguration?.disableSandbox ?? false,
             fileSystem: self.fileSystem,
             observabilityScope: self.observabilityScope
@@ -845,6 +854,7 @@ extension BuildOperation {
 extension BuildDescription {
     static func create(
         with plan: BuildPlan,
+        traitConfiguration: TraitConfiguration?,
         disableSandboxForPluginCommands: Bool,
         fileSystem: Basics.FileSystem,
         observabilityScope: ObservabilityScope
@@ -863,6 +873,7 @@ extension BuildDescription {
         // Create the build description.
         let buildDescription = try BuildDescription(
             plan: plan,
+            traitConfiguration: traitConfiguration,
             swiftCommands: swiftCommands,
             swiftFrontendCommands: swiftFrontendCommands,
             testDiscoveryCommands: testDiscoveryCommands,

@@ -17,53 +17,73 @@ import PackageModel
 import struct TSCUtility.Version
 
 package extension PackageDependency {
-    static func fileSystem(identity: PackageIdentity? = nil,
-                           deprecatedName: String? = nil,
-                           path: AbsolutePath,
-                           productFilter: ProductFilter = .everything
+    static func fileSystem(
+        identity: PackageIdentity? = nil,
+        deprecatedName: String? = nil,
+        path: AbsolutePath,
+        productFilter: ProductFilter = .everything,
+        traits: Traits = .init(enabledTraits: .init())
     ) -> Self {
         let identity = identity ?? PackageIdentity(path: path)
-        return .fileSystem(identity: identity,
-                           nameForTargetDependencyResolutionOnly: deprecatedName,
-                           path: path,
-                           productFilter: productFilter)
+        return .fileSystem(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: deprecatedName,
+            path: path,
+            productFilter: productFilter,
+            traits: traits
+        )
     }
 
-    static func localSourceControl(identity: PackageIdentity? = nil,
-                                   deprecatedName: String? = nil,
-                                   path: AbsolutePath,
-                                   requirement: SourceControl.Requirement,
-                                   productFilter: ProductFilter = .everything
+    static func localSourceControl(
+        identity: PackageIdentity? = nil,
+        deprecatedName: String? = nil,
+        path: AbsolutePath,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter = .everything,
+        traits: Traits = .init(enabledTraits: .init())
     ) -> Self {
         let identity = identity ?? PackageIdentity(path: path)
-        return .localSourceControl(identity: identity,
-                                   nameForTargetDependencyResolutionOnly: deprecatedName,
-                                   path: path,
-                                   requirement: requirement,
-                                   productFilter: productFilter)
+        return .localSourceControl(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: deprecatedName,
+            path: path,
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: traits
+        )
     }
 
-    static func remoteSourceControl(identity: PackageIdentity? = nil,
-                                    deprecatedName: String? = nil,
-                                    url: SourceControlURL,
-                                    requirement: SourceControl.Requirement,
-                                    productFilter: ProductFilter = .everything
+    static func remoteSourceControl(
+        identity: PackageIdentity? = nil,
+        deprecatedName: String? = nil,
+        url: SourceControlURL,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter = .everything,
+        traits: Traits = .init(enabledTraits: .init())
     ) -> Self {
         let identity = identity ?? PackageIdentity(url: url)
-        return .remoteSourceControl(identity: identity,
-                                    nameForTargetDependencyResolutionOnly: deprecatedName,
-                                    url: url,
-                                    requirement: requirement,
-                                    productFilter: productFilter)
+        return .remoteSourceControl(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: deprecatedName,
+            url: url,
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: traits
+        )
     }
 
-    static func registry(identity: String,
-                         requirement: Registry.Requirement,
-                         productFilter: ProductFilter = .everything
+    static func registry(
+        identity: String,
+        requirement: Registry.Requirement,
+        productFilter: ProductFilter = .everything,
+        traits: Traits = .init(enabledTraits: .init())
     ) -> Self {
-        return .registry(identity: .plain(identity),
-                         requirement: requirement,
-                         productFilter: productFilter)
+        return .registry(
+            identity: .plain(identity),
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: traits
+        )
     }
 }
 

@@ -91,6 +91,12 @@ public enum ModuleError: Swift.Error {
         scmPackage: PackageIdentity,
         targets: [String]
     )
+
+    /// Indicates that an invalid trait was enabled.
+    case invalidTrait(
+        package: PackageIdentity,
+        trait: String
+    )
 }
 
 extension ModuleError: CustomStringConvertible {
@@ -166,6 +172,10 @@ extension ModuleError: CustomStringConvertible {
             this may indicate that the two packages are the same and can be de-duplicated \
             by activating the automatic source-control to registry replacement, or by using mirrors. \
             if they are not duplicate consider using the `moduleAliases` parameter in manifest to provide unique names
+            """
+        case .invalidTrait(let package, let trait):
+            return """
+            Tried to enable invalid trait "\(trait)" for package \(package)
             """
         }
     }
@@ -315,6 +325,9 @@ public final class PackageBuilder {
 
     private var swiftVersionCache: SwiftLanguageVersion? = nil
 
+    /// The enabled traits of this package.
+    private let enabledTraits: Set<String>
+
     /// Create a builder for the given manifest and package `path`.
     ///
     /// - Parameters:
@@ -337,7 +350,8 @@ public final class PackageBuilder {
         warnAboutImplicitExecutableTargets: Bool = true,
         createREPLProduct: Bool = false,
         fileSystem: FileSystem,
-        observabilityScope: ObservabilityScope
+        observabilityScope: ObservabilityScope,
+        enabledTraits: Set<String>
     ) {
         self.identity = identity
         self.manifest = manifest
@@ -354,6 +368,7 @@ public final class PackageBuilder {
             metadata: .packageMetadata(identity: self.identity, kind: self.manifest.packageKind)
         )
         self.fileSystem = fileSystem
+        self.enabledTraits = enabledTraits
     }
 
     /// Build a new package following the conventions.
@@ -1034,6 +1049,11 @@ public final class PackageBuilder {
 
         // Process each setting.
         for setting in target.settings {
+            if let traits = setting.condition?.traits, traits.intersection(self.enabledTraits).isEmpty {
+                // The setting is currently not enabled so we should skip it
+                continue
+            }
+        
             let decl: BuildSettings.Declaration
             let values: [String]
 
@@ -1151,6 +1171,16 @@ public final class PackageBuilder {
             table.add(assignment, for: decl)
         }
 
+        // For each trait we are now generating an additional define
+        for trait in self.enabledTraits {
+            var assignment = BuildSettings.Assignment()
+            // We are prefixing the trait name with `TRAIT_` so it doesn't collide with
+            // other defines
+            assignment.values = ["TRAIT_\(trait)"]
+            assignment.conditions = []
+            table.add(assignment, for: .SWIFT_ACTIVE_COMPILATION_CONDITIONS)
+        }
+
         return table
     }
 
@@ -1170,6 +1200,10 @@ public final class PackageBuilder {
         }), !platforms.isEmpty
         {
             conditions.append(.init(platforms: platforms))
+        }
+
+        if let traits = condition?.traits {
+            conditions.append(.traits(.init(enabledTraits: traits)))
         }
 
         return conditions

@@ -45,6 +45,8 @@ enum ManifestJSONParser {
         var dependencies: [PackageDependency] = []
         var providers: [SystemPackageProviderDescription]?
         var products: [ProductDescription] = []
+        var traits: Set<TraitDescription> = []
+        var defaultTraits: Set<String>
         var cxxLanguageStandard: String?
         var cLanguageStandard: String?
     }
@@ -114,6 +116,8 @@ enum ManifestJSONParser {
             dependencies: dependencies,
             providers: input.package.providers?.map { .init($0) },
             products: try input.package.products.map { try .init($0) },
+            traits: Set(input.package.traits.map { TraitDescription($0) }),
+            defaultTraits: input.package.defaultTraits,
             cxxLanguageStandard: input.package.cxxLanguageStandard?.rawValue,
             cLanguageStandard: input.package.cLanguageStandard?.rawValue
         )
@@ -346,7 +350,10 @@ extension TargetDescription.Dependency {
 
 extension PackageConditionDescription {
     init(_ condition: Serialization.TargetDependency.Condition) {
-        self.init(platformNames: condition.platforms?.map { $0.name } ?? [])
+        self.init(
+            platformNames: condition.platforms?.map { $0.name } ?? [],
+            traits: condition.traits ?? []
+        )
     }
 }
 
@@ -541,7 +548,7 @@ extension TargetBuildSettingDescription.Kind {
 
 extension PackageConditionDescription {
     init(_ condition: Serialization.BuildSettingCondition) {
-        self.init(platformNames: condition.platforms?.map { $0.name } ?? [], config: condition.config?.config)
+        self.init(platformNames: condition.platforms?.map { $0.name } ?? [], config: condition.config?.config, traits: condition.traits)
     }
 }
 
@@ -579,26 +586,73 @@ extension TargetBuildSettingDescription.Setting {
     }
 }
 
+extension TraitDescription {
+    init(_ trait: Serialization.Trait) {
+        self.init(
+            name: trait.name,
+            enabledTraits: trait.enabledTraits
+        )
+    }
+}
+
+extension PackageDependency.Traits {
+    init(_ traits: Serialization.PackageDependency.Traits) {
+        self.init(
+            enabledTraits: Set(traits.enabledTraits.map { .init($0) }),
+            disableDefaultTraits: traits.disableDefaultTraits
+        )
+    }
+}
+
+extension PackageDependency.Traits.EnabledTrait {
+    init(_ enabledTrait: Serialization.PackageDependency.Traits.EnabledTrait) {
+        self.init(
+            name: enabledTrait.name,
+            condition: enabledTrait.condition.flatMap { .init($0) }
+        )
+    }
+}
+
+
+extension PackageDependency.Traits.EnabledTrait.Condition {
+    init(_ condition: Serialization.PackageDependency.Traits.EnabledTrait.Condition) {
+        self.init(traits: condition.traits)
+    }
+}
+
 extension MappablePackageDependency {
     fileprivate init(_ seed: Serialization.PackageDependency, parentPackagePath: AbsolutePath) {
         switch seed.kind {
         case .fileSystem(let name, let path):
             self.init(
                 parentPackagePath: parentPackagePath,
-                kind: .fileSystem(name: name, path: path),
-                productFilter: .everything
+                kind: .fileSystem(
+                    name: name,
+                    path: path
+                ),
+                productFilter: .everything,
+                traits: .init(seed.traits)
             )
         case .sourceControl(let name, let location, let requirement):
             self.init(
                 parentPackagePath: parentPackagePath,
-                kind: .sourceControl(name: name, location: location, requirement: .init(requirement)),
-                productFilter: .everything
+                kind: .sourceControl(
+                    name: name,
+                    location: location,
+                    requirement: .init(requirement)
+                ),
+                productFilter: .everything,
+                traits: .init(seed.traits)
             )
         case .registry(let id, let requirement):
             self.init(
                 parentPackagePath: parentPackagePath,
-                kind: .registry(id: id, requirement: .init(requirement)),
-                productFilter: .everything
+                kind: .registry(
+                    id: id,
+                    requirement: .init(requirement)
+                ),
+                productFilter: .everything,
+                traits: .init(seed.traits)
             )
         }
     }

@@ -321,11 +321,31 @@ private final class InProcessTool: Tool {
     }
 }
 
+public struct TraitConfiguration: Codable, Hashable {
+    /// The traits to enable for the package.
+    public var enabledTraits: Set<String>?
+
+    /// Enables all traits of the package.
+    public var enableAllTraits: Bool
+
+    /// Disables all default traits of the package.
+    public var disableDefaulTraits: Bool
+
+    public init(enabledTraits: Set<String>?, enableAllTraits: Bool, disableDefaulTraits: Bool) {
+        self.enabledTraits = enabledTraits
+        self.enableAllTraits = enableAllTraits
+        self.disableDefaulTraits = disableDefaulTraits
+    }
+}
+
 /// Contains the description of the build that is needed during the execution.
 package struct BuildDescription: Codable {
     package typealias CommandName = String
     package typealias TargetName = String
     package typealias CommandLineFlag = String
+
+    /// The enabled traits of the root package.
+    let traitConfiguration: TraitConfiguration?
 
     /// The Swift compiler invocation targets.
     let swiftCommands: [LLBuildManifest.CmdName: SwiftCompilerTool]
@@ -366,6 +386,7 @@ package struct BuildDescription: Codable {
 
     package init(
         plan: BuildPlan,
+        traitConfiguration: TraitConfiguration?,
         swiftCommands: [LLBuildManifest.CmdName: SwiftCompilerTool],
         swiftFrontendCommands: [LLBuildManifest.CmdName: SwiftFrontendTool],
         testDiscoveryCommands: [LLBuildManifest.CmdName: TestDiscoveryTool],
@@ -419,6 +440,7 @@ package struct BuildDescription: Codable {
             )
         }
         self.pluginDescriptions = pluginDescriptions
+        self.traitConfiguration = traitConfiguration
     }
 
     package func write(fileSystem: Basics.FileSystem, path: AbsolutePath) throws {

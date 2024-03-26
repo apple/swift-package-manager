@@ -89,7 +89,7 @@ final class PackageDescription5_7LoadingTests: PackageDescriptionLoadingTests {
 
         let dependencies = manifest.targets[0].dependencies
         XCTAssertEqual(dependencies[0], .target(name: "Bar", condition: .none))
-        XCTAssertEqual(dependencies[1], .target(name: "Baz", condition: .init(platformNames: ["linux"], config: .none)))
+        XCTAssertEqual(dependencies[1], .target(name: "Baz", condition: .init(platformNames: ["linux"], config: .none, traits: [])))
     }
 
     func testConditionalTargetDependenciesDeprecation() async throws {

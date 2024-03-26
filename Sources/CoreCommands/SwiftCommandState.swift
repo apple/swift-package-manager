@@ -596,6 +596,9 @@ package final class SwiftCommandState {
     @discardableResult
     package func loadPackageGraph(
         explicitProduct: String? = nil,
+        enabledTraits: Set<String>? = nil,
+        enableAllTraits: Bool = false,
+        disableDefaultTraits: Bool = false,
         testEntryPointPath: AbsolutePath? = nil
     ) throws -> ModulesGraph {
         do {
@@ -605,6 +608,9 @@ package final class SwiftCommandState {
             let graph = try workspace.loadPackageGraph(
                 rootInput: getWorkspaceRoot(),
                 explicitProduct: explicitProduct,
+                enabledTraits: enabledTraits,
+                enableAllTraits: enableAllTraits,
+                disableDefaultTraits: disableDefaultTraits,
                 forceResolvedVersions: options.resolver.forceResolvedVersions,
                 testEntryPointPath: testEntryPointPath,
                 availableLibraries: self.getHostToolchain().providedLibraries,
@@ -683,6 +689,9 @@ package final class SwiftCommandState {
     package func createBuildSystem(
         explicitBuildSystem: BuildSystemProvider.Kind? = .none,
         explicitProduct: String? = .none,
+        enabledTraits: Set<String>? = nil,
+        enableAllTraits: Bool = false,
+        disableDefaultTraits: Bool = false,
         cacheBuildManifest: Bool = true,
         shouldLinkStaticSwiftStdlib: Bool = false,
         productsBuildParameters: BuildParameters? = .none,
@@ -702,6 +711,9 @@ package final class SwiftCommandState {
         let buildSystem = try buildSystemProvider.createBuildSystem(
             kind: explicitBuildSystem ?? options.build.buildSystem,
             explicitProduct: explicitProduct,
+            enabledTraits: enabledTraits,
+            enableAllTraits: enableAllTraits,
+            disableDefaultTraits: disableDefaultTraits,
             cacheBuildManifest: cacheBuildManifest,
             productsBuildParameters: productsParameters,
             toolsBuildParameters: toolsBuildParameters,

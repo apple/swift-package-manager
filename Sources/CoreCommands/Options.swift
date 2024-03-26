@@ -59,6 +59,9 @@ package struct GlobalOptions: ParsableArguments {
 
     @OptionGroup()
     package var linker: LinkerOptions
+
+    @OptionGroup()
+    package var traits: TraitOptions
 }
 
 package struct LocationOptions: ParsableArguments {
@@ -632,6 +635,23 @@ package struct TestLibraryOptions: ParsableArguments {
 
         return result
     }
+}
+
+
+public struct TraitOptions: ParsableArguments {
+    public init() {}
+
+    /// The traits to enable for the package.
+    @Option(help: " Enables the passed traits of the package. Multiple traits can be specified by providing a comma separated list e.g. `--traits Trait1,Trait2`.")
+    public var traits: String?
+
+    /// Enables all traits of the package.
+    @Flag(help: "Enables all traits of the package.")
+    public var enableAllTraits: Bool = false
+
+    /// Disables all default traits of the package.
+    @Flag(help: "Disables all default traits of the package.")
+    public var disableDefaultTraits: Bool = false
 }
 
 // MARK: - Extensions

@@ -29,6 +29,17 @@ public struct TargetDescription: Hashable, Encodable, Sendable {
         case product(name: String, package: String?, moduleAliases: [String: String]? = nil, condition: PackageConditionDescription?)
         case byName(name: String, condition: PackageConditionDescription?)
 
+        var condition: PackageConditionDescription? {
+            switch self {
+            case .target(_, let condition):
+                return condition
+            case .product(_, _, _, let condition):
+                return condition
+            case .byName(_, let condition):
+                return condition
+            }
+        }
+
         public static func target(name: String) -> Dependency {
             return .target(name: name, condition: nil)
         }
