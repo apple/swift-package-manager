@@ -4063,6 +4063,9 @@ final class BuildPlanTests: XCTestCase {
 
             let testDiscovery = try result.target(for: "APackageDiscoveredTests").swiftTarget().compileArguments()
             XCTAssertMatch(testDiscovery, [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++17"])
+
+            let testEntryPoint = try result.target(for: "APackageTests").swiftTarget().compileArguments()
+            XCTAssertMatch(testEntryPoint, [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++17"])
         }
 
         // omit frame pointers explicitly set to true
