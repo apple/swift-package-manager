@@ -1,18 +1,18 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.9
 
 import PackageDescription
 
 let package = Package(
     name: "package-info",
     platforms: [
-        .macOS(.v12),
-        .iOS(.v13)
+        .macOS(.v13),
+        .iOS(.v16)
     ],
     dependencies: [
         // This just points to the SwiftPM at the root of this repository.
         .package(name: "swift-package-manager", path: "../../"),
         // You will want to depend on a stable semantic version instead:
-        // .package(url: "https://github.com/apple/swift-package-manager", .exact("0.4.0"))
+        // .package(url: "https://github.com/apple/swift-package-manager", branch: "swift-5.10-RELEASE")
     ],
     targets: [
         .executableTarget(
