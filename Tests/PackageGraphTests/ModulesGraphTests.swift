@@ -2676,6 +2676,57 @@ final class ModulesGraphTests: XCTestCase {
 
         XCTAssertEqual(observability.diagnostics.count, 0, "unexpected diagnostics: \(observability.diagnostics.map { $0.description })")
     }
+
+    func testDependencyResolutionWithErrorMessages() throws {
+        let fs = InMemoryFileSystem(emptyFiles:
+            "/aaa/Sources/aaa/main.swift",
+            "/zzz/Sources/zzz/source.swift"
+        )
+
+        let observability = ObservabilitySystem.makeForTesting()
+        let _ = try loadModulesGraph(
+            fileSystem: fs,
+            manifests: [
+                Manifest.createRootManifest(
+                    displayName: "aaa",
+                    path: "/aaa",
+                    dependencies: [
+                        .localSourceControl(path: "/zzz", requirement: .upToNextMajor(from: "1.0.0"))
+                    ],
+                    products: [],
+                    targets: [
+                        TargetDescription(
+                            name: "aaa",
+                            dependencies: ["zzy"],
+                            type: .executable
+                        )
+                    ]),
+                Manifest.createRootManifest(
+                    displayName: "zzz",
+                    path: "/zzz",
+                    products: [
+                        ProductDescription(
+                            name: "zzz",
+                            type: .library(.automatic),
+                            targets: ["zzz"]
+                        )
+                    ],
+                    targets: [
+                        TargetDescription(
+                            name: "zzz"
+                        )
+                    ])
+            ],
+            observabilityScope: observability.topScope
+        )
+
+        testDiagnostics(observability.diagnostics) { result in
+            result.check(
+                diagnostic: "product 'zzy' required by package 'aaa' target 'aaa' not found. Did you mean 'zzz'?",
+                severity: .error
+            )
+        }
+    }
 }
 
 

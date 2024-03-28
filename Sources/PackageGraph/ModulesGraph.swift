@@ -23,7 +23,7 @@ enum PackageGraphError: Swift.Error {
     case cycleDetected((path: [Manifest], cycle: [Manifest]))
 
     /// The product dependency not found.
-    case productDependencyNotFound(package: String, targetName: String, dependencyProductName: String, dependencyPackageName: String?, dependencyProductInDecl: Bool, similarProductName: String?)
+    case productDependencyNotFound(package: String, targetName: String, dependencyProductName: String, dependencyPackageName: String?, dependencyProductInDecl: Bool, similarProductName: String?, packageContainingSimilarProduct: String?)
 
     /// The package dependency already satisfied by a different dependency package
     case dependencyAlreadySatisfiedByIdentifier(package: String, dependencyLocation: String, otherDependencyURL: String, identity: PackageIdentity)
@@ -230,12 +230,14 @@ extension PackageGraphError: CustomStringConvertible {
             (cycle.path + cycle.cycle).map({ $0.displayName }).joined(separator: " -> ") +
             " -> " + cycle.cycle[0].displayName
 
-        case .productDependencyNotFound(let package, let targetName, let dependencyProductName, let dependencyPackageName, let dependencyProductInDecl, let similarProductName):
+        case .productDependencyNotFound(let package, let targetName, let dependencyProductName, let dependencyPackageName, let dependencyProductInDecl, let similarProductName, let packageContainingSimilarProduct):
             if dependencyProductInDecl {
                 return "product '\(dependencyProductName)' is declared in the same package '\(package)' and can't be used as a dependency for target '\(targetName)'."
             } else {
                 var description = "product '\(dependencyProductName)' required by package '\(package)' target '\(targetName)' \(dependencyPackageName.map{ "not found in package '\($0)'" } ?? "not found")."
-                if let similarProductName {
+                if let similarProductName, let packageContainingSimilarProduct {
+                    description += " Did you mean '.product(name: \"\(similarProductName)\", package: \"\(packageContainingSimilarProduct)\")'?"
+                } else if let similarProductName {
                     description += " Did you mean '\(similarProductName)'?"
                 }
                 return description
