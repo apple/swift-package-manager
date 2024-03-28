@@ -416,7 +416,7 @@ public struct TargetSourcesBuilder {
     /// ones that should be copied as-is.
     public func computeContents() -> [AbsolutePath] {
         var contents: [AbsolutePath] = []
-        var queue: [AbsolutePath] = [targetPath]
+        var queue: [AbsolutePath] = declaredSources ?? [targetPath]
 
         // Ignore xcodeproj and playground directories.
         var ignoredDirectoryExtensions = ["xcodeproj", "playground", "xcworkspace"]
