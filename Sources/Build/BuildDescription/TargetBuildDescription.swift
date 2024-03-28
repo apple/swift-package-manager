@@ -101,7 +101,7 @@ package enum TargetBuildDescription {
     var buildParameters: BuildParameters {
         switch self {
         case .swift(let swiftTargetBuildDescription):
-            return swiftTargetBuildDescription.buildParameters
+            return swiftTargetBuildDescription.defaultBuildParameters
         case .clang(let clangTargetBuildDescription):
             return clangTargetBuildDescription.buildParameters
         }

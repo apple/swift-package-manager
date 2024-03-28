@@ -317,31 +317,33 @@ extension TargetBuildDescription {
 }
 
 extension ResolvedTarget {
-    package func getCommandName(config: String) -> String {
-        "C." + self.getLLBuildTargetName(config: config)
+    package func getCommandName(buildParameters: BuildParameters) -> String {
+        "C." + self.getLLBuildTargetName(buildParameters: buildParameters)
     }
 
-    package func getLLBuildTargetName(config: String) -> String {
-        "\(name)-\(config).module"
+    package func getLLBuildTargetName(buildParameters: BuildParameters) -> String {
+        "\(self.name)-\(buildParameters.buildConfig)\(buildParameters.suffix(triple: self.buildTriple)).module"
     }
 
     package func getLLBuildResourcesCmdName(config: String) -> String {
-        "\(name)-\(config).module-resources"
+        "\(self.name)-\(config).module-resources"
     }
 }
 
 extension ResolvedProduct {
-    package func getLLBuildTargetName(config: String) throws -> String {
-        let potentialExecutableTargetName = "\(name)-\(config).exe"
-        let potentialLibraryTargetName = "\(name)-\(config).dylib"
+    package func getLLBuildTargetName(buildParameters: BuildParameters) throws -> String {
+        let config = buildParameters.buildConfig
+        let suffix = buildParameters.suffix(triple: self.buildTriple)
+        let potentialExecutableTargetName = "\(name)-\(config)\(suffix).exe"
+        let potentialLibraryTargetName = "\(name)-\(config)\(suffix).dylib"
 
         switch type {
         case .library(.dynamic):
             return potentialLibraryTargetName
         case .test:
-            return "\(name)-\(config).test"
+            return "\(name)-\(config)\(suffix).test"
         case .library(.static):
-            return "\(name)-\(config).a"
+            return "\(name)-\(config)\(suffix).a"
         case .library(.automatic):
             throw InternalError("automatic library not supported")
         case .executable, .snippet:
@@ -357,8 +359,8 @@ extension ResolvedProduct {
         }
     }
 
-    package func getCommandName(config: String) throws -> String {
-        try "C." + self.getLLBuildTargetName(config: config)
+    public func getCommandName(buildParameters: BuildParameters) throws -> String {
+        try "C.\(self.getLLBuildTargetName(buildParameters: buildParameters))\(buildParameters.suffix(triple: self.buildTriple))"
     }
 }
 

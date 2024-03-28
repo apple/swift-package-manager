@@ -165,12 +165,12 @@ extension ModulesGraph {
             observabilityScope: observabilityScope
         )
 
-        let rootPackages = resolvedPackages.filter{ root.manifests.values.contains($0.manifest) }
+        let rootPackages = resolvedPackages.filter { root.manifests.values.contains($0.manifest) }
         checkAllDependenciesAreUsed(rootPackages, observabilityScope: observabilityScope)
 
         return try ModulesGraph(
             rootPackages: rootPackages,
-            rootDependencies: resolvedPackages.filter{ rootDependencies.contains($0.manifest) },
+            rootDependencies: resolvedPackages.filter { rootDependencies.contains($0.manifest) },
             dependencies: requiredDependencies,
             binaryArtifacts: binaryArtifacts
         )
@@ -180,16 +180,16 @@ extension ModulesGraph {
 private func checkAllDependenciesAreUsed(_ rootPackages: [ResolvedPackage], observabilityScope: ObservabilityScope) {
     for package in rootPackages {
         // List all dependency products dependent on by the package targets.
-        let productDependencies = IdentifiableSet(package.targets.flatMap({ target in
-            return target.dependencies.compactMap({ targetDependency in
+        let productDependencies = IdentifiableSet(package.targets.flatMap { target in
+            return target.dependencies.compactMap { targetDependency in
                 switch targetDependency {
                 case .product(let product, _):
                     return product
                 case .target:
                     return nil
                 }
-            })
-        }))
+            }
+        })
 
         for dependency in package.dependencies {
             // We continue if the dependency contains executable products to make sure we don't
@@ -217,7 +217,12 @@ private func checkAllDependenciesAreUsed(_ rootPackages: [ResolvedPackage], obse
             )
 
             // Otherwise emit a warning if none of the dependency package's products are used.
-            let dependencyIsUsed = dependency.products.contains(where: { productDependencies.contains(id: $0.id) })
+            let dependencyIsUsed = dependency.products.contains { product in
+                // Don't compare by product ID, but by product name to make sure both build triples as properties of
+                // `ResolvedProduct.ID` are allowed.
+                productDependencies.contains { $0.name == product.name }
+            }
+
             if !dependencyIsUsed && !observabilityScope.errorsReportedInAnyScope {
                 packageDiagnosticsScope.emit(.unusedDependency(dependency.identity.description))
             }
@@ -275,7 +280,10 @@ private func createResolvedPackages(
 
     // Resolve module aliases, if specified, for targets and their dependencies
     // across packages. Aliasing will result in target renaming.
-    let moduleAliasingUsed = try resolveModuleAliases(packageBuilders: packageBuilders, observabilityScope: observabilityScope)
+    let moduleAliasingUsed = try resolveModuleAliases(
+        packageBuilders: packageBuilders,
+        observabilityScope: observabilityScope
+    )
 
     // Scan and validate the dependencies
     for packageBuilder in packageBuilders {
@@ -627,12 +635,12 @@ private func createResolvedPackages(
             observabilityScope.emit(
                 ModuleError.duplicateModule(
                     targetName: entry.key,
-                    packages: entry.value.map{ $0.identity })
+                    packages: entry.value.map { $0.identity })
             )
         }
     }
 
-    return try packageBuilders.map{ try $0.construct() }
+    return try packageBuilders.map { try $0.construct() }
 }
 
 private func emitDuplicateProductDiagnostic(

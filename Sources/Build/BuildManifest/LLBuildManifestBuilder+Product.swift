@@ -15,7 +15,7 @@ import struct LLBuildManifest.Node
 
 extension LLBuildManifestBuilder {
     func createProductCommand(_ buildProduct: ProductBuildDescription) throws {
-        let cmdName = try buildProduct.product.getCommandName(config: buildProduct.buildParameters.buildConfig)
+        let cmdName = try buildProduct.product.getCommandName(buildParameters: buildProduct.buildParameters)
 
         // Add dependency on Info.plist generation on Darwin platforms.
         let testInputs: [AbsolutePath]
@@ -34,7 +34,7 @@ extension LLBuildManifestBuilder {
         }
 
         // Create a phony node to represent the entire target.
-        let targetName = try buildProduct.product.getLLBuildTargetName(config: buildProduct.buildParameters.buildConfig)
+        let targetName = try buildProduct.product.getLLBuildTargetName(buildParameters: buildProduct.buildParameters)
         let output: Node = .virtual(targetName)
 
         let finalProductNode: Node
@@ -85,7 +85,7 @@ extension LLBuildManifestBuilder {
                     outputPath: plistPath
                 )
 
-                let cmdName = try buildProduct.product.getCommandName(config: buildProduct.buildParameters.buildConfig)
+                let cmdName = try buildProduct.product.getCommandName(buildParameters: buildProduct.buildParameters)
                 let codeSigningOutput = Node.virtual(targetName + "-CodeSigning")
                 try self.manifest.addShellCmd(
                     name: "\(cmdName)-entitlements",

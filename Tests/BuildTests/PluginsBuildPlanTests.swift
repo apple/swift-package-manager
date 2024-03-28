@@ -48,8 +48,16 @@ final class PluginsBuildPlanTests: XCTestCase {
             let (stdout, stderr) = try executeSwiftPackage(fixturePath, extraArgs: ["-v", "build-plugin-dependency"])
             XCTAssertMatch(stdout, .contains("Hello from dependencies-stub"))
             XCTAssertMatch(stderr, .contains("Build of product 'plugintool' complete!"))
-            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/\(hostTriple)/debug/plugintool"))))
-            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/\(hostTriple)/debug/placeholder"))))
+            XCTAssertTrue(
+                localFileSystem.exists(
+                    fixturePath.appending(RelativePath(".build/\(hostTriple)/debug/plugintool-tool"))
+                )
+            )
+            XCTAssertTrue(
+                localFileSystem.exists(
+                    fixturePath.appending(RelativePath(".build/\(hostTriple)/debug/placeholder"))
+                )
+            )
         }
 
         // When cross compiling the final product, plugin dependencies should still be built for the host
@@ -57,8 +65,16 @@ final class PluginsBuildPlanTests: XCTestCase {
             let (stdout, stderr) = try executeSwiftPackage(fixturePath, extraArgs: ["--triple", targetTriple, "-v", "build-plugin-dependency"])
             XCTAssertMatch(stdout, .contains("Hello from dependencies-stub"))
             XCTAssertMatch(stderr, .contains("Build of product 'plugintool' complete!"))
-            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/\(hostTriple)/debug/plugintool"))))
-            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/\(targetTriple)/debug/placeholder"))))
+            XCTAssertTrue(
+                localFileSystem.exists(
+                    fixturePath.appending(RelativePath(".build/\(hostTriple)/debug/plugintool-tool"))
+                )
+            )
+            XCTAssertTrue(
+                localFileSystem.exists(
+                    fixturePath.appending(RelativePath(".build/\(targetTriple)/debug/placeholder"))
+                )
+            )
         }
     }
 }

@@ -10,6 +10,7 @@ add_library(Build
   BuildDescription/ClangTargetBuildDescription.swift
   BuildDescription/PluginDescription.swift
   BuildDescription/ProductBuildDescription.swift
+  BuildDescription/ResolvedTarget+BuildDescription.swift
   BuildDescription/SwiftTargetBuildDescription.swift
   BuildDescription/TargetBuildDescription.swift
   BuildManifest/LLBuildManifestBuilder.swift

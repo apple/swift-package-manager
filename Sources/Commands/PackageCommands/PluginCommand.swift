@@ -18,7 +18,9 @@ import CoreCommands
 import SPMBuildCore
 
 import Dispatch
+
 import PackageGraph
+
 import PackageModel
 
 import enum TSCBasic.ProcessEnv
@@ -319,6 +321,9 @@ struct PluginCommand: SwiftCommand {
         let toolSearchDirs = [try swiftCommandState.getTargetToolchain().swiftCompilerPath.parentDirectory]
             + getEnvSearchPaths(pathString: ProcessEnv.path, currentWorkingDirectory: .none)
 
+        var buildToolsGraph = packageGraph
+        try buildToolsGraph.updateBuildTripleRecursively(.tools)
+
         let buildParameters = try swiftCommandState.toolsBuildParameters
         // Build or bring up-to-date any executable host-side tools on which this plugin depends. Add them and any binary dependencies to the tool-names-to-path map.
         let buildSystem = try swiftCommandState.createBuildSystem(
@@ -327,10 +332,12 @@ struct PluginCommand: SwiftCommand {
             // Force all dependencies to be built for the host, to work around the fact that BuildOperation.plan
             // knows to compile build tool plugin dependencies for the host but does not do the same for command
             // plugins.
-            productsBuildParameters: buildParameters
+            productsBuildParameters: buildParameters,
+            packageGraphLoader: { buildToolsGraph }
         )
+
         let accessibleTools = try plugin.processAccessibleTools(
-            packageGraph: packageGraph,
+            packageGraph: buildToolsGraph,
             fileSystem: swiftCommandState.fileSystem,
             environment: buildParameters.buildEnvironment,
             for: try pluginScriptRunner.hostTriple

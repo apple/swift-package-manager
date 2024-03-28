@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 import Basics
+
+import struct OrderedCollections.OrderedDictionary
+
 import PackageModel
 
 /// A fully resolved package. Contains resolved targets, products and dependencies of the package.
@@ -64,8 +67,50 @@ public struct ResolvedPackage {
         platformVersionProvider: PlatformVersionProvider
     ) {
         self.underlying = underlying
-        self.targets = targets
-        self.products = products
+
+        var processedTargets = OrderedDictionary<ResolvedTarget.ID, ResolvedTarget>(
+            uniqueKeysWithValues: targets.map { ($0.id, $0) }
+        )
+        var processedProducts = [ResolvedProduct]()
+        // Make sure that direct macro dependencies of test products are also built for the target triple.
+        // Without this workaround, `assertMacroExpansion` in tests can't be built, as it requires macros
+        // and SwiftSyntax to be built for the target triple: https://github.com/apple/swift-package-manager/pull/7349
+        for var product in products {
+            if product.type == .test {
+                var productTargets = IdentifiableSet<ResolvedTarget>()
+                for var target in product.targets {
+                    var targetDependencies = [ResolvedTarget.Dependency]()
+                    for dependency in target.dependencies {
+                        switch dependency {
+                        case .target(var target, let conditions) where target.type == .macro:
+                            target.buildTriple = .destination
+                            target.updateBuildTriplesOfDependencies(forceUpdate: true)
+                            targetDependencies.append(.target(target, conditions: conditions))
+
+                            if target.packageIdentity == underlying.identity {
+                                processedTargets[target.id] = target
+                            }
+                        case .product(var product, let conditions) where product.type == .macro:
+                            product.buildTriple = .destination
+                            targetDependencies.append(.product(product, conditions: conditions))
+                        default:
+                            targetDependencies.append(dependency)
+                        }
+                    }
+                    target.dependencies = targetDependencies
+                    if target.packageIdentity == underlying.identity {
+                        processedTargets[target.id] = target
+                    }
+                    productTargets.insert(target)
+                }
+                product.targets = productTargets
+            }
+
+            processedProducts.append(product)
+        }
+
+        self.products = processedProducts
+        self.targets = Array(processedTargets.values)
         self.dependencies = dependencies
         self.defaultLocalization = defaultLocalization
         self.supportedPlatforms = supportedPlatforms

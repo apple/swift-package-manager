@@ -39,7 +39,7 @@ package func macrosPackageGraph() throws -> MockPackageGraph {
     )
 
     let observability = ObservabilitySystem.makeForTesting()
-    let graph = try loadPackageGraph(
+    let graph = try loadModulesGraph(
         fileSystem: fs,
         manifests: [
             Manifest.createRootManifest(
@@ -124,6 +124,89 @@ package func macrosPackageGraph() throws -> MockPackageGraph {
     return (graph, fs, observability.topScope)
 }
 
+package func macrosTestsPackageGraph() throws -> MockPackageGraph {
+    let fs = InMemoryFileSystem(emptyFiles:
+        "/swift-mmio/Sources/MMIO/source.swift",
+        "/swift-mmio/Sources/MMIOMacros/source.swift",
+        "/swift-mmio/Sources/MMIOMacrosTests/source.swift",
+        "/swift-syntax/Sources/SwiftSyntax/source.swift",
+        "/swift-syntax/Sources/SwiftSyntaxMacrosTestSupport/source.swift",
+        "/swift-syntax/Tests/SwiftSyntaxTests/source.swift"
+    )
+
+    let observability = ObservabilitySystem.makeForTesting()
+    let graph = try loadModulesGraph(
+        fileSystem: fs,
+        manifests: [
+            Manifest.createRootManifest(
+                displayName: "swift-mmio",
+                path: "/swift-mmio",
+                dependencies: [
+                    .localSourceControl(
+                        path: "/swift-syntax",
+                        requirement: .upToNextMajor(from: "1.0.0")
+                    )
+                ],
+                products: [
+                    ProductDescription(
+                        name: "MMIO",
+                        type: .library(.automatic),
+                        targets: ["MMIO"]
+                    )
+                ],
+                targets: [
+                    TargetDescription(
+                        name: "MMIO",
+                        dependencies: [.target(name: "MMIOMacros")]
+                    ),
+                    TargetDescription(
+                        name: "MMIOMacros",
+                        dependencies: [.product(name: "SwiftSyntax", package: "swift-syntax")],
+                        type: .macro
+                    ),
+                    TargetDescription(
+                        name: "MMIOMacrosTests",
+                        dependencies: [
+                            .target(name: "MMIOMacros"),
+                            .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")
+                        ],
+                        type: .test
+                    )
+                ]
+            ),
+            Manifest.createFileSystemManifest(
+                displayName: "swift-syntax",
+                path: "/swift-syntax",
+                products: [
+                    ProductDescription(
+                        name: "SwiftSyntax",
+                        type: .library(.automatic),
+                        targets: ["SwiftSyntax"]
+                    ),
+                    ProductDescription(
+                        name: "SwiftSyntaxMacrosTestSupport",
+                        type: .library(.automatic),
+                        targets: ["SwiftSyntaxMacrosTestSupport"]
+                    )
+                ],
+                targets: [
+                    TargetDescription(name: "SwiftSyntax", dependencies: []),
+                    TargetDescription(
+                        name: "SwiftSyntaxMacrosTestSupport",
+                        dependencies: [.target(name: "SwiftSyntax")]
+                    ),
+                    TargetDescription(name: "SwiftSyntaxTests", dependencies: ["SwiftSyntax"], type: .test),
+                ]
+            ),
+        ],
+        observabilityScope: observability.topScope
+    )
+
+    XCTAssertNoDiagnostics(observability.diagnostics)
+
+    return (graph, fs, observability.topScope)
+}
+
 package func trivialPackageGraph(pkgRootPath: AbsolutePath) throws -> MockPackageGraph {
     let fs = InMemoryFileSystem(
         emptyFiles:
@@ -134,7 +217,7 @@ package func trivialPackageGraph(pkgRootPath: AbsolutePath) throws -> MockPackag
     )
 
     let observability = ObservabilitySystem.makeForTesting()
-    let graph = try loadPackageGraph(
+    let graph = try loadModulesGraph(
         fileSystem: fs,
         manifests: [
             Manifest.createRootManifest(
@@ -164,7 +247,7 @@ package func embeddedCxxInteropPackageGraph(pkgRootPath: AbsolutePath) throws ->
     )
 
     let observability = ObservabilitySystem.makeForTesting()
-    let graph = try loadPackageGraph(
+    let graph = try loadModulesGraph(
         fileSystem: fs,
         manifests: [
             Manifest.createRootManifest(

@@ -66,7 +66,7 @@ package struct SymbolGraphExtract {
         // Construct arguments for extracting symbols for a single target.
         var commandLine = [self.tool.pathString]
         commandLine += ["-module-name", target.c99name]
-        commandLine += try buildParameters.targetTripleArgs(for: target)
+        commandLine += try buildParameters.tripleArgs(for: target)
         commandLine += try buildPlan.createAPIToolCommonArgs(includeLibrarySearchPaths: true)
         commandLine += ["-module-cache-path", try buildParameters.moduleCache.pathString]
         if verboseOutput {

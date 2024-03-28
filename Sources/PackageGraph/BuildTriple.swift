@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+import class PackageModel.Target
+import class PackageModel.Product
+
 /// Triple for which code should be compiled for.
 /// > Note: We're not using "host" and "target" triple terminology in this enum, as that clashes with build
 /// > system "targets" and can lead to confusion in this context.
@@ -19,4 +22,24 @@ public enum BuildTriple {
 
     /// Triple of the destination platform for which end products are compiled (the target triple).
     case destination
+}
+
+extension Target {
+    var buildTriple: BuildTriple {
+        if self.type == .macro || self.type == .plugin {
+            .tools
+        } else {
+            .destination
+        }
+    }
+}
+
+extension Product {
+    var buildTriple: BuildTriple {
+        if self.type == .macro || self.type == .plugin {
+            .tools
+        } else {
+            .destination
+        }
+    }
 }

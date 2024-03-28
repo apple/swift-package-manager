@@ -131,7 +131,7 @@ public class Target: PolymorphicCodableProtocol {
     /// The name of the target.
     ///
     /// NOTE: This name is not the language-level target (i.e., the importable
-    /// name) name in many cases, instead use c99name if you need uniqueness.
+    /// name) name in many cases, instead use ``Target/c99name`` if you need uniqueness.
     public private(set) var name: String
 
     /// Module aliases needed to build this target. The key is an original name of a

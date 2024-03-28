@@ -74,7 +74,7 @@ extension ProductBuildDescription {
     /// The path to the product binary produced.
     public var binaryPath: AbsolutePath {
         get throws {
-            return try self.buildParameters.binaryPath(for: product)
+            try self.buildParameters.binaryPath(for: product)
         }
     }
 }

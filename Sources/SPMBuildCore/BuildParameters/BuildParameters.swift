@@ -248,7 +248,7 @@ public struct BuildParameters: Encodable {
 
     /// Returns the path to the binary of a product for the current build parameters, relative to the build directory.
     public func binaryRelativePath(for product: ResolvedProduct) throws -> RelativePath {
-        let potentialExecutablePath = try RelativePath(validating: "\(product.name)\(self.triple.executableExtension)")
+        let potentialExecutablePath = try RelativePath(validating: "\(product.name)\(self.suffix(triple: product.buildTriple))\(self.triple.executableExtension)")
 
         switch product.type {
         case .executable, .snippet:
@@ -327,5 +327,13 @@ extension BuildParameters {
 extension Triple {
     public var supportsTestSummary: Bool {
         return !self.isWindows()
+    }
+}
+
+extension BuildParameters {
+    /// Suffix appended to build manifest nodes to distinguish nodes created for tools from nodes created for
+    /// end products, i.e. nodes for host vs target triples.
+    package func suffix(triple: BuildTriple) -> String {
+        if triple == .tools { "-tool" } else { "" }
     }
 }

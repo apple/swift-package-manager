@@ -53,7 +53,7 @@ final class ProductBuildDescriptionTests: XCTestCase {
         )
         XCTAssertNoDiagnostics(observability.diagnostics)
 
-        let id = ResolvedProduct.ID(targetName: "exe", packageIdentity: .plain("pkg"), buildTriple: .destination)
+        let id = ResolvedProduct.ID(productName: "exe", packageIdentity: .plain("pkg"), buildTriple: .destination)
         let package = try XCTUnwrap(graph.rootPackages.first)
         let product = try XCTUnwrap(graph.allProducts[id])
 

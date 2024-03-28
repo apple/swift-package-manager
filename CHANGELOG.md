@@ -1,6 +1,6 @@
 Note: This is in reverse chronological order, so newer entries are added to the top.
 
-Swift Next
+Swift 6.0
 -----------
 
 * [#7202]
@@ -8,11 +8,22 @@ Swift Next
   Package manifests can now access information about the Git repository the given package is in via the context object's 
   `gitInformation` property. This allows to determine the current tag (if any), the current commit and whether or not there are uncommited changes.
 
+* [#7201]
+
+  `// swift-tools-version:` can now be specified on subsequent lines of `Package.swift`, for example when first few lines are required to contain a licensing comment header.
+
+* [#7118]
+
+  Macros cross-compiled by SwiftPM with Swift SDKs are now correctly built, loaded, and evaluated for the host triple.
+
+Swift 5.10
+-----------
+
 * [#7010]
 
   On macOS, `swift build` and `swift run` now produce binaries that allow backtraces in debug builds. Pass `SWIFT_BACKTRACE=enable=yes` environment variable to enable backtraces on such binaries when running them.
 
-* [7101]
+* [#7101]
 
    Binary artifacts are now cached along side repository checkouts so they do not need to be re-downloaded across projects.
 
@@ -387,4 +398,8 @@ Swift 3.0
 [#6276]: https://github.com/apple/swift-package-manager/pull/6276
 [#6540]: https://github.com/apple/swift-package-manager/pull/6540
 [#6663]: https://github.com/apple/swift-package-manager/pull/6663
+[#7010]: https://github.com/apple/swift-package-manager/pull/7010
 [#7101]: https://github.com/apple/swift-package-manager/pull/7101
+[#7118]: https://github.com/apple/swift-package-manager/pull/7118
+[#7201]: https://github.com/apple/swift-package-manager/pull/7201
+[#7202]: https://github.com/apple/swift-package-manager/pull/7202

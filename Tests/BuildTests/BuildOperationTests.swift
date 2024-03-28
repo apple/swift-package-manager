@@ -28,14 +28,16 @@ import class TSCBasic.InMemoryFileSystem
 
 final class BuildOperationTests: XCTestCase {
     func testDetectUnexpressedDependencies() throws {
+        let buildParameters = mockBuildParameters(shouldDisableLocalRpath: false)
+
         let fs = InMemoryFileSystem(files: [
-            "/path/to/build/debug/Lunch.build/Lunch.d" : "/Best.framework"
+            "\(buildParameters.dataPath)/debug/Lunch.build/Lunch.d" : "/Best.framework"
         ])
 
         let observability = ObservabilitySystem.makeForTesting()
         let buildOp = BuildOperation(
-            productsBuildParameters: mockBuildParameters(shouldDisableLocalRpath: false),
-            toolsBuildParameters: mockBuildParameters(shouldDisableLocalRpath: false),
+            productsBuildParameters: buildParameters,
+            toolsBuildParameters: buildParameters,
             cacheBuildManifest: false,
             packageGraphLoader: { fatalError() },
             additionalFileRules: [],

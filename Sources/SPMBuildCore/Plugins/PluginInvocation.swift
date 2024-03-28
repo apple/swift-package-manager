@@ -592,7 +592,9 @@ extension ModulesGraph {
             }
 
             // Associate the list of results with the target. The list will have one entry for each plugin used by the target.
-            pluginResultsByTarget[target.id] = (target, buildToolPluginResults)
+            var targetID = target.id
+            targetID.buildTriple = .destination
+            pluginResultsByTarget[targetID] = (target, buildToolPluginResults)
         }
         return pluginResultsByTarget
     }
