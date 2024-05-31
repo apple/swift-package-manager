@@ -3942,12 +3942,12 @@ final class BuildPlanTests: XCTestCase {
                         ),
                         .init(
                             tool: .swift,
-                            kind: .swiftLanguageVersion(.v4),
+                            kind: .swiftLanguageMode(.v4),
                             condition: .init(platformNames: ["macos"])
                         ),
                         .init(
                             tool: .swift,
-                            kind: .swiftLanguageVersion(.v5),
+                            kind: .swiftLanguageMode(.v5),
                             condition: .init(platformNames: ["linux"])
                         ),
                         .init(tool: .linker, kind: .linkedLibrary("sqlite3")),
@@ -3980,8 +3980,8 @@ final class BuildPlanTests: XCTestCase {
                     name: "t1",
                     settings: [
                         .init(tool: .swift, kind: .define("DEP")),
-                        .init(tool: .swift, kind: .swiftLanguageVersion(.v4), condition: .init(platformNames: ["linux"])),
-                        .init(tool: .swift, kind: .swiftLanguageVersion(.v5), condition: .init(platformNames: ["macos"])),
+                        .init(tool: .swift, kind: .swiftLanguageMode(.v4), condition: .init(platformNames: ["linux"])),
+                        .init(tool: .swift, kind: .swiftLanguageMode(.v5), condition: .init(platformNames: ["macos"])),
                         .init(tool: .linker, kind: .linkedLibrary("libz")),
                     ]
                 ),
