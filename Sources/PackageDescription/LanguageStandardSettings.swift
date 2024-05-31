@@ -148,9 +148,8 @@ public enum CXXLanguageStandard: String {
     case gnucxx2b = "gnu++2b"
 }
 
-/// The version of the Swift language you use to compile Swift sources in the
-/// package.
-public enum SwiftVersion {
+/// The Swift language mode used to compile Swift sources in the package
+public enum SwiftLanguageMode {
     /// The identifier for the Swift 3 language version.
     @available(_PackageDescription, introduced: 4, obsoleted: 5)
     case v3
@@ -177,7 +176,7 @@ public enum SwiftVersion {
     case version(String)
 }
 
-extension SwiftVersion: CustomStringConvertible {
+extension SwiftLanguageMode: CustomStringConvertible {
     public var description: String {
         switch self {
         case .v3: "3"
@@ -189,3 +188,6 @@ extension SwiftVersion: CustomStringConvertible {
         }
     }
 }
+
+/// Type alias to previous name for backward source compatibility
+public typealias SwiftVersion = SwiftLanguageMode
