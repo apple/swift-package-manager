@@ -3040,14 +3040,14 @@ final class PackageBuilderTests: XCTestCase {
                 try TargetDescription(
                     name: "foo",
                     settings: [
-                        .init(tool: .swift, kind: .swiftLanguageVersion(.v5))
+                        .init(tool: .swift, kind: .swiftLanguageMode(.v5))
                     ]
                 ),
                 try TargetDescription(
                     name: "bar",
                     settings: [
-                        .init(tool: .swift, kind: .swiftLanguageVersion(.v3), condition: .init(platformNames: ["linux"])),
-                        .init(tool: .swift, kind: .swiftLanguageVersion(.v4), condition: .init(platformNames: ["macos"], config: "debug"))
+                        .init(tool: .swift, kind: .swiftLanguageMode(.v3), condition: .init(platformNames: ["linux"])),
+                        .init(tool: .swift, kind: .swiftLanguageMode(.v4), condition: .init(platformNames: ["macos"], config: "debug"))
                     ]
                 ),
             ]
