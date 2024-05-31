@@ -414,13 +414,15 @@ final class PackageDescription5_2LoadingTests: PackageDescriptionLoadingTests {
                     products: [],
                     targets: [
                         .target(name: "Foo"),
-                    ]
+                    ],
+                    swiftLanguageVersions: [.v5]
                 )
                 """
 
             let observability = ObservabilitySystem.makeForTesting()
             await XCTAssertAsyncThrowsError(try await loadAndValidateManifest(content, observabilityScope: observability.topScope), "expected error") { error in
                 if case ManifestParseError.invalidManifestFormat(let error, _, _) = error {
+                    print("BEGIN Error\n\(error)\nEND Error")
                     XCTAssertMatch(error, .contains("is unavailable"))
                     XCTAssertMatch(error, .contains("was introduced in PackageDescription 5.3"))
                 } else {
