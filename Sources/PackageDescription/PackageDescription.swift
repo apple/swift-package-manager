@@ -109,8 +109,15 @@ public final class Package {
     /// The list of package dependencies.
     public var dependencies: [Dependency]
 
-    /// The list of Swift versions with which this package is compatible.
-    public var swiftLanguageVersions: [SwiftVersion]?
+    /// The list of Swift language modes with which this package is compatible.
+    public var swiftLanguageModes: [SwiftLanguageMode]?
+    
+    /// Legacy property name, accesses value of `swiftLanguageModes`
+    @available(_PackageDescription, obsoleted: 6, renamed: "swiftLanguageModes")
+    public var swiftLanguageVersions: [SwiftVersion]? {
+        get { swiftLanguageModes }
+        set { swiftLanguageModes = newValue }
+    }
 
     /// The C language standard to use for all C targets in this package.
     public var cLanguageStandard: CLanguageStandard?
@@ -151,7 +158,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageVersions = swiftLanguageVersions.map{ $0.map{ .version("\($0)") } }
+        self.swiftLanguageModes = swiftLanguageVersions.map{ $0.map{ .version("\($0)") } }
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -189,7 +196,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -230,7 +237,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -274,7 +281,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -317,7 +324,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageVersions = swiftLanguageModes
+        self.swiftLanguageModes = swiftLanguageModes
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()

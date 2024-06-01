@@ -372,7 +372,7 @@ extension Serialization.Package {
         self.targets = package.targets.map { .init($0) }
         self.products = package.products.map { .init($0) }
         self.dependencies = package.dependencies.map { .init($0) }
-        self.swiftLanguageVersions = package.swiftLanguageVersions?.map { .init($0) }
+        self.swiftLanguageVersions = package.swiftLanguageModes?.map { .init($0) }
         self.cLanguageStandard = package.cLanguageStandard.map { .init($0) }
         self.cxxLanguageStandard = package.cxxLanguageStandard.map { .init($0) }
     }
