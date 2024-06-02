@@ -398,11 +398,11 @@ public struct SwiftSetting: Sendable {
     ///   - condition: A condition that restricts the application of the build setting.
     @available(_PackageDescription, introduced: 6.0)
     public static func swiftLanguageMode(
-      _ languageMode: SwiftLanguageMode,
+      _ mode: SwiftLanguageMode,
       _ condition: BuildSettingCondition? = nil
     ) -> SwiftSetting {
         return SwiftSetting(
-            name: "swiftLanguageMode", value: [.init(describing: languageMode)], condition: condition)
+            name: "swiftLanguageMode", value: [.init(describing: mode)], condition: condition)
     }
 }
 
