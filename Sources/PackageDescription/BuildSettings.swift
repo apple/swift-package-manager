@@ -394,7 +394,7 @@ public struct SwiftSetting: Sendable {
     /// - Since: First available in PackageDescription 6.0.
     ///
     /// - Parameters:
-    ///   - languageMode: The Swift language mode to use.
+    ///   - mode: The Swift language mode to use.
     ///   - condition: A condition that restricts the application of the build setting.
     @available(_PackageDescription, introduced: 6.0)
     public static func swiftLanguageMode(
