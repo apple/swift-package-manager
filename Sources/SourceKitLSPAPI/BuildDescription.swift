@@ -24,6 +24,7 @@ import class Build.SwiftTargetBuildDescription
 import struct PackageGraph.ResolvedModule
 import struct PackageGraph.ModulesGraph
 import enum PackageGraph.BuildTriple
+internal import class PackageModel.UserToolchain
 
 public typealias BuildTriple = PackageGraph.BuildTriple
 
@@ -128,6 +129,7 @@ public struct BuildDescription {
                 return PluginTargetBuildDescription(
                     target: target,
                     toolsVersion: package.manifest.toolsVersion,
+                    toolchain: buildPlan.toolsBuildParameters.toolchain as? UserToolchain,
                     isPartOfRootPackage: modulesGraph.rootPackages.map(\.id).contains(package.id)
                 )
             }
