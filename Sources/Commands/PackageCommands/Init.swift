@@ -60,7 +60,8 @@ extension SwiftPackageCommand {
             if testLibraryOptions.enableXCTestSupport {
                 testingLibraries.insert(.xctest)
             }
-            if testLibraryOptions.explicitlyEnableSwiftTestingLibrarySupport == true {
+            if testLibraryOptions.explicitlyEnableSwiftTestingLibrarySupport == true
+                || testLibraryOptions.explicitlyEnableExperimentalSwiftTestingLibrarySupport == true {
                 testingLibraries.insert(.swiftTesting)
             }
             let packageName = self.packageName ?? cwd.basename

@@ -110,7 +110,8 @@ struct BuildCommandOptions: ParsableArguments {
         // or disable either testing library.
         if !buildTests {
             if testLibraryOptions.explicitlyEnableXCTestSupport != nil
-                || testLibraryOptions.explicitlyEnableSwiftTestingLibrarySupport != nil {
+                || testLibraryOptions.explicitlyEnableSwiftTestingLibrarySupport != nil
+                || testLibraryOptions.explicitlyEnableExperimentalSwiftTestingLibrarySupport != nil {
                 throw StringError("pass --build-tests to build test targets")
             }
         }

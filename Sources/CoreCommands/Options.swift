@@ -582,10 +582,16 @@ public struct TestLibraryOptions: ParsableArguments {
     /// Callers (other than `swift package init`) will generally want to use
     /// ``enableSwiftTestingLibrarySupport(swiftCommandState:)`` since it will
     /// take into account whether the package has a dependency on swift-testing.
+    @Flag(name: .customLong("swift-testing"),
+          inversion: .prefixedEnableDisable,
+          help: "Enable support for swift-testing")
+    public var explicitlyEnableSwiftTestingLibrarySupport: Bool?
+
+    /// Deprecated shadow of ``explicitlyEnableSwiftTestingLibrarySupport``.
     @Flag(name: .customLong("experimental-swift-testing"),
           inversion: .prefixedEnableDisable,
-          help: "Enable experimental support for swift-testing")
-    public var explicitlyEnableSwiftTestingLibrarySupport: Bool?
+          help: .hidden)
+    public var explicitlyEnableExperimentalSwiftTestingLibrarySupport: Bool?
 
     /// Whether to enable support for swift-testing.
     public func enableSwiftTestingLibrarySupport(
@@ -593,6 +599,11 @@ public struct TestLibraryOptions: ParsableArguments {
     ) throws -> Bool {
         // Honor the user's explicit command-line selection, if any.
         if let callerSuppliedValue = explicitlyEnableSwiftTestingLibrarySupport {
+            return callerSuppliedValue
+        }
+        
+        // Temporarily honor the experimental flag too.
+        if let callerSuppliedValue = explicitlyEnableExperimentalSwiftTestingLibrarySupport {
             return callerSuppliedValue
         }
 
