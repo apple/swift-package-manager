@@ -3534,6 +3534,7 @@ final class BuildPlanTests: XCTestCase {
                             pkgConfig: "BTarget",
                             providers: [
                                 .brew(["BTarget"]),
+                                .macPort(["BTarget"]),
                                 .apt(["BTarget"]),
                                 .yum(["BTarget"]),
                             ]

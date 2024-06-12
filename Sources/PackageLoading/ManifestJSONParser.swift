@@ -260,6 +260,8 @@ extension SystemPackageProviderDescription {
         switch provider {
         case .brew(let values):
             self = .brew(values)
+        case .macPort(let values):
+            self = .macPort(values)
         case .apt(let values):
             self = .apt(values)
         case .yum(let values):
