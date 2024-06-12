@@ -71,6 +71,25 @@ public struct Platform: Equatable, Sendable {
     public static let openbsd: Platform = Platform(name: "openbsd")
 }
 
+@available(_PackageDescription, introduced: 5.11)
+extension Platform: CaseIterable {
+    public static var allCases: [Platform] {
+        // Why visionOS does not need something like @available(_PackageDescription, introduced: 5.9)
+        var defaultCases: [Platform] = [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .visionOS, .driverKit, .linux]
+//        if #available(_PackageDescription 5.2, *) {
+            defaultCases.append(.windows)
+            defaultCases.append(.android)
+//        }
+//        if #available(_PackageDescription 5.3, *) {
+            defaultCases.append(.wasi)
+//        }
+//        if #available(_PackageDescription 5.8, *) {
+            defaultCases.append(.openbsd)
+//        }
+        return defaultCases
+    }
+}
+
 /// A platform that the Swift package supports.
 ///
 /// By default, Swift Package Manager assigns a predefined minimum deployment version for each
