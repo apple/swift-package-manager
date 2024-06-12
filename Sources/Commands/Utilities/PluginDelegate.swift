@@ -373,6 +373,20 @@ final class PluginDelegate: PluginInvocationDelegate {
         }
     }
 
+    func authorizationInfoRequest(
+        for url: URL,
+        completion: @escaping (Result<PluginInvocationAuthorizationInfoResult?, Error>) -> Void
+    ) {
+        // Get the authorization info from the authorization provider
+        DispatchQueue.sharedConcurrent.async {
+            completion(Result {
+                try self.swiftTool.getAuthorizationProvider()?.authentication(for: url).map {
+                    .init(username: $0, password: $1)
+                }
+            })
+        }
+    }
+
     private func createSymbolGraphForPlugin(
         forTarget targetName: String,
         options: PluginInvocationSymbolGraphOptions

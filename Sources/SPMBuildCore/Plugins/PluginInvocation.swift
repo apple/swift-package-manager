@@ -323,6 +323,23 @@ extension PluginTarget {
                             self.observabilityScope.emit(debug: "couldn't send reply to plugin", underlyingError: error)
                         }
                     }
+                case .authorizationInfoRequest(let _url):
+                    guard let url = URL(string: _url) else {
+                        throw StringError("Invalid URL: \(_url)")
+                    }
+                    self.invocationDelegate.authorizationInfoRequest(for: url) {
+                        do {
+                            switch $0 {
+                            case .success(let result):
+                                responder(try HostToPluginMessage.authorizationInfoResponse(result: result.map{ .init($0) }).toData())
+                            case .failure(let error):
+                                responder(try HostToPluginMessage.errorResponse(error: String(describing: error)).toData())
+                            }
+                        }
+                        catch {
+                            self.observabilityScope.emit(debug: "couldn't send reply to plugin", underlyingError: error)
+                        }
+                    }
                 }
             }
         }
@@ -846,6 +863,9 @@ public protocol PluginInvocationDelegate {
 
     /// Called when a plugin requests that the host computes and returns symbol graph information for a particular target.
     func pluginRequestedSymbolGraph(forTarget name: String, options: PluginInvocationSymbolGraphOptions, completion: @escaping (Result<PluginInvocationSymbolGraphResult, Error>) -> Void)
+
+    /// Called when a plugin requests authorization information  through the PackagePlugin APIs.
+    func authorizationInfoRequest(for url: URL, completion: @escaping (Result<PluginInvocationAuthorizationInfoResult?, Error>) -> Void)
 }
 
 public struct PluginInvocationSymbolGraphOptions {
@@ -862,6 +882,15 @@ public struct PluginInvocationSymbolGraphResult {
     public var directoryPath: String
     public init(directoryPath: String) {
         self.directoryPath = directoryPath
+    }
+}
+
+public struct PluginInvocationAuthorizationInfoResult {
+    public var username: String
+    public var password: String
+    public init(username: String, password: String) {
+        self.username = username
+        self.password = password
     }
 }
 
@@ -972,6 +1001,9 @@ public extension PluginInvocationDelegate {
         DispatchQueue.sharedConcurrent.async { completion(Result.failure(StringError("unimplemented"))) }
     }
     func pluginRequestedSymbolGraph(forTarget name: String, options: PluginInvocationSymbolGraphOptions, completion: @escaping (Result<PluginInvocationSymbolGraphResult, Error>) -> Void) {
+        DispatchQueue.sharedConcurrent.async { completion(Result.failure(StringError("unimplemented"))) }
+    }
+    func authorizationInfoRequest(for url: URL, completion: @escaping (Result<PluginInvocationAuthorizationInfoResult?, Error>) -> Void) {
         DispatchQueue.sharedConcurrent.async { completion(Result.failure(StringError("unimplemented"))) }
     }
 }
@@ -1144,6 +1176,13 @@ fileprivate extension PluginInvocationSymbolGraphOptions.AccessLevel {
 fileprivate extension HostToPluginMessage.SymbolGraphResult {
     init(_ result: PluginInvocationSymbolGraphResult) {
         self.directoryPath = .init(fileURLWithPath: result.directoryPath)
+    }
+}
+
+fileprivate extension HostToPluginMessage.AuthorizationInfo {
+    init(_ result: PluginInvocationAuthorizationInfoResult) {
+        self.username = result.username
+        self.password = result.password
     }
 }
 
