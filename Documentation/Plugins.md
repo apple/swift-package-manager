@@ -27,7 +27,7 @@ To get access to a plugin defined in another package, add a package dependency o
 
 ### Making use of a build tool plugin
 
-To make use of a build tool plugin, list its name in each target to which it should apply:
+Add the plugin to the `plugins:` parameter of each target to which it applies:
 
 ```swift
 // swift-tools-version: 5.6
@@ -170,11 +170,15 @@ struct MyPlugin: BuildToolPlugin {
 
 The plugin script can import *Foundation* and other standard libraries, but in the current version of SwiftPM, it cannot import other libraries.
 
+##### Build Commands
+
 In this example, the returned command is of the type `buildCommand`, so it will be incorporated into the build system's command graph and will run if any of the output files are missing or if the contents of any of the input files have changed since the last time the command ran.
 
-Note that build tool plugins are always applied to a target, which is passed in the parameter to the entry point.  Only source module targets have source files, so a plugin that iterates over source files will commonly test that the target it was given conforms to `SourceModuleTarget`.
+The target to which the plugin applies is passed as the `target` parameter.  Only source module targets have source files, so a plugin that iterates over source files will commonly test that the target it was given conforms to `SourceModuleTarget`.
 
-A build tool plugin can also return commands of the type `prebuildCommand`, which run before the build starts and can populate a directory with output files whose names are not known until the command runs:
+##### Prebuild Commands
+
+A build tool plugin can return a combination of build commands and prebuild commands.  A `prebuildCommand` runs after the build tool plugin but before the build starts.  This one populates a `GeneratedFiles/` directory:
 
 ```swift
 import PackagePlugin
@@ -203,13 +207,9 @@ struct MyBuildToolPlugin: BuildToolPlugin {
 }
 ```
 
-In the case of prebuild commands, any dependencies must be binary targets, since these commands run before the build starts.
+A prebuild command has no inputs, so it will never be re-run due to changes in source files. The only trigger for re-running a prebuild command is a change to declared dependencies, which can only be (prebuilt) binary targets, since these commands run before any other targets have been built.
 
-Note that a build tool plugin can return a combination of build tool commands and prebuild commands.  After the plugin runs, any build commands are incorporated into the build graph, which may result in changes that require commands to run during the subsequent build.
-
-Any prebuild commands are run after the plugin runs but before the build starts, and any files that are in the prebuild command's declared `outputFilesDirectory` will be evaluated as if they had been source files in the target.  The prebuild command should add or remove files in this directory to reflect the results of having run the command.
-
-The current version of the Swift Package Manager supports generated Swift source files and resources as outputs, but it does not yet support non-Swift source files.  Any generated resources are processed as if they had been declared in the manifest with the `.process()` rule.  The intent is to eventually support any type of file that could have been included as a source file in the target, and to let the plugin provide greater controls over the downstream processing of generated files.
+Any `.swift` files that are outputs of build commands or prebuild commands will be treated as Swift source files and compiled into the target being built by the plugin. Currently, compilation of output files in other source langauges isn't supported, so any other output files are treated as resources and processed as if they had been declared in the manifest with the `.process()` rule.  The intent is to eventually support any type of file that could have been included as a source file in the target, and to let the plugin provide greater controls over the downstream processing of generated files.
 
 ### Command plugins
 
