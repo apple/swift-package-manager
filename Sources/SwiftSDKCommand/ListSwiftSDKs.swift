@@ -16,8 +16,8 @@ import CoreCommands
 import PackageModel
 import SPMBuildCore
 
-public struct ListSwiftSDKs: SwiftSDKSubcommand {
-    public static let configuration = CommandConfiguration(
+package struct ListSwiftSDKs: SwiftSDKSubcommand {
+    package static let configuration = CommandConfiguration(
         commandName: "list",
         abstract:
         """
@@ -28,7 +28,7 @@ public struct ListSwiftSDKs: SwiftSDKSubcommand {
     @OptionGroup()
     var locations: LocationOptions
 
-    public init() {}
+    package init() {}
 
     func run(
         hostTriple: Triple,

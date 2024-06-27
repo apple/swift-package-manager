@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import _Concurrency
+import struct Foundation.URL
 
 /// The `Archiver` protocol abstracts away the different operations surrounding archives.
 public protocol Archiver: Sendable {
@@ -94,5 +95,9 @@ extension Archiver {
         try await withCheckedThrowingContinuation { continuation in
             self.validate(path: path, completion: { continuation.resume(with: $0) })
         }
+    }
+
+    package func isFileSupported(_ lastPathComponent: String) -> Bool {
+        self.supportedExtensions.contains(where: { lastPathComponent.hasSuffix($0) })
     }
 }

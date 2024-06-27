@@ -17,10 +17,11 @@ import CoreCommands
 import Foundation
 import PackageModel
 
+import class Workspace.Workspace
 import var TSCBasic.stdoutStream
 
-public struct InstallSwiftSDK: SwiftSDKSubcommand {
-    public static let configuration = CommandConfiguration(
+struct InstallSwiftSDK: SwiftSDKSubcommand {
+    static let configuration = CommandConfiguration(
         commandName: "install",
         abstract: """
         Installs a given Swift SDK bundle to a location discoverable by SwiftPM. If the artifact bundle \
@@ -34,8 +35,8 @@ public struct InstallSwiftSDK: SwiftSDKSubcommand {
     @Argument(help: "A local filesystem path or a URL of a Swift SDK bundle to install.")
     var bundlePathOrURL: String
 
-
-    public init() {}
+    @Option(help: "The checksum of the bundle generated with `swift package compute-checksum`.")
+    var checksum: String? = nil
 
     func run(
         hostTriple: Triple,
@@ -54,10 +55,18 @@ public struct InstallSwiftSDK: SwiftSDKSubcommand {
                 .percent(stream: stdoutStream, verbose: false, header: "Downloading")
                 .throttled(interval: .milliseconds(300))
         )
+
         try await store.install(
             bundlePathOrURL: bundlePathOrURL,
+            checksum: self.checksum,
             UniversalArchiver(self.fileSystem, cancellator),
-            HTTPClient()
+            HTTPClient(),
+            hasher: {
+                try Workspace.BinaryArtifactsManager.checksum(
+                    forBinaryArtifactAt: $0,
+                    fileSystem: self.fileSystem
+                )
+            }
         )
     }
 }

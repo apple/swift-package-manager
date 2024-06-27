@@ -14,8 +14,8 @@ import ArgumentParser
 import Basics
 import PackageModel
 
-public struct DeprecatedSwiftSDKConfigurationCommand: ParsableCommand {
-    public static let configuration = CommandConfiguration(
+package struct DeprecatedSwiftSDKConfigurationCommand: ParsableCommand {
+    package static let configuration = CommandConfiguration(
         commandName: "configuration",
         abstract: """
         Deprecated: use `swift sdk configure` instead.
@@ -29,5 +29,5 @@ public struct DeprecatedSwiftSDKConfigurationCommand: ParsableCommand {
         ]
     )
 
-    public init() {}
+    package init() {}
 }

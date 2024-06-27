@@ -15,8 +15,8 @@ import Basics
 import CoreCommands
 import PackageModel
 
-public struct RemoveSwiftSDK: SwiftSDKSubcommand {
-    public static let configuration = CommandConfiguration(
+package struct RemoveSwiftSDK: SwiftSDKSubcommand {
+    package static let configuration = CommandConfiguration(
         commandName: "remove",
         abstract: """
         Removes a previously installed Swift SDK bundle from the filesystem.
