@@ -15,8 +15,6 @@ import Dispatch
 import Foundation
 import PackageModel
 
-import enum TSCBasic.ProcessEnv
-
 /// Manages a collection of bare repositories.
 public class RepositoryManager: Cancellable {
     public typealias Delegate = RepositoryManagerDelegate
@@ -331,7 +329,7 @@ public class RepositoryManager: Cancellable {
         }
         
         // We are expecting handle.repository.url to always be a resolved absolute path.
-        let shouldCacheLocalPackages = ProcessEnv.block["SWIFTPM_TESTS_PACKAGECACHE"] == "1" || cacheLocalPackages
+        let shouldCacheLocalPackages = Environment.current["SWIFTPM_TESTS_PACKAGECACHE"] == "1" || cacheLocalPackages
 
         if let cachePath, !(handle.repository.isLocal && !shouldCacheLocalPackages) {
             let cachedRepositoryPath = try cachePath.appending(handle.repository.storagePath())

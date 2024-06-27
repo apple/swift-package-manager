@@ -15,7 +15,7 @@ import PackageGraph
 import PackageLoading
 import PackageModel
 import SourceControl
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import enum TSCBasic.JSON
@@ -201,7 +201,7 @@ extension ProductFilter {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension ProductFilter: JSONSerializable, JSONMappable {}
 #else
 extension ProductFilter: @retroactive JSONSerializable, @retroactive JSONMappable {}

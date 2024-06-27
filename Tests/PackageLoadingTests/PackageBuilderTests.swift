@@ -13,7 +13,7 @@
 import Basics
 import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem
@@ -499,7 +499,7 @@ final class PackageBuilderTests: XCTestCase {
         )
         PackageBuilderTester(manifest, in: fs) { package, diagnostics in
             diagnostics.check(
-                diagnostic: "'exec2' was identified as an executable target given the presence of a 'main.swift' file. Starting with tools version 5.4.0 executable targets should be declared as 'executableTarget()'",
+                diagnostic: "'exec2' was identified as an executable target given the presence of a 'main' file. Starting with tools version 5.4.0 executable targets should be declared as 'executableTarget()'",
                 severity: .warning
             )
             package.checkModule("lib") { _ in }
@@ -511,7 +511,7 @@ final class PackageBuilderTests: XCTestCase {
     }
 
     func testTestEntryPointFound() throws {
-        try SwiftTarget.testEntryPointNames.forEach { name in
+        try SwiftModule.testEntryPointNames.forEach { name in
             let fs = InMemoryFileSystem(emptyFiles:
                 "/swift/exe/foo.swift",
                 "/\(name)",
@@ -596,7 +596,7 @@ final class PackageBuilderTests: XCTestCase {
     }
 
     func testMultipleTestEntryPointsError() throws {
-        let name = SwiftTarget.defaultTestEntryPointName
+        let name = SwiftModule.defaultTestEntryPointName
         let swift: AbsolutePath = "/swift"
 
         let fs = InMemoryFileSystem(emptyFiles:
@@ -769,7 +769,7 @@ final class PackageBuilderTests: XCTestCase {
             package.checkPredefinedPaths(target: Sources, testTarget: Tests)
 
             package.checkModule("Foo") { module in
-                let clangTarget = module.target as? ClangTarget
+                let clangTarget = module.target as? ClangModule
                 XCTAssertEqual(clangTarget?.headers.map{ $0.pathString }, [Sources.appending(components: "Foo", "Foo_private.h").pathString, Sources.appending(components: "Foo", "inc", "Foo.h").pathString])
                 module.check(c99name: "Foo", type: .library)
                 module.checkSources(root: Sources.appending(components: "Foo").pathString, paths: "Foo.c")
@@ -3104,7 +3104,7 @@ final class PackageBuilderTester {
     private let result: Result
 
     /// Contains the targets which have not been checked yet.
-    private var uncheckedModules: Set<PackageModel.Target> = []
+    private var uncheckedModules: Set<PackageModel.Module> = []
 
     /// Contains the products which have not been checked yet.
     private var uncheckedProducts: Set<PackageModel.Product> = []
@@ -3137,11 +3137,12 @@ final class PackageBuilderTester {
                 warnAboutImplicitExecutableTargets: true,
                 createREPLProduct: createREPLProduct,
                 fileSystem: fs,
-                observabilityScope: observability.topScope
+                observabilityScope: observability.topScope,
+                enabledTraits: []
             )
             let loadedPackage = try builder.construct()
             self.result = .package(loadedPackage)
-            uncheckedModules = Set(loadedPackage.targets)
+            uncheckedModules = Set(loadedPackage.modules)
             uncheckedProducts = Set(loadedPackage.products)
         } catch {
             let errorString = String(describing: error)
@@ -3178,7 +3179,7 @@ final class PackageBuilderTester {
         guard case .package(let package) = result else {
             return XCTFail("Expected package did not load \(self)", file: file, line: line)
         }
-        guard let target = package.targets.first(where: {$0.name == name}) else {
+        guard let target = package.modules.first(where: {$0.name == name}) else {
             return XCTFail("Module: \(name) not found", file: file, line: line)
         }
         uncheckedModules.remove(target)
@@ -3206,7 +3207,7 @@ final class PackageBuilderTester {
 
         func check(type: PackageModel.ProductType, targets: [String], file: StaticString = #file, line: UInt = #line) {
             XCTAssertEqual(product.type, type, file: file, line: line)
-            XCTAssertEqual(product.targets.map{$0.name}.sorted(), targets.sorted(), file: file, line: line)
+            XCTAssertEqual(product.modules.map{$0.name}.sorted(), targets.sorted(), file: file, line: line)
         }
 
         func check(testEntryPointPath: String?, file: StaticString = #file, line: UInt = #line) {
@@ -3215,27 +3216,27 @@ final class PackageBuilderTester {
     }
 
     final class ModuleResult {
-        let target: PackageModel.Target
+        let target: PackageModel.Module
 
-        fileprivate init(_ target: PackageModel.Target) {
+        fileprivate init(_ target: PackageModel.Module) {
             self.target = target
         }
 
         func check(includeDir: String, file: StaticString = #file, line: UInt = #line) {
-            guard case let target as ClangTarget = target else {
+            guard case let target as ClangModule = target else {
                 return XCTFail("Include directory is being checked on a non clang target", file: file, line: line)
             }
             XCTAssertEqual(target.includeDir.pathString, includeDir, file: file, line: line)
         }
 
         func check(moduleMapType: ModuleMapType, file: StaticString = #file, line: UInt = #line) {
-            guard case let target as ClangTarget = target else {
+            guard case let target as ClangModule = target else {
                 return XCTFail("Module map type is being checked on a non-Clang target", file: file, line: line)
             }
             XCTAssertEqual(target.moduleMapType, moduleMapType, file: file, line: line)
         }
 
-        func check(c99name: String? = nil, type: PackageModel.Target.Kind? = nil, file: StaticString = #file, line: UInt = #line) {
+        func check(c99name: String? = nil, type: PackageModel.Module.Kind? = nil, file: StaticString = #file, line: UInt = #line) {
             if let c99name {
                 XCTAssertEqual(target.c99name, c99name, file: file, line: line)
             }
@@ -3261,11 +3262,11 @@ final class PackageBuilderTester {
         }
 
         func check(targetDependencies depsToCheck: [String], file: StaticString = #file, line: UInt = #line) {
-            XCTAssertEqual(Set(depsToCheck), Set(target.dependencies.compactMap { $0.target?.name }), "unexpected dependencies in \(target.name)", file: file, line: line)
+            XCTAssertEqual(Set(depsToCheck), Set(target.dependencies.compactMap { $0.module?.name }), "unexpected dependencies in \(target.name)", file: file, line: line)
         }
 
         func check(
-            productDependencies depsToCheck: [Target.ProductReference],
+            productDependencies depsToCheck: [Module.ProductReference],
             file: StaticString = #file,
             line: UInt = #line
         ) {
@@ -3304,7 +3305,7 @@ final class PackageBuilderTester {
         }
 
         func check(swiftVersion: String, file: StaticString = #file, line: UInt = #line) {
-            guard case let swiftTarget as SwiftTarget = target else {
+            guard case let swiftTarget as SwiftModule = target else {
                 return XCTFail("\(target) is not a swift target", file: file, line: line)
             }
             let versionAssignments = swiftTarget.buildSettings.assignments[.SWIFT_VERSION]?
@@ -3313,7 +3314,7 @@ final class PackageBuilderTester {
         }
 
         func check(pluginCapability: PluginCapability, file: StaticString = #file, line: UInt = #line) {
-            guard case let target as PluginTarget = target else {
+            guard case let target as PluginModule = target else {
                 return XCTFail("Plugin capability is being checked on a target", file: file, line: line)
             }
             XCTAssertEqual(target.capability, pluginCapability, file: file, line: line)
@@ -3325,9 +3326,9 @@ final class PackageBuilderTester {
     }
 
     final class ModuleDependencyResult {
-        let dependency: PackageModel.Target.Dependency
+        let dependency: PackageModel.Module.Dependency
 
-        fileprivate init(_ dependency: PackageModel.Target.Dependency) {
+        fileprivate init(_ dependency: PackageModel.Module.Dependency) {
             self.dependency = dependency
         }
 

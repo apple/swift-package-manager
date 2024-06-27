@@ -88,8 +88,8 @@ public extension PluginScriptRunner {
 /// Protocol by which `PluginScriptRunner` communicates back to the caller as it compiles plugins.
 public protocol PluginScriptCompilerDelegate {
     /// Called immediately before compiling a plugin. Will not be called if the plugin didn't have to be compiled. This call is always followed by a `didCompilePlugin()` but is mutually exclusive with a `skippedCompilingPlugin()` call.
-    func willCompilePlugin(commandLine: [String], environment: EnvironmentVariables)
-    
+    func willCompilePlugin(commandLine: [String], environment: [String: String])
+
     /// Called immediately after compiling a plugin (regardless of whether it succeeded or failed). Will not be called if the plugin didn't have to be compiled. This call is always follows a `willCompilePlugin()` but is mutually exclusive with a `skippedCompilingPlugin()` call.
     func didCompilePlugin(result: PluginCompilationResult)
     

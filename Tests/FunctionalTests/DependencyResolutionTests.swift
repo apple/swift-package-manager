@@ -14,38 +14,38 @@ import Basics
 import Commands
 import PackageModel
 import SourceControl
-import SPMTestSupport
+import _InternalTestSupport
 import Workspace
 import XCTest
 
 class DependencyResolutionTests: XCTestCase {
-    func testInternalSimple() throws {
-        try fixture(name: "DependencyResolution/Internal/Simple") { fixturePath in
-            XCTAssertBuilds(fixturePath)
+    func testInternalSimple() async throws {
+        try await fixture(name: "DependencyResolution/Internal/Simple") { fixturePath in
+            await XCTAssertBuilds(fixturePath)
 
-            let output = try Process.checkNonZeroExit(args: fixturePath.appending(components: ".build", UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Foo").pathString)
+            let output = try await AsyncProcess.checkNonZeroExit(args: fixturePath.appending(components: ".build", UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Foo").pathString)
             XCTAssertEqual(output, "Foo\nBar\n")
         }
     }
 
-    func testInternalExecAsDep() throws {
-        try fixture(name: "DependencyResolution/Internal/InternalExecutableAsDependency") { fixturePath in
-            XCTAssertBuildFails(fixturePath)
+    func testInternalExecAsDep() async throws {
+        try await fixture(name: "DependencyResolution/Internal/InternalExecutableAsDependency") { fixturePath in
+            await XCTAssertBuildFails(fixturePath)
         }
     }
 
-    func testInternalComplex() throws {
-        try fixture(name: "DependencyResolution/Internal/Complex") { fixturePath in
-            XCTAssertBuilds(fixturePath)
+    func testInternalComplex() async throws {
+        try await fixture(name: "DependencyResolution/Internal/Complex") { fixturePath in
+            await XCTAssertBuilds(fixturePath)
 
-            let output = try Process.checkNonZeroExit(args: fixturePath.appending(components: ".build", UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Foo").pathString)
+            let output = try await AsyncProcess.checkNonZeroExit(args: fixturePath.appending(components: ".build", UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Foo").pathString)
             XCTAssertEqual(output, "meiow Baz\n")
         }
     }
 
     /// Check resolution of a trivial package with one dependency.
-    func testExternalSimple() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testExternalSimple() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             // Add several other tags to check version selection.
             let repo = GitRepository(path: fixturePath.appending(components: "Foo"))
             for tag in ["1.1.0", "1.2.0"] {
@@ -53,45 +53,45 @@ class DependencyResolutionTests: XCTestCase {
             }
 
             let packageRoot = fixturePath.appending("Bar")
-            XCTAssertBuilds(packageRoot)
+            await XCTAssertBuilds(packageRoot)
             XCTAssertFileExists(fixturePath.appending(components: "Bar", ".build", try UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Bar"))
             let path = try SwiftPM.packagePath(for: "Foo", packageRoot: packageRoot)
             XCTAssert(try GitRepository(path: path).getTags().contains("1.2.3"))
         }
     }
 
-    func testExternalComplex() throws {
-        try fixture(name: "DependencyResolution/External/Complex") { fixturePath in
-            XCTAssertBuilds(fixturePath.appending("app"))
-            let output = try Process.checkNonZeroExit(args: fixturePath.appending(components: "app", ".build", UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Dealer").pathString)
+    func testExternalComplex() async throws {
+        try await fixture(name: "DependencyResolution/External/Complex") { fixturePath in
+            await XCTAssertBuilds(fixturePath.appending("app"))
+            let output = try await AsyncProcess.checkNonZeroExit(args: fixturePath.appending(components: "app", ".build", UserToolchain.default.targetTriple.platformBuildPathComponent, "debug", "Dealer").pathString)
             XCTAssertEqual(output, "♣︎K\n♣︎Q\n♣︎J\n♣︎10\n♣︎9\n♣︎8\n♣︎7\n♣︎6\n♣︎5\n♣︎4\n")
         }
     }
     
-    func testConvenienceBranchInit() throws {
-        try fixture(name: "DependencyResolution/External/Branch") { fixturePath in
+    func testConvenienceBranchInit() async throws {
+        try await fixture(name: "DependencyResolution/External/Branch") { fixturePath in
             // Tests the convenience init .package(url: , branch: )
             let app = fixturePath.appending("Bar")
-            try SwiftPM.Build.execute(packagePath: app)
+            try await SwiftPM.Build.execute(packagePath: app)
         }
     }
 
-    func testMirrors() throws {
-        try fixture(name: "DependencyResolution/External/Mirror") { fixturePath in
+    func testMirrors() async throws {
+        try await fixture(name: "DependencyResolution/External/Mirror") { fixturePath in
             let prefix = try resolveSymlinks(fixturePath)
             let appPath = prefix.appending("App")
             let appPinsPath = appPath.appending("Package.resolved")
 
             // prepare the dependencies as git repos
-            try ["Foo", "Bar", "BarMirror"].forEach { directory in
+            for directory in ["Foo", "Bar", "BarMirror"] {
                 let path = prefix.appending(component: directory)
-                _ = try Process.checkNonZeroExit(args: "git", "-C", path.pathString, "init")
-                _ = try Process.checkNonZeroExit(args: "git", "-C", path.pathString, "checkout", "-b", "newMain")
+                _ = try await AsyncProcess.checkNonZeroExit(args: "git", "-C", path.pathString, "init")
+                _ = try await AsyncProcess.checkNonZeroExit(args: "git", "-C", path.pathString, "checkout", "-b", "newMain")
             }
 
             // run with no mirror
             do {
-                let output = try executeSwiftPackage(appPath, extraArgs: ["show-dependencies"])
+                let output = try await executeSwiftPackage(appPath, extraArgs: ["show-dependencies"])
                 // logs are in stderr
                 XCTAssertMatch(output.stderr, .contains("Fetching \(prefix.pathString)/Foo\n"))
                 XCTAssertMatch(output.stderr, .contains("Fetching \(prefix.pathString)/Bar\n"))
@@ -103,7 +103,7 @@ class DependencyResolutionTests: XCTestCase {
                 XCTAssertMatch(pins, .contains("\"\(prefix.pathString)/Foo\""))
                 XCTAssertMatch(pins, .contains("\"\(prefix.pathString)/Bar\""))
 
-                XCTAssertBuilds(appPath)
+                await XCTAssertBuilds(appPath)
             }
 
             // clean
@@ -111,13 +111,13 @@ class DependencyResolutionTests: XCTestCase {
             try localFileSystem.removeFileTree(appPinsPath)
 
             // set mirror
-            _ = try executeSwiftPackage(appPath, extraArgs: ["config", "set-mirror",
+            _ = try await executeSwiftPackage(appPath, extraArgs: ["config", "set-mirror",
                                                               "--original-url", prefix.appending("Bar").pathString,
                                                               "--mirror-url", prefix.appending("BarMirror").pathString])
 
             // run with mirror
             do {
-                let output = try executeSwiftPackage(appPath, extraArgs: ["show-dependencies"])
+                let output = try await executeSwiftPackage(appPath, extraArgs: ["show-dependencies"])
                 // logs are in stderr
                 XCTAssertMatch(output.stderr, .contains("Fetching \(prefix.pathString)/Foo\n"))
                 XCTAssertMatch(output.stderr, .contains("Fetching \(prefix.pathString)/BarMirror\n"))
@@ -133,14 +133,14 @@ class DependencyResolutionTests: XCTestCase {
                 XCTAssertMatch(pins, .contains("\"\(prefix.pathString)/Bar\""))
                 XCTAssertNoMatch(pins, .contains("\"\(prefix.pathString)/BarMirror\""))
 
-                XCTAssertBuilds(appPath)
+                await XCTAssertBuilds(appPath)
             }
         }
     }
 
-    func testPackageLookupCaseInsensitive() throws {
-        try fixture(name: "DependencyResolution/External/PackageLookupCaseInsensitive") { fixturePath in
-            try SwiftPM.Package.execute(["update"], packagePath: fixturePath.appending("pkg"))
+    func testPackageLookupCaseInsensitive() async throws {
+        try await fixture(name: "DependencyResolution/External/PackageLookupCaseInsensitive") { fixturePath in
+            try await SwiftPM.Package.execute(["update"], packagePath: fixturePath.appending("pkg"))
         }
     }
 }

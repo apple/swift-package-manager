@@ -18,7 +18,7 @@ import struct TSCUtility.Version
 
 /// A container for an individual package. This enhances PackageContainer to add PubGrub specific
 /// logic which is mostly related to computing incompatibilities at a particular version.
-internal final class PubGrubPackageContainer {
+final class PubGrubPackageContainer {
     /// The underlying package container.
     let underlying: PackageContainer
 
@@ -38,9 +38,9 @@ internal final class PubGrubPackageContainer {
     var pinnedVersion: Version? {
         switch self.pins[self.underlying.package.identity]?.state {
         case .version(let version, _):
-            return version
+            version
         default:
-            return .none
+            .none
         }
     }
 
@@ -55,7 +55,8 @@ internal final class PubGrubPackageContainer {
     /// Computes the bounds of the given range against the versions available in the package.
     ///
     /// `includesLowerBound` is `false` if range's lower bound is less than or equal to the lowest available version.
-    /// Similarly, `includesUpperBound` is `false` if range's upper bound is greater than or equal to the highest available version.
+    /// Similarly, `includesUpperBound` is `false` if range's upper bound is greater than or equal to the highest
+    /// available version.
     func computeBounds(for range: Range<Version>) throws -> (includesLowerBound: Bool, includesUpperBound: Bool) {
         var includeLowerBound = true
         var includeUpperBound = true
@@ -157,10 +158,17 @@ internal final class PubGrubPackageContainer {
         if !self.underlying.isToolsVersionCompatible(at: version) {
             let requirement = try self.computeIncompatibleToolsVersionBounds(fromVersion: version)
             let toolsVersion = try self.underlying.toolsVersion(for: version)
-            return [try Incompatibility(Term(node, requirement), root: root, cause: .incompatibleToolsVersion(toolsVersion))]
+            return try [Incompatibility(
+                Term(node, requirement),
+                root: root,
+                cause: .incompatibleToolsVersion(toolsVersion)
+            )]
         }
 
-        var unprocessedDependencies = try self.underlying.getDependencies(at: version, productFilter: node.productFilter)
+        var unprocessedDependencies = try self.underlying.getDependencies(
+            at: version,
+            productFilter: node.productFilter
+        )
         if let sharedVersion = node.versionLock(version: version) {
             unprocessedDependencies.append(sharedVersion)
         }
@@ -172,7 +180,7 @@ internal final class PubGrubPackageContainer {
                     versionedDependency: self.package,
                     unversionedDependency: dep.package
                 )
-                return [try Incompatibility(Term(node, .exact(version)), root: root, cause: cause)]
+                return try [Incompatibility(Term(node, .exact(version)), root: root, cause: cause)]
             }
 
             // Skip if this package is overridden.

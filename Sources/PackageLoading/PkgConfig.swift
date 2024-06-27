@@ -14,8 +14,7 @@ import Basics
 import Foundation
 import OrderedCollections
 
-import class TSCBasic.Process
-import enum TSCBasic.ProcessEnv
+import class Basics.AsyncProcess
 
 /// Information on an individual `pkg-config` supported package.
 public struct PkgConfig {
@@ -88,7 +87,7 @@ public struct PkgConfig {
             )
         }
 
-        var parser = try PkgConfigParser(pcFile: pcFile, fileSystem: fileSystem, sysrootDir: ProcessEnv.block["PKG_CONFIG_SYSROOT_DIR"])
+        var parser = try PkgConfigParser(pcFile: pcFile, fileSystem: fileSystem, sysrootDir: Environment.current["PKG_CONFIG_SYSROOT_DIR"])
         try parser.parse()
 
         func getFlags(from dependencies: [String]) throws -> (cFlags: [String], libs: [String]) {
@@ -130,7 +129,7 @@ public struct PkgConfig {
 
     private static var envSearchPaths: [AbsolutePath] {
         get throws {
-            if let configPath = ProcessEnv.block["PKG_CONFIG_PATH"] {
+            if let configPath = Environment.current["PKG_CONFIG_PATH"] {
                 #if os(Windows)
                 return try configPath.split(separator: ";").map({ try AbsolutePath(validating: String($0)) })
                 #else
@@ -483,7 +482,7 @@ internal struct PCFileFinder {
     private init(pkgConfigPath: String) {
         if PCFileFinder.pkgConfigPaths == nil {
             do {
-                let searchPaths = try TSCBasic.Process.checkNonZeroExit(args:
+                let searchPaths = try AsyncProcess.checkNonZeroExit(args:
                     pkgConfigPath, "--variable", "pc_path", "pkg-config"
                 ).spm_chomp()
 

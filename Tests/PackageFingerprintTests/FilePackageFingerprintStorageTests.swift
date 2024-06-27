@@ -14,7 +14,7 @@ import Basics
 import struct Foundation.URL
 @testable import PackageFingerprint
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem

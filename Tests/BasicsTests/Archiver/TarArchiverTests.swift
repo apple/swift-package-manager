@@ -12,7 +12,7 @@
 
 import Basics
 import TSCclibc // for SPM_posix_spawn_file_actions_addchdir_np_supported
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem

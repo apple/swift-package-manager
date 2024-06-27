@@ -14,13 +14,11 @@ import Basics
 import Dispatch
 import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem
 import enum TSCBasic.PathValidationError
-
-import func TSCTestSupport.withCustomEnv
 
 import struct TSCUtility.Version
 

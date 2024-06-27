@@ -25,8 +25,16 @@ add_library(PackageModel
   Manifest/SystemPackageProviderDescription.swift
   Manifest/TargetBuildSettingDescription.swift
   Manifest/TargetDescription.swift
+  Manifest/TraitDescription.swift
   ManifestSourceGeneration.swift
   MinimumDeploymentTarget.swift
+  Module/BinaryModule.swift
+  Module/ClangModule.swift
+  Module/PluginModule.swift
+  Module/ProvidedLibraryModule.swift
+  Module/SwiftModule.swift
+  Module/SystemLibraryModule.swift
+  Module/Module.swift
   ModuleMapType.swift
   PackageModel.swift
   PackageIdentity.swift
@@ -48,13 +56,6 @@ add_library(PackageModel
   SwiftSDKs/SwiftSDKConfigurationStore.swift
   SwiftSDKs/SwiftSDKBundle.swift
   SwiftSDKs/SwiftSDKBundleStore.swift
-  Target/BinaryTarget.swift
-  Target/ClangTarget.swift
-  Target/PluginTarget.swift
-  Target/ProvidedLibraryTarget.swift
-  Target/SwiftTarget.swift
-  Target/SystemLibraryTarget.swift
-  Target/Target.swift
   Toolchain.swift
   ToolchainConfiguration.swift
   Toolset.swift

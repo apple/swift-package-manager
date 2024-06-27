@@ -81,7 +81,7 @@ internal struct PluginContextSerializer {
         // Look at the target and decide what to serialize. At this point we may decide to not serialize it at all.
         let targetInfo: WireInput.Target.TargetInfo
         switch target.underlying {
-        case let target as SwiftTarget:
+        case let target as SwiftModule:
             targetInfo = .swiftSourceModuleInfo(
                 moduleName: target.c99name,
                 kind: try .init(target.type),
@@ -90,7 +90,7 @@ internal struct PluginContextSerializer {
                 linkedLibraries: scope.evaluate(.LINK_LIBRARIES),
                 linkedFrameworks: scope.evaluate(.LINK_FRAMEWORKS))
 
-        case let target as ClangTarget:
+        case let target as ClangModule:
             targetInfo = .clangSourceModuleInfo(
                 moduleName: target.c99name,
                 kind: try .init(target.type),
@@ -101,7 +101,7 @@ internal struct PluginContextSerializer {
                 linkedLibraries: scope.evaluate(.LINK_LIBRARIES),
                 linkedFrameworks: scope.evaluate(.LINK_FRAMEWORKS))
 
-        case let target as SystemLibraryTarget:
+        case let target as SystemLibraryModule:
             var cFlags: [String] = []
             var ldFlags: [String] = []
             // FIXME: What do we do with any diagnostics here?
@@ -130,7 +130,7 @@ internal struct PluginContextSerializer {
                 compilerFlags: cFlags,
                 linkerFlags: ldFlags)
             
-        case let target as BinaryTarget:
+        case let target as BinaryModule:
             let artifactKind: WireInput.Target.TargetInfo.BinaryArtifactKind
             switch target.kind {
             case .artifactsArchive:
@@ -161,7 +161,7 @@ internal struct PluginContextSerializer {
         // We only get this far if we are serializing the target. If so we also serialize its dependencies. This needs to be done before assigning the next wire ID for the target we're serializing, to make sure we end up with the correct one.
         let dependencies: [WireInput.Target.Dependency] = try target.dependencies(satisfying: buildEnvironment).compactMap {
             switch $0 {
-            case .target(let target, _):
+            case .module(let target, _):
                 return try serialize(target: target).map { .target(targetId: $0) }
             case .product(let product, _):
                 return try serialize(product: product).map { .product(productId: $0) }
@@ -191,7 +191,7 @@ internal struct PluginContextSerializer {
         switch product.type {
             
         case .executable:
-            let mainExecTarget = try product.executableTarget
+            let mainExecTarget = try product.executableModule
             guard let mainExecTargetId = try serialize(target: mainExecTarget) else {
                 throw InternalError("unable to serialize main executable target \(mainExecTarget) for product \(product)")
             }
@@ -216,7 +216,7 @@ internal struct PluginContextSerializer {
         let id = products.count
         products.append(.init(
             name: product.name,
-            targetIds: try product.targets.compactMap{ try serialize(target: $0) },
+            targetIds: try product.modules.compactMap{ try serialize(target: $0) },
             info: productInfo))
         productsToWireIDs[product.id] = id
         return id
@@ -262,14 +262,14 @@ internal struct PluginContextSerializer {
                 patch: package.manifest.toolsVersion.patch),
             dependencies: dependencies,
             productIds: try package.products.compactMap{ try serialize(product: $0) },
-            targetIds: try package.targets.compactMap{ try serialize(target: $0) }))
+            targetIds: try package.modules.compactMap{ try serialize(target: $0) }))
         packagesToWireIDs[package.id] = id
         return id
     }
 }
 
 fileprivate extension WireInput.Target.TargetInfo.SourceModuleKind {
-    init(_ kind: Target.Kind) throws {
+    init(_ kind: Module.Kind) throws {
         switch kind {
         case .library:
             self = .generic

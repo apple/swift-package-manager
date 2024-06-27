@@ -360,7 +360,7 @@ fileprivate let macroTargetDependencies: [TargetDescription.Dependency] = [
 fileprivate extension PackageDependency {
     /// Source control URL for the swift-syntax package.
     static var swiftSyntaxURL: SourceControlURL {
-        "https://github.com/apple/swift-syntax.git"
+        "https://github.com/swiftlang/swift-syntax.git"
     }
 
     /// Package dependency on the swift-syntax package.
@@ -376,7 +376,8 @@ fileprivate extension PackageDependency {
             nameForTargetDependencyResolutionOnly: nil,
             location: .remote(swiftSyntaxURL),
             requirement: .range(.upToNextMajor(from: swiftSyntaxVersion)),
-            productFilter: .everything
+            productFilter: .everything,
+            traits: []
         )
     }
 }
@@ -408,7 +409,8 @@ fileprivate extension PackageDependency {
             nameForTargetDependencyResolutionOnly: nil,
             location: .remote(swiftTestingURL),
             requirement: .range(.upToNextMajor(from: swiftTestingVersion)),
-            productFilter: .everything
+            productFilter: .everything,
+            traits: []
         )
     }
 }

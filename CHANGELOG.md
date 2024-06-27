@@ -1,5 +1,8 @@
 Note: This is in reverse chronological order, so newer entries are added to the top.
 
+Swift Next
+-----------
+
 * [#7530]
 
   Starting from tools-version 6.0 makes it possible for packages to depend on each other if such dependency doesn't form any target-level cycles.
@@ -420,4 +423,5 @@ Swift 3.0
 [#7201]: https://github.com/apple/swift-package-manager/pull/7201
 [#7202]: https://github.com/apple/swift-package-manager/pull/7202
 [#7507]: https://github.com/apple/swift-package-manager/pull/7507
+[#7530]: https://github.com/apple/swift-package-manager/pull/7530
 [#7535]: https://github.com/apple/swift-package-manager/pull/7535

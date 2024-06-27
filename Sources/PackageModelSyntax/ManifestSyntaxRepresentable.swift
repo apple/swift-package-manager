@@ -22,10 +22,10 @@ protocol ManifestSyntaxRepresentable {
     /// There might be other kinds of syntax nodes that can also represent
     /// the syntax, but this is the one that a canonical manifest will use.
     /// As an example, a package dependency is usually expressed as, e.g.,
-    ///     .package(url: "https://github.com/apple/swift-syntax.git", from: "510.0.1")
+    ///     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "510.0.1")
     ///
     /// However, there could be other forms, e.g., this is also valid:
-    ///     Package.Dependency.package(url: "https://github.com/apple/swift-syntax.git", from: "510.0.1")
+    ///     Package.Dependency.package(url: "https://github.com/swiftlang/swift-syntax.git", from: "510.0.1")
     associatedtype PreferredSyntax: SyntaxProtocol
 
     /// Provides a suitable syntax node to describe this entity in the package
@@ -35,7 +35,7 @@ protocol ManifestSyntaxRepresentable {
     /// and it's enclosing entity will need to understand how to fit it in.
     /// For example, a `PackageDependency` entity would map to syntax for
     /// something like
-    ///     .package(url: "https://github.com/apple/swift-syntax.git", from: "510.0.1")
+    ///     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "510.0.1")
     func asSyntax() -> PreferredSyntax
 }
 

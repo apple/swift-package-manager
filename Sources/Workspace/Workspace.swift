@@ -173,7 +173,7 @@ public class Workspace {
     ///   - delegate: Delegate for workspace events
     public convenience init(
         fileSystem: any FileSystem,
-        environment: EnvironmentVariables = .process(),
+        environment: Environment = .current,
         location: Location,
         authorizationProvider: (any AuthorizationProvider)? = .none,
         registryAuthorizationProvider: (any AuthorizationProvider)? = .none,
@@ -238,7 +238,7 @@ public class Workspace {
     ///   - delegate: Delegate for workspace events
     public convenience init(
         fileSystem: FileSystem? = .none,
-        environment: EnvironmentVariables = .process(),
+        environment: Environment = .current,
         forRootPackage packagePath: AbsolutePath,
         authorizationProvider: AuthorizationProvider? = .none,
         registryAuthorizationProvider: AuthorizationProvider? = .none,
@@ -337,7 +337,7 @@ public class Workspace {
     public static func _init(
         // core
         fileSystem: FileSystem,
-        environment: EnvironmentVariables,
+        environment: Environment,
         location: Location,
         authorizationProvider: AuthorizationProvider? = .none,
         registryAuthorizationProvider: AuthorizationProvider? = .none,
@@ -396,7 +396,7 @@ public class Workspace {
     private init(
         // core
         fileSystem: FileSystem,
-        environment: EnvironmentVariables,
+        environment: Environment,
         location: Location,
         authorizationProvider: AuthorizationProvider?,
         registryAuthorizationProvider: AuthorizationProvider?,
@@ -891,6 +891,29 @@ extension Workspace {
         expectedSigningEntities: [PackageIdentity: RegistryReleaseMetadata.SigningEntity] = [:],
         observabilityScope: ObservabilityScope
     ) throws -> ModulesGraph {
+        try self.loadPackageGraph(
+            rootInput: root,
+            explicitProduct: explicitProduct,
+            traitConfiguration: nil,
+            forceResolvedVersions: forceResolvedVersions,
+            customXCTestMinimumDeploymentTargets: customXCTestMinimumDeploymentTargets,
+            testEntryPointPath: testEntryPointPath,
+            expectedSigningEntities: expectedSigningEntities,
+            observabilityScope: observabilityScope
+        )
+    }
+
+    @discardableResult
+    package func loadPackageGraph(
+        rootInput root: PackageGraphRootInput,
+        explicitProduct: String? = nil,
+        traitConfiguration: TraitConfiguration? = nil,
+        forceResolvedVersions: Bool = false,
+        customXCTestMinimumDeploymentTargets: [PackageModel.Platform: PlatformVersion]? = .none,
+        testEntryPointPath: AbsolutePath? = nil,
+        expectedSigningEntities: [PackageIdentity: RegistryReleaseMetadata.SigningEntity] = [:],
+        observabilityScope: ObservabilityScope
+    ) throws -> ModulesGraph {
         let start = DispatchTime.now()
         self.delegate?.willLoadGraph()
         defer {
@@ -931,6 +954,7 @@ extension Workspace {
             binaryArtifacts: binaryArtifacts,
             shouldCreateMultipleTestProducts: self.configuration.shouldCreateMultipleTestProducts,
             createREPLProduct: self.configuration.createREPLProduct,
+            traitConfiguration: traitConfiguration,
             customXCTestMinimumDeploymentTargets: customXCTestMinimumDeploymentTargets,
             testEntryPointPath: testEntryPointPath,
             fileSystem: self.fileSystem,
@@ -952,8 +976,24 @@ extension Workspace {
         observabilityScope: ObservabilityScope
     ) throws -> ModulesGraph {
         try self.loadPackageGraph(
+            rootPath: rootPath,
+            explicitProduct: explicitProduct,
+            traitConfiguration: nil,
+            observabilityScope: observabilityScope
+        )
+    }
+
+    @discardableResult
+    package func loadPackageGraph(
+        rootPath: AbsolutePath,
+        explicitProduct: String? = nil,
+        traitConfiguration: TraitConfiguration? = nil,
+        observabilityScope: ObservabilityScope
+    ) throws -> ModulesGraph {
+        try self.loadPackageGraph(
             rootInput: PackageGraphRootInput(packages: [rootPath]),
             explicitProduct: explicitProduct,
+            traitConfiguration: traitConfiguration,
             observabilityScope: observabilityScope
         )
     }
@@ -1108,7 +1148,9 @@ extension Workspace {
                     additionalFileRules: [],
                     binaryArtifacts: binaryArtifacts,
                     fileSystem: self.fileSystem,
-                    observabilityScope: observabilityScope
+                    observabilityScope: observabilityScope,
+                    // For now we enable all traits
+                    enabledTraits: Set(manifest.traits.map { $0.name })
                 )
                 return try builder.construct()
             }
@@ -1119,7 +1161,7 @@ extension Workspace {
     public func loadPluginImports(
         packageGraph: ModulesGraph
     ) async throws -> [PackageIdentity: [String: [String]]] {
-        let pluginTargets = packageGraph.allTargets.filter { $0.type == .plugin }
+        let pluginTargets = packageGraph.allModules.filter { $0.type == .plugin }
         let scanner = SwiftcImportScanner(
             swiftCompilerEnvironment: hostToolchain.swiftCompilerEnvironment,
             swiftCompilerFlags: self.hostToolchain
@@ -1188,20 +1230,13 @@ extension Workspace {
                     shouldCreateMultipleTestProducts: self.configuration.shouldCreateMultipleTestProducts,
                     createREPLProduct: self.configuration.createREPLProduct,
                     fileSystem: self.fileSystem,
-                    observabilityScope: observabilityScope
+                    observabilityScope: observabilityScope,
+                    // For now we enable all traits
+                    enabledTraits: Set(manifest.traits.map { $0.name })
                 )
                 return try builder.construct()
             }
             completion(result)
-        }
-    }
-
-    /// Returns `true` if the file at the given path might influence build settings for a `swiftc` or `clang` invocation
-    /// generated by SwiftPM.
-    public func fileAffectsSwiftOrClangBuildSettings(filePath: AbsolutePath, packageGraph: ModulesGraph) -> Bool {
-        // TODO: Implement a more sophisticated check that also verifies if the file is in the sources directories of the passed in `packageGraph`.
-        FileRuleDescription.builtinRules.contains { fileRuleDescription in
-            fileRuleDescription.match(path: filePath, toolsVersion: self.currentToolsVersion)
         }
     }
 
@@ -1480,7 +1515,7 @@ private func warnToStderr(_ message: String) {
 }
 
 // used for manifest validation
-#if swift(<6.0)
+#if compiler(<6.0)
 extension RepositoryManager: ManifestSourceControlValidator {}
 #else
 extension RepositoryManager: @retroactive ManifestSourceControlValidator {}

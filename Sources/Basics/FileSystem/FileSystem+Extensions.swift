@@ -214,7 +214,7 @@ extension FileSystem {
     /// or under $XDG_CONFIG_HOME/swiftpm if the environmental variable is defined
     public var dotSwiftPM: AbsolutePath {
         get throws {
-            if let configurationDirectory = EnvironmentVariables.process()["XDG_CONFIG_HOME"] {
+            if let configurationDirectory = Environment.current["XDG_CONFIG_HOME"] {
                 return try AbsolutePath(validating: configurationDirectory).appending("swiftpm")
             } else {
                 return try self.homeDirectory.appending(".swiftpm")

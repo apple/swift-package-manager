@@ -21,7 +21,7 @@ import PackageModel
 import struct SPMBuildCore.BuildParameters
 
 @_spi(SwiftPMInternal)
-import SPMTestSupport
+import _InternalTestSupport
 
 import class TSCBasic.InMemoryFileSystem
 import XCTest
@@ -193,7 +193,7 @@ final class LLBuildManifestBuilderTests: XCTestCase {
         )
     }
     
-    /// Verifies that two targets with the same name but different triples don't share same build manifest keys.
+    /// Verifies that two modules with the same name but different triples don't share same build manifest keys.
     func testToolsBuildTriple() throws {
         let (graph, fs, scope) = try macrosPackageGraph()
         let productsTriple = Triple.x86_64MacOS
@@ -218,5 +218,7 @@ final class LLBuildManifestBuilderTests: XCTestCase {
         let manifest = try builder.generateManifest(at: "/manifest")
 
         XCTAssertNotNil(manifest.commands["C.SwiftSyntax-aarch64-unknown-linux-gnu-debug-tool.module"])
+        // Ensure that Objects.LinkFileList is -tool suffixed.
+        XCTAssertNotNil(manifest.commands["/path/to/build/aarch64-unknown-linux-gnu/debug/MMIOMacros-tool.product/Objects.LinkFileList"])
     }
 }

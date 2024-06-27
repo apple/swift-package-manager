@@ -22,8 +22,8 @@ import SourceControl
 import Workspace
 
 import protocol TSCBasic.DiagnosticLocation
-import class TSCBasic.Process
-import struct TSCBasic.ProcessResult
+import class Basics.AsyncProcess
+import struct Basics.AsyncProcessResult
 import func TSCBasic.withTemporaryFile
 
 import enum TSCUtility.Diagnostics
@@ -139,6 +139,7 @@ struct APIDigesterBaselineDumper {
         // FIXME: We need to implement the build tool invocation closure here so that build tool plugins work with the APIDigester. rdar://86112934
         let buildSystem = try swiftCommandState.createBuildSystem(
             explicitBuildSystem: .native,
+            traitConfiguration: .init(),
             cacheBuildManifest: false,
             productsBuildParameters: productsBuildParameters,
             toolsBuildParameters: toolsBuildParameters,
@@ -256,9 +257,9 @@ public struct SwiftAPIDigester {
         }
     }
 
-    @discardableResult private func runTool(_ args: [String]) throws -> ProcessResult {
+    @discardableResult private func runTool(_ args: [String]) throws -> AsyncProcessResult {
         let arguments = [tool.pathString] + args
-        let process = TSCBasic.Process(
+        let process = AsyncProcess(
             arguments: arguments,
             outputRedirection: .collect(redirectStderr: true)
         )
@@ -316,8 +317,8 @@ extension ModulesGraph {
         self.rootPackages
             .flatMap(\.products)
             .filter { $0.type.isLibrary }
-            .flatMap(\.targets)
-            .filter { $0.underlying is SwiftTarget }
+            .flatMap(\.modules)
+            .filter { $0.underlying is SwiftModule }
             .map { $0.c99name }
     }
 }
@@ -328,7 +329,7 @@ extension SerializedDiagnostics.SourceLocation {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension SerializedDiagnostics.SourceLocation: DiagnosticLocation {}
 #else
 extension SerializedDiagnostics.SourceLocation: @retroactive DiagnosticLocation {}

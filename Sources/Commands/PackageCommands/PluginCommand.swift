@@ -19,8 +19,6 @@ import PackageGraph
 
 import PackageModel
 
-import enum TSCBasic.ProcessEnv
-
 struct PluginCommand: SwiftCommand {
     static let configuration = CommandConfiguration(
         commandName: "plugin",
@@ -148,12 +146,17 @@ struct PluginCommand: SwiftCommand {
         // List the available plugins, if asked to.
         if self.listCommands {
             let packageGraph = try swiftCommandState.loadPackageGraph()
-            let allPlugins = PluginCommand.availableCommandPlugins(in: packageGraph, limitedTo: self.pluginOptions.packageIdentity)
+            let allPlugins = PluginCommand.availableCommandPlugins(
+                in: packageGraph,
+                limitedTo: self.pluginOptions.packageIdentity
+            ).map {
+                $0.underlying as! PluginTarget
+            }
             for plugin in allPlugins.sorted(by: { $0.name < $1.name }) {
                 guard case .command(let intent, _) = plugin.capability else { continue }
                 var line = "‘\(intent.invocationVerb)’ (plugin ‘\(plugin.name)’"
                 if let package = packageGraph.packages
-                    .first(where: { $0.targets.contains(where: { $0.name == plugin.name }) })
+                    .first(where: { $0.modules.contains(where: { $0.name == plugin.name }) })
                 {
                     line += " in package ‘\(package.manifest.displayName)’"
                 }
@@ -211,13 +214,15 @@ struct PluginCommand: SwiftCommand {
     }
 
     static func run(
-        plugin: PluginTarget,
+        plugin: ResolvedModule,
         package: ResolvedPackage,
         packageGraph: ModulesGraph,
         options: PluginOptions,
         arguments: [String],
         swiftCommandState: SwiftCommandState
     ) throws {
+        let pluginTarget = plugin.underlying as! PluginModule
+
         swiftCommandState.observabilityScope
             .emit(
                 info: "Running command plugin \(plugin) on package \(package) with options \(options) and arguments \(arguments)"
@@ -243,7 +248,7 @@ struct PluginCommand: SwiftCommand {
         }
 
         // If the plugin requires permissions, we ask the user for approval.
-        if case .command(_, let permissions) = plugin.capability {
+        if case .command(_, let permissions) = pluginTarget.capability {
             try permissions.forEach {
                 let permissionString: String
                 let reasonString: String
@@ -315,20 +320,20 @@ struct PluginCommand: SwiftCommand {
 
         // Use the directory containing the compiler as an additional search directory, and add the $PATH.
         let toolSearchDirs = [try swiftCommandState.getTargetToolchain().swiftCompilerPath.parentDirectory]
-            + getEnvSearchPaths(pathString: ProcessEnv.path, currentWorkingDirectory: .none)
+            + getEnvSearchPaths(pathString: Environment.current[.path], currentWorkingDirectory: .none)
 
         let buildParameters = try swiftCommandState.toolsBuildParameters
         // Build or bring up-to-date any executable host-side tools on which this plugin depends. Add them and any binary dependencies to the tool-names-to-path map.
         let buildSystem = try swiftCommandState.createBuildSystem(
             explicitBuildSystem: .native,
+            traitConfiguration: .init(),
             cacheBuildManifest: false,
             productsBuildParameters: swiftCommandState.productsBuildParameters,
             toolsBuildParameters: buildParameters,
             packageGraphLoader: { packageGraph }
         )
 
-        let accessibleTools = try plugin.processAccessibleTools(
-            packageGraph: packageGraph,
+        let accessibleTools = try plugin.preparePluginTools(
             fileSystem: swiftCommandState.fileSystem,
             environment: buildParameters.buildEnvironment,
             for: try pluginScriptRunner.hostTriple
@@ -345,12 +350,12 @@ struct PluginCommand: SwiftCommand {
         }
 
         // Set up a delegate to handle callbacks from the command plugin.
-        let pluginDelegate = PluginDelegate(swiftCommandState: swiftCommandState, plugin: plugin)
+        let pluginDelegate = PluginDelegate(swiftCommandState: swiftCommandState, plugin: pluginTarget)
         let delegateQueue = DispatchQueue(label: "plugin-invocation")
 
         // Run the command plugin.
         let buildEnvironment = buildParameters.buildEnvironment
-        let _ = try temp_await { plugin.invoke(
+        let _ = try temp_await { pluginTarget.invoke(
             action: .performCommand(package: package, arguments: arguments),
             buildEnvironment: buildEnvironment,
             scriptRunner: pluginScriptRunner,
@@ -374,7 +379,7 @@ struct PluginCommand: SwiftCommand {
         // TODO: We should also emit a final line of output regarding the result.
     }
 
-    static func availableCommandPlugins(in graph: ModulesGraph, limitedTo packageIdentity: String?) -> [PluginTarget] {
+    static func availableCommandPlugins(in graph: ModulesGraph, limitedTo packageIdentity: String?) -> [ResolvedModule] {
         // All targets from plugin products of direct dependencies are "available".
         let directDependencyPackages = graph.rootPackages.flatMap {
             $0.dependencies
@@ -384,22 +389,27 @@ struct PluginCommand: SwiftCommand {
             graph.package(for: $0)
         }
 
-        let directDependencyPluginTargets = directDependencyPackages.flatMap { $0.products.filter { $0.type == .plugin } }.flatMap { $0.targets }
+        let directDependencyPluginTargets = directDependencyPackages.flatMap { $0.products.filter { $0.type == .plugin } }.flatMap { $0.modules }
         // As well as any plugin targets in root packages.
-        let rootPackageTargets = graph.rootPackages.filter { $0.identity.matching(identity: packageIdentity) }.flatMap { $0.targets }
-        return (directDependencyPluginTargets + rootPackageTargets).compactMap { $0.underlying as? PluginTarget }.filter {
-            switch $0.capability {
-            case .buildTool: return false
-            case .command: return true
+        let rootPackageTargets = graph.rootPackages.filter { $0.identity.matching(identity: packageIdentity) }.flatMap { $0.modules }
+        return (directDependencyPluginTargets + rootPackageTargets).filter {
+            guard let plugin = $0.underlying as? PluginModule else {
+                return false
+            }
+
+            return switch plugin.capability {
+            case .buildTool: false
+            case .command: true
             }
         }
     }
 
-    static func findPlugins(matching verb: String, in graph: ModulesGraph, limitedTo packageIdentity: String?) -> [PluginTarget] {
+    static func findPlugins(matching verb: String, in graph: ModulesGraph, limitedTo packageIdentity: String?) -> [ResolvedModule] {
         // Find and return the command plugins that match the command.
         Self.availableCommandPlugins(in: graph, limitedTo: packageIdentity).filter {
+            let plugin = $0.underlying as! PluginModule
             // Filter out any non-command plugins and any whose verb is different.
-            guard case .command(let intent, _) = $0.capability else { return false }
+            guard case .command(let intent, _) = plugin.capability else { return false }
             return verb == intent.invocationVerb
         }
     }

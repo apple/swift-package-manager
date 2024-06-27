@@ -38,7 +38,10 @@ public struct Assignment: Equatable {
 
     /// An assignment made during decision making.
     public static func decision(_ term: Term, decisionLevel: Int) -> Assignment {
-        assert(term.requirement.isExact, "Cannot create a decision assignment with a non-exact version selection: \(term.requirement)")
+        assert(
+            term.requirement.isExact,
+            "Cannot create a decision assignment with a non-exact version selection: \(term.requirement)"
+        )
 
         return self.init(
             term: term,
@@ -68,9 +71,9 @@ extension Assignment: CustomStringConvertible {
     public var description: String {
         switch self.isDecision {
         case true:
-            return "[Decision \(self.decisionLevel): \(self.term)]"
+            "[Decision \(self.decisionLevel): \(self.term)]"
         case false:
-            return "[Derivation: \(self.term) ← \(self.cause?.description ?? "-")]"
+            "[Derivation: \(self.term) ← \(self.cause?.description ?? "-")]"
         }
     }
 }

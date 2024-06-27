@@ -12,7 +12,6 @@
 
 import Dispatch
 import Foundation
-import class TSCBasic.Process
 import class TSCBasic.Thread
 #if canImport(WinSDK)
 import WinSDK
@@ -123,7 +122,7 @@ public final class Cancellator: Cancellable, Sendable {
         self.register(name: name, handler: { _ in try handler() })
     }
 
-    public func register(_ process: TSCBasic.Process) -> RegistrationKey? {
+    package func register(_ process: AsyncProcess) -> RegistrationKey? {
         self.register(name: "\(process.arguments.joined(separator: " "))", handler: process.terminate)
     }
 
@@ -202,7 +201,7 @@ public struct CancellationError: Error, CustomStringConvertible {
         self.description = description
     }
 
-    static func failedToRegisterProcess(_ process: TSCBasic.Process) -> Self {
+    static func failedToRegisterProcess(_ process: AsyncProcess) -> Self {
         Self(
             description: """
             failed to register a cancellation handler for this process invocation `\(
@@ -213,7 +212,7 @@ public struct CancellationError: Error, CustomStringConvertible {
     }
 }
 
-extension TSCBasic.Process {
+extension AsyncProcess {
     fileprivate func terminate(timeout: DispatchTime) {
         // send graceful shutdown signal
         self.signal(SIGINT)

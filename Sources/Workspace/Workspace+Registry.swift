@@ -204,7 +204,8 @@ extension Workspace {
                             nameForTargetDependencyResolutionOnly: settings.nameForTargetDependencyResolutionOnly,
                             location: settings.location,
                             requirement: settings.requirement,
-                            productFilter: settings.productFilter
+                            productFilter: settings.productFilter,
+                            traits: settings.traits
                         )
                     case .swizzle:
                         // we replace the *entire* source control dependency with a registry one
@@ -218,11 +219,12 @@ extension Workspace {
                                     info: "swizzling '\(dependency.locationString)' with registry dependency '\(registryIdentity)'."
                                 )
                             targetDependencyPackageNameTransformations[dependency
-                                .nameForTargetDependencyResolutionOnly] = registryIdentity.description
+                                .nameForModuleDependencyResolutionOnly] = registryIdentity.description
                             modifiedDependency = .registry(
                                 identity: registryIdentity,
                                 requirement: requirement,
-                                productFilter: settings.productFilter
+                                productFilter: settings.productFilter,
+                                traits: settings.traits
                             )
                         case .branch, .revision:
                             // branch and revision dependencies are not supported by the registry
@@ -238,7 +240,8 @@ extension Workspace {
                                 nameForTargetDependencyResolutionOnly: settings.nameForTargetDependencyResolutionOnly,
                                 location: settings.location,
                                 requirement: settings.requirement,
-                                productFilter: settings.productFilter
+                                productFilter: settings.productFilter,
+                                traits: settings.traits
                             )
                         }
                     }
@@ -309,7 +312,8 @@ extension Workspace {
                 swiftLanguageVersions: manifest.swiftLanguageVersions,
                 dependencies: modifiedDependencies,
                 products: manifest.products,
-                targets: modifiedTargets
+                targets: modifiedTargets,
+                traits: manifest.traits
             )
 
             return modifiedManifest

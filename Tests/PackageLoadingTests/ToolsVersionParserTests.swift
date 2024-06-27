@@ -14,7 +14,7 @@
 import Basics
 import PackageModel
 import PackageLoading
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem

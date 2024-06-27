@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import class PackageModel.Target
+import class PackageModel.Module
 import class PackageModel.Product
 
 /// Triple for which code should be compiled for.
@@ -24,7 +24,7 @@ public enum BuildTriple: String {
     case destination = "destination"
 }
 
-extension Target {
+extension Module {
     var buildTriple: BuildTriple {
         if self.type == .macro || self.type == .plugin {
             .tools

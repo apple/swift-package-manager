@@ -18,7 +18,7 @@ extension LLBuildManifestBuilder {
     ///
     /// Returns the virtual node that will build the entire bundle.
     func createResourcesBundle(
-        for target: TargetBuildDescription
+        for target: ModuleBuildDescription
     ) throws -> Node? {
         guard let bundlePath = target.bundlePath else { return nil }
 

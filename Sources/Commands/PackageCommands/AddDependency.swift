@@ -136,7 +136,8 @@ extension SwiftPackageCommand {
                 nameForTargetDependencyResolutionOnly: nil,
                 location: location,
                 requirement: requirement,
-                productFilter: .everything
+                productFilter: .everything,
+                traits: []
             )
 
             let editResult = try AddPackageDependency.addPackageDependency(

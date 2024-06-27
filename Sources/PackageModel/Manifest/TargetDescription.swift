@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The description of an individual target.
+/// The description of an individual module.
 public struct TargetDescription: Hashable, Encodable, Sendable {
-    /// The target type.
-    public enum TargetType: String, Hashable, Encodable, Sendable {
+    @available(*, deprecated, renamed: "TargetKind")
+    public typealias TargetType = TargetKind
+
+    /// The target kind.
+    public enum TargetKind: String, Hashable, Encodable, Sendable {
         case regular
         case executable
         case test
@@ -29,6 +32,17 @@ public struct TargetDescription: Hashable, Encodable, Sendable {
         case target(name: String, condition: PackageConditionDescription?)
         case product(name: String, package: String?, moduleAliases: [String: String]? = nil, condition: PackageConditionDescription?)
         case byName(name: String, condition: PackageConditionDescription?)
+
+        var condition: PackageConditionDescription? {
+            switch self {
+            case .target(_, let condition):
+                return condition
+            case .product(_, _, _, let condition):
+                return condition
+            case .byName(_, let condition):
+                return condition
+            }
+        }
 
         public static func target(name: String) -> Dependency {
             return .target(name: name, condition: nil)
@@ -99,7 +113,7 @@ public struct TargetDescription: Hashable, Encodable, Sendable {
     public let publicHeadersPath: String?
 
     /// The type of target.
-    public let type: TargetType
+    public let type: TargetKind
 
     /// The pkg-config name of a system library target.
     public let pkgConfig: String?
@@ -169,7 +183,7 @@ public struct TargetDescription: Hashable, Encodable, Sendable {
         sources: [String]? = nil,
         resources: [Resource] = [],
         publicHeadersPath: String? = nil,
-        type: TargetType = .regular,
+        type: TargetKind = .regular,
         packageAccess: Bool = true,
         pkgConfig: String? = nil,
         providers: [SystemPackageProviderDescription]? = nil,

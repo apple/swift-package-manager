@@ -117,7 +117,7 @@ public struct ShellTool: ToolProtocol {
     public var inputs: [Node]
     public var outputs: [Node]
     public var arguments: [String]
-    public var environment: EnvironmentVariables
+    public var environment: Environment
     public var workingDirectory: String?
     public var allowMissingInputs: Bool
 
@@ -126,7 +126,7 @@ public struct ShellTool: ToolProtocol {
         inputs: [Node],
         outputs: [Node],
         arguments: [String],
-        environment: EnvironmentVariables = .empty(),
+        environment: Environment,
         workingDirectory: String? = nil,
         allowMissingInputs: Bool = false
     ) {
@@ -245,7 +245,7 @@ public struct SwiftFrontendTool: ToolProtocol {
     }
 
     public func write(to stream: inout ManifestToolStream) {
-      ShellTool(description: description, inputs: inputs, outputs: outputs, arguments: arguments).write(to: &stream)
+        ShellTool(description: description, inputs: inputs, outputs: outputs, arguments: arguments, environment: [:]).write(to: &stream)
     }
 }
 
@@ -347,6 +347,6 @@ public struct SwiftCompilerTool: ToolProtocol {
     }
 
     public func write(to stream: inout ManifestToolStream) {
-        ShellTool(description: description, inputs: inputs, outputs: outputs, arguments: arguments).write(to: &stream)
+        ShellTool(description: description, inputs: inputs, outputs: outputs, arguments: arguments, environment: [:]).write(to: &stream)
     }
 }

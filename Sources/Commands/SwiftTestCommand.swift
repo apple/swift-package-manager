@@ -32,8 +32,7 @@ import Workspace
 
 import struct TSCBasic.ByteString
 import enum TSCBasic.JSON
-import class TSCBasic.Process
-import enum TSCBasic.ProcessEnv
+import class Basics.AsyncProcess
 import var TSCBasic.stdoutStream
 import class TSCBasic.SynchronizedQueue
 import class TSCBasic.Thread
@@ -171,6 +170,9 @@ struct TestCommandOptions: ParsableArguments {
     @Option(name: .customLong("experimental-event-stream-version"),
             help: .hidden)
     var eventStreamVersion: Int?
+
+    @OptionGroup(visibility: .hidden)
+    package var traits: TraitOptions
 }
 
 /// Tests filtering specifier, which is used to filter tests to run.
@@ -531,7 +533,7 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
         }
         args += ["-o", productsBuildParameters.codeCovDataFile.pathString]
 
-        try TSCBasic.Process.checkNonZeroExit(arguments: args)
+        try AsyncProcess.checkNonZeroExit(arguments: args)
     }
 
     /// Exports profdata as a JSON file.
@@ -550,7 +552,7 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
             "-instr-profile=\(productsBuildParameters.codeCovDataFile)",
             testBinary.pathString
         ]
-        let result = try TSCBasic.Process.popen(arguments: args)
+        let result = try AsyncProcess.popen(arguments: args)
 
         if result.exitStatus != .terminated(code: 0) {
             let output = try result.utf8Output() + result.utf8stderrOutput()
@@ -571,7 +573,8 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
             swiftCommandState: swiftCommandState,
             productsBuildParameters: productsBuildParameters,
             toolsBuildParameters: toolsBuildParameters,
-            testProduct: self.options.sharedOptions.testProduct
+            testProduct: self.options.sharedOptions.testProduct,
+            traitConfiguration: .init(traitOptions: self.options.traits)
         )
     }
 
@@ -652,6 +655,9 @@ extension SwiftTestCommand {
         /// Which testing libraries to use (and any related options.)
         @OptionGroup()
         var testLibraryOptions: TestLibraryOptions
+
+        @OptionGroup(visibility: .hidden)
+        package var traits: TraitOptions
 
         // for deprecated passthrough from SwiftTestTool (parse will fail otherwise)
         @Flag(name: [.customLong("list-tests"), .customShort("l")], help: .hidden)
@@ -749,7 +755,8 @@ extension SwiftTestCommand {
                 swiftCommandState: swiftCommandState,
                 productsBuildParameters: productsBuildParameters,
                 toolsBuildParameters: toolsBuildParameters,
-                testProduct: self.sharedOptions.testProduct
+                testProduct: self.sharedOptions.testProduct,
+                traitConfiguration: .init(traitOptions: self.traits)
             )
         }
     }
@@ -788,7 +795,7 @@ final class TestRunner {
     // The toolchain to use.
     private let toolchain: UserToolchain
 
-    private let testEnv: [String: String]
+    private let testEnv: Environment
 
     /// ObservabilityScope  to emit diagnostics.
     private let observabilityScope: ObservabilityScope
@@ -822,7 +829,7 @@ final class TestRunner {
         additionalArguments: [String],
         cancellator: Cancellator,
         toolchain: UserToolchain,
-        testEnv: [String: String],
+        testEnv: Environment,
         observabilityScope: ObservabilityScope,
         library: BuildParameters.Testing.Library
     ) {
@@ -876,11 +883,11 @@ final class TestRunner {
                     outputHandler(output)
                 }
             }
-            let outputRedirection = Process.OutputRedirection.stream(
+            let outputRedirection = AsyncProcess.OutputRedirection.stream(
                 stdout: outputHandler,
                 stderr: outputHandler
             )
-            let process = TSCBasic.Process(arguments: try args(forTestAt: path), environment: self.testEnv, outputRedirection: outputRedirection)
+            let process = AsyncProcess(arguments: try args(forTestAt: path), environment: self.testEnv, outputRedirection: outputRedirection)
             guard let terminationKey = self.cancellator.register(process) else {
                 return false // terminating
             }
@@ -971,7 +978,7 @@ final class ParallelTestRunner {
 
         // command's result output goes on stdout
         // ie "swift test" should output to stdout
-        if ProcessEnv.block["SWIFTPM_TEST_RUNNER_PROGRESS_BAR"] == "lit" {
+        if Environment.current["SWIFTPM_TEST_RUNNER_PROGRESS_BAR"] == "lit" {
             self.progressAnimation = ProgressAnimation.percent(
                 stream: TSCBasic.stdoutStream,
                 verbose: false,
@@ -1332,7 +1339,7 @@ extension TestCommandOptions {
 
     /// Returns the test case specifier if overridden in the env.
     private func skippedTestsOverride(fileSystem: FileSystem) -> TestCaseSpecifier? {
-        guard let override = ProcessEnv.block["_SWIFTPM_SKIP_TESTS_LIST"] else {
+        guard let override = Environment.current["_SWIFTPM_SKIP_TESTS_LIST"] else {
             return nil
         }
 
@@ -1374,9 +1381,11 @@ private func buildTestsIfNeeded(
     swiftCommandState: SwiftCommandState,
     productsBuildParameters: BuildParameters,
     toolsBuildParameters: BuildParameters,
-    testProduct: String?
+    testProduct: String?,
+    traitConfiguration: TraitConfiguration
 ) throws -> [BuiltTestProduct] {
     let buildSystem = try swiftCommandState.createBuildSystem(
+        traitConfiguration: traitConfiguration,
         productsBuildParameters: productsBuildParameters,
         toolsBuildParameters: toolsBuildParameters
     )

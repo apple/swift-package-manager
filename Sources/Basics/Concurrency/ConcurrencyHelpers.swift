@@ -15,12 +15,11 @@ import Dispatch
 import class Foundation.NSLock
 import class Foundation.ProcessInfo
 import struct Foundation.URL
-import enum TSCBasic.ProcessEnv
 import func TSCBasic.tsc_await
 
 public enum Concurrency {
     public static var maxOperations: Int {
-        ProcessEnv.block["SWIFTPM_MAX_CONCURRENT_OPERATIONS"].flatMap(Int.init) ?? ProcessInfo.processInfo
+        Environment.current["SWIFTPM_MAX_CONCURRENT_OPERATIONS"].flatMap(Int.init) ?? ProcessInfo.processInfo
             .activeProcessorCount
     }
 }

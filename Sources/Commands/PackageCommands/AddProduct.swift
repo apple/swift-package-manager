@@ -51,15 +51,6 @@ extension SwiftPackageCommand {
         )
         var targets: [String] = []
 
-        @Option(help: "The URL for a remote binary target")
-        var url: String?
-
-        @Option(help: "The path to a local binary target")
-        var path: String?
-
-        @Option(help: "The checksum for a remote binary target")
-        var checksum: String?
-
         func run(_ swiftCommandState: SwiftCommandState) throws {
             let workspace = try swiftCommandState.getActiveWorkspace()
 

@@ -17,7 +17,7 @@ import Foundation
 // need to decide how to best deal with that
 import FoundationNetworking
 #endif
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import struct TSCBasic.ByteString

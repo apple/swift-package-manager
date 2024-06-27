@@ -16,7 +16,7 @@ import OrderedCollections
 import PackageLoading
 @testable import PackageModel
 import SourceControl
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem
@@ -3802,7 +3802,7 @@ extension PackageReference {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension Term: ExpressibleByStringLiteral {}
 extension PackageReference: ExpressibleByStringLiteral {}
 #else

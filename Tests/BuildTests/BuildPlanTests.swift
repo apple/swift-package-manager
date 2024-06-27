@@ -26,7 +26,7 @@ import PackageLoading
 @testable import PackageModel
 
 import SPMBuildCore
-import SPMTestSupport
+import _InternalTestSupport
 import SwiftDriver
 import Workspace
 import XCTest
@@ -613,15 +613,15 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertTrue(result.targetMap.values.contains { $0.target.name == "BarLogging" })
     }
 
-    func testPackageNameFlag() throws {
+    func testPackageNameFlag() async throws {
         try XCTSkipIfCI() // test is disabled because it isn't stable, see rdar://118239206
         let isFlagSupportedInDriver = try DriverSupport.checkToolchainDriverFlags(
             flags: ["package-name"],
             toolchain: UserToolchain.default,
             fileSystem: localFileSystem
         )
-        try fixture(name: "Miscellaneous/PackageNameFlag") { fixturePath in
-            let (stdout, _) = try executeSwiftBuild(fixturePath.appending("appPkg"), extraArgs: ["-vv"])
+        try await fixture(name: "Miscellaneous/PackageNameFlag") { fixturePath in
+            let (stdout, _) = try await executeSwiftBuild(fixturePath.appending("appPkg"), extraArgs: ["-vv"])
             XCTAssertMatch(stdout, .contains("-module-name Foo"))
             XCTAssertMatch(stdout, .contains("-module-name Zoo"))
             XCTAssertMatch(stdout, .contains("-module-name Bar"))
@@ -641,14 +641,14 @@ final class BuildPlanTests: XCTestCase {
     }
 
     #if os(macOS)
-    func testPackageNameFlagXCBuild() throws {
+    func testPackageNameFlagXCBuild() async throws {
         let isFlagSupportedInDriver = try DriverSupport.checkToolchainDriverFlags(
             flags: ["package-name"],
             toolchain: UserToolchain.default,
             fileSystem: localFileSystem
         )
-        try fixture(name: "Miscellaneous/PackageNameFlag") { fixturePath in
-            let (stdout, _) = try executeSwiftBuild(
+        try await fixture(name: "Miscellaneous/PackageNameFlag") { fixturePath in
+            let (stdout, _) = try await executeSwiftBuild(
                 fixturePath.appending("appPkg"),
                 extraArgs: ["--build-system", "xcode", "-vv"]
             )
@@ -671,14 +671,14 @@ final class BuildPlanTests: XCTestCase {
     }
     #endif
 
-    func testTargetsWithPackageAccess() throws {
+    func testTargetsWithPackageAccess() async throws {
         let isFlagSupportedInDriver = try DriverSupport.checkToolchainDriverFlags(
             flags: ["package-name"],
             toolchain: UserToolchain.default,
             fileSystem: localFileSystem
         )
-        try fixture(name: "Miscellaneous/TargetPackageAccess") { fixturePath in
-            let (stdout, _) = try executeSwiftBuild(fixturePath.appending("libPkg"), extraArgs: ["-v"])
+        try await fixture(name: "Miscellaneous/TargetPackageAccess") { fixturePath in
+            let (stdout, _) = try await executeSwiftBuild(fixturePath.appending("libPkg"), extraArgs: ["-v"])
             if isFlagSupportedInDriver {
                 let moduleFlag1 = stdout.range(of: "-module-name DataModel")
                 XCTAssertNotNil(moduleFlag1)
@@ -759,7 +759,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = plan.productsBuildPath
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(
             exe,
             [
@@ -777,7 +777,7 @@ final class BuildPlanTests: XCTestCase {
             ]
         )
 
-        let lib = try result.target(for: "lib").swiftTarget().compileArguments()
+        let lib = try result.moduleBuildDescription(for: "lib").swift().compileArguments()
         XCTAssertMatch(
             lib,
             [
@@ -1147,9 +1147,9 @@ final class BuildPlanTests: XCTestCase {
 
         XCTAssertEqual(Set(result.productMap.keys.map(\.productName)), ["APackageTests"])
         #if os(macOS)
-        XCTAssertEqual(Set(result.targetMap.keys.map(\.targetName)), ["ATarget", "BTarget", "ATargetTests"])
+        XCTAssertEqual(Set(result.targetMap.keys.map(\.moduleName)), ["ATarget", "BTarget", "ATargetTests"])
         #else
-        XCTAssertEqual(Set(result.targetMap.keys.map(\.targetName)), [
+        XCTAssertEqual(Set(result.targetMap.keys.map(\.moduleName)), [
             "APackageTests",
             "APackageDiscoveredTests",
             "ATarget",
@@ -1193,7 +1193,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.destinationBuildParameters.dataPath.appending(components: "release")
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(
             exe,
             [
@@ -1287,7 +1287,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.destinationBuildParameters.dataPath.appending(components: "release")
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(
             exe,
             [
@@ -1399,7 +1399,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.destinationBuildParameters.dataPath.appending(components: "debug")
 
-        let ext = try result.target(for: "extlib").clangTarget()
+        let ext = try result.moduleBuildDescription(for: "extlib").clang()
         var args: [String] = []
 
         #if os(macOS)
@@ -1426,7 +1426,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertEqual(try ext.objects, [buildPath.appending(components: "extlib.build", "extlib.c.o")])
         XCTAssertEqual(ext.moduleMap, buildPath.appending(components: "extlib.build", "module.modulemap"))
 
-        let exe = try result.target(for: "exe").clangTarget()
+        let exe = try result.moduleBuildDescription(for: "exe").clang()
         args = []
 
         #if os(macOS)
@@ -1579,11 +1579,11 @@ final class BuildPlanTests: XCTestCase {
                 observabilityScope: observability.topScope
             ))
 
-            let exeArguments = try result.target(for: "exe").clangTarget().basicArguments(isCXX: false)
+            let exeArguments = try result.moduleBuildDescription(for: "exe").clang().basicArguments(isCXX: false)
             XCTAssert(exeArguments.contains { $0.contains("PkgLib") })
             XCTAssert(exeArguments.allSatisfy { !$0.contains("ExtLib") })
 
-            let libArguments = try result.target(for: "PkgLib").clangTarget().basicArguments(isCXX: false)
+            let libArguments = try result.moduleBuildDescription(for: "PkgLib").clang().basicArguments(isCXX: false)
             XCTAssert(libArguments.allSatisfy { !$0.contains("ExtLib") })
         }
 
@@ -1598,10 +1598,10 @@ final class BuildPlanTests: XCTestCase {
                 observabilityScope: observability.topScope
             ))
 
-            let arguments = try result.target(for: "exe").clangTarget().basicArguments(isCXX: false)
+            let arguments = try result.moduleBuildDescription(for: "exe").clang().basicArguments(isCXX: false)
             XCTAssert(arguments.allSatisfy { !$0.contains("PkgLib") && !$0.contains("ExtLib") })
 
-            let libArguments = try result.target(for: "PkgLib").clangTarget().basicArguments(isCXX: false)
+            let libArguments = try result.moduleBuildDescription(for: "PkgLib").clang().basicArguments(isCXX: false)
             XCTAssert(libArguments.contains { $0.contains("ExtLib") })
         }
     }
@@ -1716,33 +1716,33 @@ final class BuildPlanTests: XCTestCase {
         )
 
         // Assert compile args for swift modules importing cxx modules
-        let swiftInteropLib = try result.target(for: "swiftInteropLib").swiftTarget().compileArguments()
+        let swiftInteropLib = try result.moduleBuildDescription(for: "swiftInteropLib").swift().compileArguments()
         XCTAssertMatch(
             swiftInteropLib,
             [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++1z", .anySequence]
         )
-        let swiftLib = try result.target(for: "swiftLib").swiftTarget().compileArguments()
+        let swiftLib = try result.moduleBuildDescription(for: "swiftLib").swift().compileArguments()
         XCTAssertNoMatch(swiftLib, [.anySequence, "-Xcc", "-std=c++1z", .anySequence])
 
         // Assert symbolgraph-extract args for swift modules importing cxx modules
         do {
-            let swiftInteropLib = try result.target(for: "swiftInteropLib").swiftTarget().compileArguments()
+            let swiftInteropLib = try result.moduleBuildDescription(for: "swiftInteropLib").swift().compileArguments()
             XCTAssertMatch(
                 swiftInteropLib,
                 [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++1z", .anySequence]
             )
-            let swiftLib = try result.target(for: "swiftLib").swiftTarget().compileArguments()
+            let swiftLib = try result.moduleBuildDescription(for: "swiftLib").swift().compileArguments()
             XCTAssertNoMatch(swiftLib, [.anySequence, "-Xcc", "-std=c++1z", .anySequence])
         }
 
         // Assert symbolgraph-extract args for cxx modules
         do {
-            let swiftInteropLib = try result.target(for: "swiftInteropLib").swiftTarget().compileArguments()
+            let swiftInteropLib = try result.moduleBuildDescription(for: "swiftInteropLib").swift().compileArguments()
             XCTAssertMatch(
                 swiftInteropLib,
                 [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++1z", .anySequence]
             )
-            let swiftLib = try result.target(for: "swiftLib").swiftTarget().compileArguments()
+            let swiftLib = try result.moduleBuildDescription(for: "swiftLib").swift().compileArguments()
             XCTAssertNoMatch(swiftLib, [.anySequence, "-Xcc", "-std=c++1z", .anySequence])
         }
     }
@@ -1785,7 +1785,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = plan.productsBuildPath
 
-        let lib = try result.target(for: "lib").clangTarget()
+        let lib = try result.moduleBuildDescription(for: "lib").clang()
         var args: [String] = []
 
         #if os(macOS)
@@ -1813,7 +1813,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertEqual(try lib.objects, [buildPath.appending(components: "lib.build", "lib.c.o")])
         XCTAssertEqual(lib.moduleMap, buildPath.appending(components: "lib.build", "module.modulemap"))
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(
             exe,
             [
@@ -1911,7 +1911,7 @@ final class BuildPlanTests: XCTestCase {
         result.checkProductsCount(1)
         result.checkTargetsCount(2)
 
-        let lib = try result.target(for: "lib").clangTarget()
+        let lib = try result.moduleBuildDescription(for: "lib").clang()
         XCTAssertEqual(try lib.objects, [
             AbsolutePath("/path/to/build/\(result.plan.destinationBuildParameters.triple)/debug/lib.build/lib.S.o"),
             AbsolutePath("/path/to/build/\(result.plan.destinationBuildParameters.triple)/debug/lib.build/lib.c.o"),
@@ -1962,7 +1962,7 @@ final class BuildPlanTests: XCTestCase {
         // Cxx module
         do {
             try XCTAssertMatch(
-                result.target(for: "cxxLib").clangTarget().symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "cxxLib").clang().symbolGraphExtractArguments(),
                 [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++20", .anySequence]
             )
         }
@@ -1970,11 +1970,11 @@ final class BuildPlanTests: XCTestCase {
         // Swift module directly importing cxx module
         do {
             try XCTAssertMatch(
-                result.target(for: "swiftLib").swiftTarget().compileArguments(),
+                result.moduleBuildDescription(for: "swiftLib").swift().compileArguments(),
                 [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++20", .anySequence]
             )
             try XCTAssertMatch(
-                result.target(for: "swiftLib").swiftTarget().symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "swiftLib").swift().symbolGraphExtractArguments(),
                 [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++20", .anySequence]
             )
         }
@@ -1982,19 +1982,19 @@ final class BuildPlanTests: XCTestCase {
         // Swift module transitively importing cxx module
         do {
             try XCTAssertNoMatch(
-                result.target(for: "swiftLib2").swiftTarget().compileArguments(),
+                result.moduleBuildDescription(for: "swiftLib2").swift().compileArguments(),
                 [.anySequence, "-cxx-interoperability-mode=default", .anySequence]
             )
             try XCTAssertNoMatch(
-                result.target(for: "swiftLib2").swiftTarget().compileArguments(),
+                result.moduleBuildDescription(for: "swiftLib2").swift().compileArguments(),
                 [.anySequence, "-Xcc", "-std=c++20", .anySequence]
             )
             try XCTAssertNoMatch(
-                result.target(for: "swiftLib2").swiftTarget().symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "swiftLib2").swift().symbolGraphExtractArguments(),
                 [.anySequence, "-cxx-interoperability-mode=default", .anySequence]
             )
             try XCTAssertNoMatch(
-                result.target(for: "swiftLib2").swiftTarget().symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "swiftLib2").swift().symbolGraphExtractArguments(),
                 [.anySequence, "-Xcc", "-std=c++20", .anySequence]
             )
         }
@@ -2070,7 +2070,7 @@ final class BuildPlanTests: XCTestCase {
         // A
         do {
             try XCTAssertMatchesSubSequences(
-                result.target(for: "A").symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "A").symbolGraphExtractArguments(),
                 // Swift Module dependencies
                 ["-I", "/path/to/build/\(triple)/debug/Modules"],
                 // C Module dependencies
@@ -2082,7 +2082,7 @@ final class BuildPlanTests: XCTestCase {
         // D
         do {
             try XCTAssertMatchesSubSequences(
-                result.target(for: "D").symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "D").symbolGraphExtractArguments(),
                 // Self Module
                 ["-I", "/Pkg/Sources/D/include"],
                 ["-Xcc", "-fmodule-map-file=/path/to/build/\(triple)/debug/D.build/module.modulemap"],
@@ -2101,7 +2101,7 @@ final class BuildPlanTests: XCTestCase {
 
 #if os(macOS)
             try XCTAssertMatchesSubSequences(
-                result.target(for: "D").symbolGraphExtractArguments(),
+                result.moduleBuildDescription(for: "D").symbolGraphExtractArguments(),
                 // Swift Module dependencies
                 ["-Xcc", "-fmodule-map-file=/path/to/build/\(triple)/debug/B.build/module.modulemap"]
             )
@@ -2186,7 +2186,7 @@ final class BuildPlanTests: XCTestCase {
         let fs = InMemoryFileSystem(
             emptyFiles:
             "/Pkg/Sources/Foo/foo.swift",
-            "/Pkg/Tests/\(SwiftTarget.defaultTestEntryPointName)",
+            "/Pkg/Tests/\(SwiftModule.defaultTestEntryPointName)",
             "/Pkg/Tests/FooTests/foo.swift"
         )
 
@@ -2223,7 +2223,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let foo = try result.target(for: "Foo").swiftTarget().compileArguments()
+        let foo = try result.moduleBuildDescription(for: "Foo").swift().compileArguments()
         XCTAssertMatch(
             foo,
             [
@@ -2242,7 +2242,7 @@ final class BuildPlanTests: XCTestCase {
             ]
         )
 
-        let fooTests = try result.target(for: "FooTests").swiftTarget().compileArguments()
+        let fooTests = try result.moduleBuildDescription(for: "FooTests").swift().compileArguments()
         XCTAssertMatch(
             fooTests,
             [
@@ -2354,7 +2354,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
 
         XCTAssertMatch(
             exe,
@@ -2614,63 +2614,63 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertNoDiagnostics(observability.diagnostics)
 
         // single source file not named main, and without @main should not have -parse-as-library.
-        let exe1 = try result.target(for: "exe1").swiftTarget().emitCommandLine()
+        let exe1 = try result.moduleBuildDescription(for: "exe1").swift().emitCommandLine()
         XCTAssertNoMatch(exe1, ["-parse-as-library"])
 
         // single source file named main, and without @main should not have -parse-as-library.
-        let exe2 = try result.target(for: "exe2").swiftTarget().emitCommandLine()
+        let exe2 = try result.moduleBuildDescription(for: "exe2").swift().emitCommandLine()
         XCTAssertNoMatch(exe2, ["-parse-as-library"])
 
         // single source file not named main, with @main should have -parse-as-library.
-        let exe3 = try result.target(for: "exe3").swiftTarget().emitCommandLine()
+        let exe3 = try result.moduleBuildDescription(for: "exe3").swift().emitCommandLine()
         XCTAssertMatch(exe3, ["-parse-as-library"])
 
         // single source file named main, with @main should have -parse-as-library.
-        let exe4 = try result.target(for: "exe4").swiftTarget().emitCommandLine()
+        let exe4 = try result.moduleBuildDescription(for: "exe4").swift().emitCommandLine()
         XCTAssertMatch(exe4, ["-parse-as-library"])
 
         // multiple source files should not have -parse-as-library.
-        let exe5 = try result.target(for: "exe5").swiftTarget().emitCommandLine()
+        let exe5 = try result.moduleBuildDescription(for: "exe5").swift().emitCommandLine()
         XCTAssertNoMatch(exe5, ["-parse-as-library"])
 
         // @main in comment should not have -parse-as-library.
-        let exe6 = try result.target(for: "exe6").swiftTarget().emitCommandLine()
+        let exe6 = try result.moduleBuildDescription(for: "exe6").swift().emitCommandLine()
         XCTAssertNoMatch(exe6, ["-parse-as-library"])
 
         // @main in comment should not have -parse-as-library.
-        let exe7 = try result.target(for: "exe7").swiftTarget().emitCommandLine()
+        let exe7 = try result.moduleBuildDescription(for: "exe7").swift().emitCommandLine()
         XCTAssertNoMatch(exe7, ["-parse-as-library"])
 
         // @main in comment should not have -parse-as-library.
-        let exe8 = try result.target(for: "exe8").swiftTarget().emitCommandLine()
+        let exe8 = try result.moduleBuildDescription(for: "exe8").swift().emitCommandLine()
         XCTAssertNoMatch(exe8, ["-parse-as-library"])
 
         // @main in comment should not have -parse-as-library.
-        let exe9 = try result.target(for: "exe9").swiftTarget().emitCommandLine()
+        let exe9 = try result.moduleBuildDescription(for: "exe9").swift().emitCommandLine()
         XCTAssertNoMatch(exe9, ["-parse-as-library"])
 
         // @main in comment + non-comment should have -parse-as-library.
-        let exe10 = try result.target(for: "exe10").swiftTarget().emitCommandLine()
+        let exe10 = try result.moduleBuildDescription(for: "exe10").swift().emitCommandLine()
         XCTAssertMatch(exe10, ["-parse-as-library"])
 
         // @main in comment + non-comment should have -parse-as-library.
-        let exe11 = try result.target(for: "exe11").swiftTarget().emitCommandLine()
+        let exe11 = try result.moduleBuildDescription(for: "exe11").swift().emitCommandLine()
         XCTAssertMatch(exe11, ["-parse-as-library"])
 
         // @main in comment + non-comment should have -parse-as-library.
-        let exe12 = try result.target(for: "exe12").swiftTarget().emitCommandLine()
+        let exe12 = try result.moduleBuildDescription(for: "exe12").swift().emitCommandLine()
         XCTAssertMatch(exe12, ["-parse-as-library"])
 
         // multiple source files should not have -parse-as-library.
-        let exe13 = try result.target(for: "exe13").swiftTarget().emitCommandLine()
+        let exe13 = try result.moduleBuildDescription(for: "exe13").swift().emitCommandLine()
         XCTAssertNoMatch(exe13, ["-parse-as-library"])
 
         // A snippet with top-level code should not have -parse-as-library.
-        let topLevelCodeSnippet = try result.target(for: "TopLevelCodeSnippet").swiftTarget().emitCommandLine()
+        let topLevelCodeSnippet = try result.moduleBuildDescription(for: "TopLevelCodeSnippet").swift().emitCommandLine()
         XCTAssertNoMatch(topLevelCodeSnippet, ["-parse-as-library"])
 
         // A snippet with @main should have -parse-as-library
-        let atMainSnippet = try result.target(for: "AtMainSnippet").swiftTarget().emitCommandLine()
+        let atMainSnippet = try result.moduleBuildDescription(for: "AtMainSnippet").swift().emitCommandLine()
         XCTAssertMatch(atMainSnippet, ["-parse-as-library"])
     }
 
@@ -2720,7 +2720,7 @@ final class BuildPlanTests: XCTestCase {
         let buildPath = result.plan.productsBuildPath
 
         XCTAssertMatch(
-            try result.target(for: "exe").swiftTarget().compileArguments(),
+            try result.moduleBuildDescription(for: "exe").swift().compileArguments(),
             [
                 "-enable-batch-mode",
                 "-Onone",
@@ -3015,7 +3015,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(
             exe,
             [
@@ -3033,7 +3033,7 @@ final class BuildPlanTests: XCTestCase {
             ]
         )
 
-        let lib = try result.target(for: "lib").swiftTarget().compileArguments()
+        let lib = try result.moduleBuildDescription(for: "lib").swift().compileArguments()
         XCTAssertMatch(
             lib,
             [
@@ -3139,7 +3139,7 @@ final class BuildPlanTests: XCTestCase {
         let triple = result.plan.destinationBuildParameters.triple
         let buildPath = result.plan.productsBuildPath
 
-        let exe = try result.target(for: "exe").clangTarget()
+        let exe = try result.moduleBuildDescription(for: "exe").clang()
 
         var expectedExeBasicArgs = triple.isDarwin() ? ["-fobjc-arc"] : []
         expectedExeBasicArgs += ["-target", defaultTargetTriple]
@@ -3163,7 +3163,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertEqual(try exe.objects, [buildPath.appending(components: "exe.build", "main.c.o")])
         XCTAssertEqual(exe.moduleMap, nil)
 
-        let lib = try result.target(for: "lib").clangTarget()
+        let lib = try result.moduleBuildDescription(for: "lib").clang()
 
         var expectedLibBasicArgs = triple.isDarwin() ? ["-fobjc-arc"] : []
         expectedLibBasicArgs += ["-target", defaultTargetTriple]
@@ -3341,10 +3341,10 @@ final class BuildPlanTests: XCTestCase {
         graphResult.check(reachableTargets: "ATarget", "BTarget1")
         #if ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION
         graphResult.check(products: "aexec", "BLibrary")
-        graphResult.check(targets: "ATarget", "BTarget1")
+        graphResult.check(modules: "ATarget", "BTarget1")
         #else
         graphResult.check(products: "BLibrary", "bexec", "aexec", "cexec")
-        graphResult.check(targets: "ATarget", "BTarget1", "BTarget2", "CTarget")
+        graphResult.check(modules: "ATarget", "BTarget1", "BTarget2", "CTarget")
         #endif
 
         let planResult = try BuildPlanResult(plan: mockBuildPlan(
@@ -3595,7 +3595,7 @@ final class BuildPlanTests: XCTestCase {
 
         XCTAssertEqual(diagnostic.message, "couldn't find pc file for BTarget")
         XCTAssertEqual(diagnostic.severity, .warning)
-        XCTAssertEqual(diagnostic.metadata?.targetName, "BTarget")
+        XCTAssertEqual(diagnostic.metadata?.moduleName, "BTarget")
         XCTAssertEqual(diagnostic.metadata?.pcFile, "BTarget.pc")
     }
 
@@ -3636,7 +3636,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.destinationBuildParameters.dataPath.appending(components: "debug")
 
-        let lib = try result.target(for: "lib").clangTarget()
+        let lib = try result.moduleBuildDescription(for: "lib").clang()
         let args = [
             "-target", "x86_64-unknown-windows-msvc",
             "-O0",
@@ -3650,7 +3650,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertEqual(try lib.objects, [buildPath.appending(components: "lib.build", "lib.c.o")])
         XCTAssertEqual(lib.moduleMap, buildPath.appending(components: "lib.build", "module.modulemap"))
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(exe, [
             "-enable-batch-mode",
             "-Onone",
@@ -3720,7 +3720,7 @@ final class BuildPlanTests: XCTestCase {
         let supportingTriples: [Basics.Triple] = [.x86_64Linux, .x86_64MacOS]
         for triple in supportingTriples {
             let result = try createResult(for: triple)
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(exe, ["-Xfrontend", "-entry-point-function-name", "-Xfrontend", "exe_main"])
             let linkExe = try result.buildProduct(for: "exe").linkArguments()
             XCTAssertMatch(linkExe, [.contains("exe_main")])
@@ -3729,7 +3729,7 @@ final class BuildPlanTests: XCTestCase {
         let unsupportingTriples: [Basics.Triple] = [.wasi, .windows]
         for triple in unsupportingTriples {
             let result = try createResult(for: triple)
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertNoMatch(exe, ["-entry-point-function-name"])
         }
     }
@@ -3769,7 +3769,7 @@ final class BuildPlanTests: XCTestCase {
                 observabilityScope: observability.topScope
             ))
 
-            let lib = try result.target(for: "lib").clangTarget()
+            let lib = try result.moduleBuildDescription(for: "lib").clang()
             let path = StringPattern.equal(result.plan.destinationBuildParameters.indexStore.pathString)
 
             XCTAssertMatch(
@@ -3777,7 +3777,7 @@ final class BuildPlanTests: XCTestCase {
                 [.anySequence, "-index-store-path", path, .anySequence]
             )
 
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(exe, [.anySequence, "-index-store-path", path, .anySequence])
         }
 
@@ -3836,7 +3836,7 @@ final class BuildPlanTests: XCTestCase {
             observabilityScope: observability.topScope
         ))
 
-        let aTarget = try result.target(for: "ATarget").swiftTarget().compileArguments()
+        let aTarget = try result.moduleBuildDescription(for: "ATarget").swift().compileArguments()
         #if os(macOS)
         XCTAssertMatch(
             aTarget,
@@ -3846,7 +3846,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertMatch(aTarget, [.equal("-target"), .equal(defaultTargetTriple), .anySequence])
         #endif
 
-        let bTarget = try result.target(for: "BTarget").swiftTarget().compileArguments()
+        let bTarget = try result.moduleBuildDescription(for: "BTarget").swift().compileArguments()
         #if os(macOS)
         XCTAssertMatch(
             bTarget,
@@ -3912,7 +3912,7 @@ final class BuildPlanTests: XCTestCase {
 
         let targetTriple = Triple.arm64iOS
 
-        let aTarget = try result.target(for: "ATarget").swiftTarget().compileArguments()
+        let aTarget = try result.moduleBuildDescription(for: "ATarget").swift().compileArguments()
         let expectedVersion = Platform.iOS.oldestSupportedVersion.versionString
 
         XCTAssertMatch(aTarget, [
@@ -3921,7 +3921,7 @@ final class BuildPlanTests: XCTestCase {
             .anySequence,
         ])
 
-        let bTarget = try result.target(for: "BTarget").swiftTarget().compileArguments()
+        let bTarget = try result.moduleBuildDescription(for: "BTarget").swift().compileArguments()
         XCTAssertMatch(bTarget, [
             .equal("-target"),
             .equal(targetTriple.tripleString(forPlatformVersion: expectedVersion)),
@@ -4230,11 +4230,11 @@ final class BuildPlanTests: XCTestCase {
         do {
             let result = try createResult(for: .x86_64Linux)
 
-            let dep = try result.target(for: "t1").swiftTarget().compileArguments()
+            let dep = try result.moduleBuildDescription(for: "t1").swift().compileArguments()
             XCTAssertMatch(dep, [.anySequence, "-DDEP", .anySequence])
             XCTAssertMatch(dep, [.anySequence, "-swift-version", "4", .anySequence])
 
-            let cbar = try result.target(for: "cbar").clangTarget().basicArguments(isCXX: false)
+            let cbar = try result.moduleBuildDescription(for: "cbar").clang().basicArguments(isCXX: false)
             XCTAssertMatch(
                 cbar,
                 [
@@ -4252,7 +4252,7 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let bar = try result.target(for: "bar").swiftTarget().compileArguments()
+            let bar = try result.moduleBuildDescription(for: "bar").swift().compileArguments()
             XCTAssertMatch(
                 bar,
                 [
@@ -4271,16 +4271,16 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(exe, [.anySequence, "-swift-version", "5", "-DFOO", "-g", "-Xcc", "-g", "-Xcc", "-fno-omit-frame-pointer", .end])
 
             let linkExe = try result.buildProduct(for: "exe").linkArguments()
             XCTAssertMatch(linkExe, [.anySequence, "-lsqlite3", "-llibz", "-Ilfoo", "-L", "lbar", "-g", .end])
 
-            let testDiscovery = try result.target(for: "APackageDiscoveredTests").swiftTarget().compileArguments()
+            let testDiscovery = try result.moduleBuildDescription(for: "APackageDiscoveredTests").swift().compileArguments()
             XCTAssertMatch(testDiscovery, [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++17"])
 
-            let testEntryPoint = try result.target(for: "APackageTests").swiftTarget().compileArguments()
+            let testEntryPoint = try result.moduleBuildDescription(for: "APackageTests").swift().compileArguments()
             XCTAssertMatch(testEntryPoint, [.anySequence, "-cxx-interoperability-mode=default", "-Xcc", "-std=c++17"])
         }
 
@@ -4294,10 +4294,10 @@ final class BuildPlanTests: XCTestCase {
                 observabilityScope: observability.topScope
             ))
 
-            let dep = try result.target(for: "t1").swiftTarget().compileArguments()
+            let dep = try result.moduleBuildDescription(for: "t1").swift().compileArguments()
             XCTAssertMatch(dep, [.anySequence, "-DDEP", .anySequence])
 
-            let cbar = try result.target(for: "cbar").clangTarget().basicArguments(isCXX: false)
+            let cbar = try result.moduleBuildDescription(for: "cbar").clang().basicArguments(isCXX: false)
             XCTAssertMatch(
                 cbar,
                 [
@@ -4315,7 +4315,7 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let bar = try result.target(for: "bar").swiftTarget().compileArguments()
+            let bar = try result.moduleBuildDescription(for: "bar").swift().compileArguments()
             XCTAssertMatch(
                 bar,
                 [
@@ -4335,7 +4335,7 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(exe, [.anySequence, "-swift-version", "5", "-DFOO", "-g", "-Xcc", "-g", "-Xcc", "-fomit-frame-pointer", .end])
         }
 
@@ -4349,10 +4349,10 @@ final class BuildPlanTests: XCTestCase {
                 observabilityScope: observability.topScope
             ))
 
-            let dep = try result.target(for: "t1").swiftTarget().compileArguments()
+            let dep = try result.moduleBuildDescription(for: "t1").swift().compileArguments()
             XCTAssertMatch(dep, [.anySequence, "-DDEP", .anySequence])
 
-            let cbar = try result.target(for: "cbar").clangTarget().basicArguments(isCXX: false)
+            let cbar = try result.moduleBuildDescription(for: "cbar").clang().basicArguments(isCXX: false)
             XCTAssertMatch(
                 cbar,
                 [
@@ -4370,7 +4370,7 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let bar = try result.target(for: "bar").swiftTarget().compileArguments()
+            let bar = try result.moduleBuildDescription(for: "bar").swift().compileArguments()
             XCTAssertMatch(
                 bar,
                 [
@@ -4390,14 +4390,14 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(exe, [.anySequence, "-swift-version", "5", "-DFOO", "-g", "-Xcc", "-g", "-Xcc", "-fno-omit-frame-pointer", .end])
         }
 
         do {
             let result = try createResult(for: .x86_64MacOS)
 
-            let cbar = try result.target(for: "cbar").clangTarget().basicArguments(isCXX: false)
+            let cbar = try result.moduleBuildDescription(for: "cbar").clang().basicArguments(isCXX: false)
             XCTAssertMatch(
                 cbar,
                 [
@@ -4414,7 +4414,7 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let bar = try result.target(for: "bar").swiftTarget().compileArguments()
+            let bar = try result.moduleBuildDescription(for: "bar").swift().compileArguments()
             XCTAssertMatch(
                 bar,
                 [
@@ -4433,7 +4433,7 @@ final class BuildPlanTests: XCTestCase {
                 ]
             )
 
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(
                 exe,
                 [
@@ -4575,7 +4575,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let lib = try result.target(for: "lib").clangTarget()
+        let lib = try result.moduleBuildDescription(for: "lib").clang()
         var args: [StringPattern] = [.anySequence]
         args += ["--sysroot"]
         args += [
@@ -4587,7 +4587,7 @@ final class BuildPlanTests: XCTestCase {
         ]
         XCTAssertMatch(try lib.basicArguments(isCXX: false), args)
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(exe, [
             "-module-cache-path", "\(buildPath.appending(components: "ModuleCache"))",
             .anySequence,
@@ -4623,7 +4623,7 @@ final class BuildPlanTests: XCTestCase {
             observabilityScope: observability.topScope
         ))
 
-        let staticExe = try staticResult.target(for: "exe").swiftTarget().compileArguments()
+        let staticExe = try staticResult.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(staticExe, [
             .anySequence,
             "-resource-dir", "\(AbsolutePath("/fake/lib/swift_static"))",
@@ -4732,7 +4732,7 @@ final class BuildPlanTests: XCTestCase {
         }
 
         // Compile C Target
-        let cLibCompileArguments = try result.target(for: "cLib").clangTarget().basicArguments(isCXX: false)
+        let cLibCompileArguments = try result.moduleBuildDescription(for: "cLib").clang().basicArguments(isCXX: false)
         let cLibCompileArgumentsPattern: [StringPattern] = [
             jsonFlag(tool: .cCompiler), "-g", cliFlag(tool: .cCompiler),
         ]
@@ -4747,7 +4747,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertCount(0, cLibCompileArguments, cliFlag(tool: .linker))
 
         // Compile Cxx Target
-        let cxxLibCompileArguments = try result.target(for: "cxxLib").clangTarget().basicArguments(isCXX: true)
+        let cxxLibCompileArguments = try result.moduleBuildDescription(for: "cxxLib").clang().basicArguments(isCXX: true)
         let cxxLibCompileArgumentsPattern: [StringPattern] = [
             jsonFlag(tool: .cCompiler), "-g", cliFlag(tool: .cCompiler),
             .anySequence,
@@ -4764,7 +4764,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertCount(0, cxxLibCompileArguments, cliFlag(tool: .linker))
 
         // Compile Swift Target
-        let exeCompileArguments = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exeCompileArguments = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         let exeCompileArgumentsPattern: [StringPattern] = [
             jsonFlag(tool: .swiftCompiler),
             "-ld-path=/fake/toolchain/usr/bin/linker",
@@ -4859,12 +4859,12 @@ final class BuildPlanTests: XCTestCase {
         result.checkTargetsCount(2)
 
         // Compile C Target
-        let cLibCompileArguments = try result.target(for: "cLib").clangTarget().basicArguments(isCXX: false)
+        let cLibCompileArguments = try result.moduleBuildDescription(for: "cLib").clang().basicArguments(isCXX: false)
         let cLibCompileArgumentsPattern: [StringPattern] = ["-I", "\(sdkIncludeSearchPath)"]
         XCTAssertMatch(cLibCompileArguments, cLibCompileArgumentsPattern)
 
         // Compile Swift Target
-        let exeCompileArguments = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exeCompileArguments = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         let exeCompileArgumentsPattern: [StringPattern] = ["-I", "\(sdkIncludeSearchPath)"]
         XCTAssertMatch(exeCompileArguments, exeCompileArgumentsPattern)
 
@@ -4993,7 +4993,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let fooTarget = try result.target(for: "Foo").swiftTarget().compileArguments()
+        let fooTarget = try result.moduleBuildDescription(for: "Foo").swift().compileArguments()
         #if os(macOS)
         XCTAssertMatch(
             fooTarget,
@@ -5016,7 +5016,7 @@ final class BuildPlanTests: XCTestCase {
         )
         #endif
 
-        let barTarget = try result.target(for: "Bar").clangTarget().basicArguments(isCXX: false)
+        let barTarget = try result.moduleBuildDescription(for: "Bar").clang().basicArguments(isCXX: false)
         #if os(macOS)
         XCTAssertMatch(
             barTarget,
@@ -5092,7 +5092,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let fooTarget = try result.target(for: "Foo").swiftTarget().compileArguments()
+        let fooTarget = try result.moduleBuildDescription(for: "Foo").swift().compileArguments()
         #if os(macOS)
         XCTAssertMatch(
             fooTarget,
@@ -5117,7 +5117,7 @@ final class BuildPlanTests: XCTestCase {
         )
         #endif
 
-        let barTarget = try result.target(for: "Bar").clangTarget().basicArguments(isCXX: false)
+        let barTarget = try result.moduleBuildDescription(for: "Bar").clang().basicArguments(isCXX: false)
         #if os(macOS)
         XCTAssertMatch(
             barTarget,
@@ -5205,7 +5205,7 @@ final class BuildPlanTests: XCTestCase {
         #endif
         let result = try BuildPlanResult(plan: plan)
 
-        let fooTarget = try result.target(for: "Foo").swiftTarget().compileArguments()
+        let fooTarget = try result.moduleBuildDescription(for: "Foo").swift().compileArguments()
         #if os(macOS)
         XCTAssertMatch(
             fooTarget,
@@ -5230,7 +5230,7 @@ final class BuildPlanTests: XCTestCase {
         )
         #endif
 
-        let barTarget = try result.target(for: "Bar").clangTarget().basicArguments(isCXX: false)
+        let barTarget = try result.moduleBuildDescription(for: "Bar").clang().basicArguments(isCXX: false)
         #if os(macOS)
         XCTAssertMatch(
             barTarget,
@@ -5539,7 +5539,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let fooTarget = try result.target(for: "Foo").swiftTarget()
+        let fooTarget = try result.moduleBuildDescription(for: "Foo").swift()
         XCTAssertEqual(try fooTarget.objects.map(\.pathString), [
             buildPath.appending(components: "Foo.build", "Foo.swift.o").pathString,
             buildPath.appending(components: "Foo.build", "resource_bundle_accessor.swift.o").pathString,
@@ -5550,10 +5550,10 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertMatch(contents, .contains("extension Foundation.Bundle"))
         // Assert that `Bundle.main` is executed in the compiled binary (and not during compilation)
         // See https://bugs.swift.org/browse/SR-14555 and
-        // https://github.com/apple/swift-package-manager/pull/2972/files#r623861646
+        // https://github.com/swiftlang/swift-package-manager/pull/2972/files#r623861646
         XCTAssertMatch(contents, .contains("let mainPath = Bundle.main."))
 
-        let barTarget = try result.target(for: "Bar").swiftTarget()
+        let barTarget = try result.moduleBuildDescription(for: "Bar").swift()
         XCTAssertEqual(try barTarget.objects.map(\.pathString), [
             buildPath.appending(components: "Bar.build", "Bar.swift.o").pathString,
         ])
@@ -5607,7 +5607,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let fooTarget = try result.target(for: "Foo").swiftTarget()
+        let fooTarget = try result.moduleBuildDescription(for: "Foo").swift()
         XCTAssertEqual(try fooTarget.objects.map(\.pathString), [
             buildPath.appending(components: "Foo.build", "Foo.swift.o").pathString,
             buildPath.appending(components: "Foo.build", "resource_bundle_accessor.swift.o").pathString,
@@ -5618,10 +5618,10 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertMatch(contents, .contains("extension Foundation.Bundle"))
         // Assert that `Bundle.main` is executed in the compiled binary (and not during compilation)
         // See https://bugs.swift.org/browse/SR-14555 and
-        // https://github.com/apple/swift-package-manager/pull/2972/files#r623861646
+        // https://github.com/swiftlang/swift-package-manager/pull/2972/files#r623861646
         XCTAssertMatch(contents, .contains("let mainPath = \""))
 
-        let barTarget = try result.target(for: "Bar").swiftTarget()
+        let barTarget = try result.moduleBuildDescription(for: "Bar").swift()
         XCTAssertEqual(try barTarget.objects.map(\.pathString), [
             buildPath.appending(components: "Bar.build", "Bar.swift.o").pathString,
         ])
@@ -5673,7 +5673,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let fooTarget = try result.target(for: "Foo").clangTarget()
+        let fooTarget = try result.moduleBuildDescription(for: "Foo").clang()
         XCTAssertEqual(try fooTarget.objects.map(\.pathString).sorted(), [
             buildPath.appending(components: "Foo.build", "Foo.m.o").pathString,
             buildPath.appending(components: "Foo.build", "bar.c.o").pathString,
@@ -5739,9 +5739,9 @@ final class BuildPlanTests: XCTestCase {
                 observabilityScope: observability.topScope
             ))
 
-            let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+            let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
             XCTAssertMatch(exe, ["-static-stdlib"])
-            let lib = try result.target(for: "lib").swiftTarget().compileArguments()
+            let lib = try result.moduleBuildDescription(for: "lib").swift().compileArguments()
             XCTAssertMatch(lib, ["-static-stdlib"])
             let link = try result.buildProduct(for: "exe").linkArguments()
             XCTAssertMatch(link, ["-static-stdlib"])
@@ -5870,7 +5870,7 @@ final class BuildPlanTests: XCTestCase {
 
         let buildPath = result.plan.productsBuildPath
 
-        let libraryBasicArguments = try result.target(for: "Library").swiftTarget().compileArguments()
+        let libraryBasicArguments = try result.moduleBuildDescription(for: "Library").swift().compileArguments()
         XCTAssertMatch(libraryBasicArguments, [.anySequence, "-F", "\(buildPath)", .anySequence])
 
         let libraryLinkArguments = try result.buildProduct(for: "Library").linkArguments()
@@ -5878,7 +5878,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertMatch(libraryLinkArguments, [.anySequence, "-L", "\(buildPath)", .anySequence])
         XCTAssertMatch(libraryLinkArguments, [.anySequence, "-framework", "Framework", .anySequence])
 
-        let exeCompileArguments = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exeCompileArguments = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(exeCompileArguments, [.anySequence, "-F", "\(buildPath)", .anySequence])
         XCTAssertMatch(
             exeCompileArguments,
@@ -5895,7 +5895,7 @@ final class BuildPlanTests: XCTestCase {
         XCTAssertMatch(exeLinkArguments, [.anySequence, "-L", "\(buildPath)", .anySequence])
         XCTAssertMatch(exeLinkArguments, [.anySequence, "-framework", "Framework", .anySequence])
 
-        let clibraryBasicArguments = try result.target(for: "CLibrary").clangTarget().basicArguments(isCXX: false)
+        let clibraryBasicArguments = try result.moduleBuildDescription(for: "CLibrary").clang().basicArguments(isCXX: false)
         XCTAssertMatch(clibraryBasicArguments, [.anySequence, "-F", "\(buildPath)", .anySequence])
         XCTAssertMatch(
             clibraryBasicArguments,
@@ -6139,13 +6139,13 @@ final class BuildPlanTests: XCTestCase {
         result.checkProductsCount(1)
         result.checkTargetsCount(3)
 
-        let exe = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         XCTAssertMatch(exe, ["-sanitize=\(expectedName)"])
 
-        let lib = try result.target(for: "lib").swiftTarget().compileArguments()
+        let lib = try result.moduleBuildDescription(for: "lib").swift().compileArguments()
         XCTAssertMatch(lib, ["-sanitize=\(expectedName)"])
 
-        let clib = try result.target(for: "clib").clangTarget().basicArguments(isCXX: false)
+        let clib = try result.moduleBuildDescription(for: "clib").clang().basicArguments(isCXX: false)
         XCTAssertMatch(clib, ["-fsanitize=\(expectedName)"])
 
         XCTAssertMatch(try result.buildProduct(for: "exe").linkArguments(), ["-sanitize=\(expectedName)"])
@@ -6190,18 +6190,18 @@ final class BuildPlanTests: XCTestCase {
         result.checkTargetsCount(2)
 
         // Compile C Target
-        let cLibCompileArguments = try result.target(for: "cLib").clangTarget().basicArguments(isCXX: false)
+        let cLibCompileArguments = try result.moduleBuildDescription(for: "cLib").clang().basicArguments(isCXX: false)
         let cLibCompileArgumentsPattern: [StringPattern] = ["-flto=full"]
         XCTAssertMatch(cLibCompileArguments, cLibCompileArgumentsPattern)
 
         // Compile Swift Target
-        let exeCompileArguments = try result.target(for: "exe").swiftTarget().compileArguments()
+        let exeCompileArguments = try result.moduleBuildDescription(for: "exe").swift().compileArguments()
         let exeCompileArgumentsPattern: [StringPattern] = ["-lto=llvm-full"]
         XCTAssertMatch(exeCompileArguments, exeCompileArgumentsPattern)
 
         // Assert the objects built by the Swift Target are actually bitcode
         // files, indicated by the "bc" extension.
-        let exeCompileObjects = try result.target(for: "exe").swiftTarget().objects
+        let exeCompileObjects = try result.moduleBuildDescription(for: "exe").swift().objects
         XCTAssert(exeCompileObjects.allSatisfy { $0.extension == "bc" })
 
         // Assert the objects getting linked contain all the bitcode objects
@@ -6261,7 +6261,7 @@ final class BuildPlanTests: XCTestCase {
 
         switch try XCTUnwrap(
             result.targetMap[.init(
-                targetName: "ExtLib",
+                moduleName: "ExtLib",
                 packageIdentity: "ExtPkg",
                 buildTriple: .destination
             )]
@@ -6513,7 +6513,7 @@ final class BuildPlanTests: XCTestCase {
         result.checkTargetsCount(1)
 
         XCTAssertMatch(
-            try result.target(for: "ATarget").swiftTarget().compileArguments(),
+            try result.moduleBuildDescription(for: "ATarget").swift().compileArguments(),
             [
                 .anySequence,
                 "-I", "/Libraries/C",
@@ -6583,7 +6583,7 @@ final class BuildPlanTests: XCTestCase {
             ))
 
             XCTAssertMatch(
-              try result.target(for: "foo").swiftTarget().compileArguments(),
+              try result.moduleBuildDescription(for: "foo").swift().compileArguments(),
               [
                 "-swift-version", .equal(expectedVersionString)
               ]

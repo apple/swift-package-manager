@@ -11,19 +11,19 @@
 //===----------------------------------------------------------------------===//
 
 import struct Basics.InternalError
-import class PackageModel.BinaryTarget
-import class PackageModel.ClangTarget
-import class PackageModel.SystemLibraryTarget
-import class PackageModel.ProvidedLibraryTarget
+import class PackageModel.BinaryModule
+import class PackageModel.ClangModule
+import class PackageModel.SystemLibraryModule
+import class PackageModel.ProvidedLibraryModule
 
 extension BuildPlan {
-    func plan(swiftTarget: SwiftTargetBuildDescription) throws {
+    func plan(swiftTarget: SwiftModuleBuildDescription) throws {
         // We need to iterate recursive dependencies because Swift compiler needs to see all the targets a target
         // depends on.
         let environment = swiftTarget.buildParameters.buildEnvironment
-        for case .target(let dependency, _) in try swiftTarget.target.recursiveDependencies(satisfying: environment) {
+        for case .module(let dependency, _) in try swiftTarget.target.recursiveDependencies(satisfying: environment) {
             switch dependency.underlying {
-            case let underlyingTarget as ClangTarget where underlyingTarget.type == .library:
+            case let underlyingTarget as ClangModule where underlyingTarget.type == .library:
                 guard case let .clang(target)? = targetMap[dependency.id] else {
                     throw InternalError("unexpected clang target \(underlyingTarget)")
                 }
@@ -36,10 +36,10 @@ extension BuildPlan {
                     "-Xcc", "-fmodule-map-file=\(moduleMap.pathString)",
                     "-Xcc", "-I", "-Xcc", target.clangTarget.includeDir.pathString,
                 ]
-            case let target as SystemLibraryTarget:
+            case let target as SystemLibraryModule:
                 swiftTarget.additionalFlags += ["-Xcc", "-fmodule-map-file=\(target.moduleMapPath.pathString)"]
                 swiftTarget.additionalFlags += try pkgConfig(for: target).cFlags
-            case let target as BinaryTarget:
+            case let target as BinaryModule:
                 if case .xcframework = target.kind {
                     let libraries = try self.parseXCFramework(for: target, triple: swiftTarget.buildParameters.triple)
                     for library in libraries {
@@ -49,7 +49,7 @@ extension BuildPlan {
                         swiftTarget.libraryBinaryPaths.insert(library.libraryPath)
                     }
                 }
-            case let target as ProvidedLibraryTarget:
+            case let target as ProvidedLibraryModule:
                 swiftTarget.additionalFlags += [
                     "-I", target.path.pathString
                 ]

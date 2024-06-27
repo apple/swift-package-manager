@@ -291,7 +291,7 @@ needs to be listed here.
 - Quinn McHenry <quinn@jqm.us>
 - Rahul Malik <rmalik@pinterest.com>
 - Randy Becker <81446220+randy-becker@users.noreply.github.com>
-- Rauhul Varma <rauhul@users.noreply.github.com>
+- Rauhul Varma <rauhul@apple.com>
 - Renzo Crisóstomo <renzo.crisostomo@xing.com>
 - Rich Ellis <rich@richellis.net>
 - Rick Ballard <rballard@apple.com>

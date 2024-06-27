@@ -102,7 +102,7 @@ public struct Term: Equatable, Hashable {
     public func isValidDecision(for solution: PartialSolution) -> Bool {
         for assignment in solution.assignments where assignment.term.node == self.node {
             assert(!assignment.isDecision, "Expected assignment to be a derivation.")
-            guard satisfies(assignment.term) else { return false }
+            guard self.satisfies(assignment.term) else { return false }
         }
         return true
     }
@@ -178,12 +178,12 @@ extension Term: CustomStringConvertible {
     }
 }
 
-private extension VersionSetSpecifier {
-    func containsAll(_ other: VersionSetSpecifier) -> Bool {
+extension VersionSetSpecifier {
+    fileprivate func containsAll(_ other: VersionSetSpecifier) -> Bool {
         self.intersection(other) == other
     }
 
-    func containsAny(_ other: VersionSetSpecifier) -> Bool {
+    fileprivate func containsAny(_ other: VersionSetSpecifier) -> Bool {
         self.intersection(other) != .empty
     }
 }

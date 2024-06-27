@@ -52,12 +52,12 @@ struct DescribedPackage: Encodable {
         // product of the package, the set of targets that contribute to products still accurately represents the
         // set of targets reachable from external clients.
         let targetProductPairs = nonTestProducts.flatMap{ p in
-            transitiveClosure(p.targets, successors: {
-                $0.dependencies.compactMap{ $0.target }
-            }).union(p.targets).map{ t in (t, p) }
+            transitiveClosure(p.modules, successors: {
+                $0.dependencies.compactMap{ $0.module }
+            }).union(p.modules).map{ t in (t, p) }
         }
         let targetsToProducts = Dictionary(targetProductPairs.map{ ($0.0, [$0.1]) }, uniquingKeysWith: { $0 + $1 })
-        self.targets = package.targets.map {
+        self.targets = package.modules.map {
             return DescribedTarget(from: $0, in: package, productMemberships: targetsToProducts[$0]?.map{ $0.name })
         }
         self.cLanguageStandard = package.manifest.cLanguageStandard
@@ -143,7 +143,7 @@ struct DescribedPackage: Encodable {
         init(from product: Product, in package: Package) {
             self.name = product.name
             self.type = product.type
-            self.targets = product.targets.map { $0.name }
+            self.targets = product.modules.map { $0.name }
         }
     }
 
@@ -241,16 +241,16 @@ struct DescribedPackage: Encodable {
         let productDependencies: [String]?
         let productMemberships: [String]?
         
-        init(from target: Target, in package: Package, productMemberships: [String]?) {
+        init(from target: Module, in package: Package, productMemberships: [String]?) {
             self.name = target.name
             self.type = target.type.rawValue
             self.c99name = target.c99name
-            self.moduleType = String(describing: Swift.type(of: target))
-            self.pluginCapability = (target as? PluginTarget).map{ DescribedPluginCapability(from: $0.capability, in: package) }
+            self.moduleType = Swift.type(of: target).typeDescription
+            self.pluginCapability = (target as? PluginModule).map{ DescribedPluginCapability(from: $0.capability, in: package) }
             self.path = target.sources.root.relative(to: package.path).pathString
             self.sources = target.sources.relativePaths.map{ $0.pathString }
             self.resources = target.resources.isEmpty ? nil : target.resources
-            let targetDependencies = target.dependencies.compactMap{ $0.target }
+            let targetDependencies = target.dependencies.compactMap{ $0.module }
             self.targetDependencies = targetDependencies.isEmpty ? nil : targetDependencies.map{ $0.name }
             let productDependencies = target.dependencies.compactMap{ $0.product }
             self.productDependencies = productDependencies.isEmpty ? nil : productDependencies.map{ $0.name }

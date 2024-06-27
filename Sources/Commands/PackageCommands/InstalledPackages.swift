@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import ArgumentParser
+import struct Basics.Environment
 import CoreCommands
 import Foundation
 import PackageModel
@@ -32,9 +33,9 @@ extension SwiftPackageCommand {
         func run(_ tool: SwiftCommandState) throws {
             let swiftpmBinDir = try tool.fileSystem.getOrCreateSwiftPMInstalledBinariesDirectory()
 
-            let env = ProcessInfo.processInfo.environment
+            let env = Environment.current
 
-            if let path = env.path, !path.contains(swiftpmBinDir.pathString), !globalOptions.logging.quiet {
+            if let path = env[.path], !path.contains(swiftpmBinDir.pathString), !globalOptions.logging.quiet {
                 tool.observabilityScope.emit(
                     warning: """
                     PATH doesn't include \(swiftpmBinDir.pathString)! This means you won't be able to access \
@@ -80,7 +81,7 @@ extension SwiftPackageCommand {
                 throw StringError("\(productToInstall.name) is already installed at \(existingPkg.path)")
             }
 
-            try tool.createBuildSystem(explicitProduct: productToInstall.name)
+            try tool.createBuildSystem(explicitProduct: productToInstall.name, traitConfiguration: .init())
                 .build(subset: .product(productToInstall.name))
 
             let binPath = try tool.productsBuildParameters.buildPath.appending(component: productToInstall.name)

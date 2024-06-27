@@ -16,7 +16,7 @@ import PackageGraph
 import PackageLoading
 import PackageModel
 import SourceControl
-import SPMTestSupport
+import _InternalTestSupport
 @testable import Workspace
 import XCTest
 
@@ -604,7 +604,7 @@ final class SourceControlPackageContainerTests: XCTestCase {
             )
             let containerProvider = try Workspace._init(
                 fileSystem: localFileSystem,
-                environment: .process(),
+                environment: .current,
                 location: .init(forRootPackage: packageDir, fileSystem: localFileSystem),
                 customManifestLoader: MockManifestLoader(manifests: [.init(url: packageDir.pathString, version: nil): manifest]),
                 customRepositoryManager: repositoryManager
@@ -657,7 +657,7 @@ final class SourceControlPackageContainerTests: XCTestCase {
 
             let containerProvider = try Workspace._init(
                 fileSystem: localFileSystem,
-                environment: .process(),
+                environment: .current,
                 location: .init(forRootPackage: packageDirectory, fileSystem: localFileSystem),
                 customManifestLoader: MockManifestLoader(
                     manifests: [
@@ -769,7 +769,7 @@ final class SourceControlPackageContainerTests: XCTestCase {
             )
             let containerProvider = try Workspace._init(
                 fileSystem: localFileSystem,
-                environment: .process(),
+                environment: .current,
                 location: .init(forRootPackage: packageDirectory, fileSystem: localFileSystem),
                 customManifestLoader: MockManifestLoader(
                     manifests: [.init(url: packageDirectory.pathString, version: Version(1, 0, 0)): manifest]

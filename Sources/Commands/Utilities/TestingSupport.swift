@@ -16,7 +16,7 @@ import PackageModel
 import SPMBuildCore
 import Workspace
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 import var TSCBasic.stderrStream
 import var TSCBasic.stdoutStream
 import func TSCBasic.withTemporaryFile
@@ -55,8 +55,8 @@ enum TestingSupport {
         }
 
         // This will be true during swiftpm development or when using swift.org toolchains.
-        let xcodePath = try TSCBasic.Process.checkNonZeroExit(args: "/usr/bin/xcode-select", "--print-path").spm_chomp()
-        let installedSwiftBuildPath = try TSCBasic.Process.checkNonZeroExit(
+        let xcodePath = try AsyncProcess.checkNonZeroExit(args: "/usr/bin/xcode-select", "--print-path").spm_chomp()
+        let installedSwiftBuildPath = try AsyncProcess.checkNonZeroExit(
             args: "/usr/bin/xcrun", "--find", "swift-build",
             environment: ["DEVELOPER_DIR": xcodePath]
         ).spm_chomp()
@@ -125,7 +125,7 @@ enum TestingSupport {
                 library: .xctest
             )
 
-            try TSCBasic.Process.checkNonZeroExit(arguments: args, environment: env)
+            try AsyncProcess.checkNonZeroExit(arguments: args, environment: env)
             // Read the temporary file's content.
             return try swiftCommandState.fileSystem.readFileContents(AbsolutePath(tempFile.path))
         }
@@ -141,7 +141,7 @@ enum TestingSupport {
             library: .xctest
         )
         args = [path.description, "--dump-tests-json"]
-        let data = try Process.checkNonZeroExit(arguments: args, environment: env)
+        let data = try AsyncProcess.checkNonZeroExit(arguments: args, environment: env)
         #endif
         // Parse json and return TestSuites.
         return try TestSuite.parse(jsonString: data, context: args.joined(separator: " "))
@@ -153,8 +153,8 @@ enum TestingSupport {
         destinationBuildParameters buildParameters: BuildParameters,
         sanitizers: [Sanitizer],
         library: BuildParameters.Testing.Library
-    ) throws -> EnvironmentVariables {
-        var env = EnvironmentVariables.process()
+    ) throws -> Environment {
+        var env = Environment.current
 
         // If the standard output or error stream is NOT a TTY, set the NO_COLOR
         // environment variable. This environment variable is a de facto
@@ -183,7 +183,7 @@ enum TestingSupport {
         #if !os(macOS)
         #if os(Windows)
         if let location = toolchain.xctestPath {
-            env.prependPath("Path", value: location.pathString)
+            env.prependPath(key: .path, value: location.pathString)
         }
         #endif
         return env
@@ -191,8 +191,8 @@ enum TestingSupport {
         // Add the sdk platform path if we have it.
         if let sdkPlatformFrameworksPath = try? SwiftSDK.sdkPlatformFrameworkPaths() {
             // appending since we prefer the user setting (if set) to the one we inject
-            env.appendPath("DYLD_FRAMEWORK_PATH", value: sdkPlatformFrameworksPath.fwk.pathString)
-            env.appendPath("DYLD_LIBRARY_PATH", value: sdkPlatformFrameworksPath.lib.pathString)
+            env.appendPath(key: "DYLD_FRAMEWORK_PATH", value: sdkPlatformFrameworksPath.fwk.pathString)
+            env.appendPath(key: "DYLD_LIBRARY_PATH", value: sdkPlatformFrameworksPath.lib.pathString)
         }
 
         // Fast path when no sanitizers are enabled.

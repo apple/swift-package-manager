@@ -10,26 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-import class PackageModel.BinaryTarget
-import class PackageModel.ClangTarget
-import class PackageModel.SwiftTarget
-import class PackageModel.SystemLibraryTarget
+import class PackageModel.BinaryModule
+import class PackageModel.ClangModule
+import class PackageModel.SwiftModule
+import class PackageModel.SystemLibraryModule
 
 extension BuildPlan {
     /// Plan a Clang target.
-    func plan(clangTarget: ClangTargetBuildDescription) throws {
+    func plan(clangTarget: ClangModuleBuildDescription) throws {
         let dependencies = try clangTarget.target.recursiveDependencies(satisfying: clangTarget.buildEnvironment)
 
-        for case .target(let dependency, _) in dependencies {
+        for case .module(let dependency, _) in dependencies {
             switch dependency.underlying {
-            case is SwiftTarget:
+            case is SwiftModule:
                 if case let .swift(dependencyTargetDescription)? = targetMap[dependency.id] {
                     if let moduleMap = dependencyTargetDescription.moduleMap {
                         clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap.pathString)"]
                     }
                 }
 
-            case let target as ClangTarget where target.type == .library:
+            case let target as ClangModule where target.type == .library:
                 // Setup search paths for C dependencies:
                 clangTarget.additionalFlags += ["-I", target.includeDir.pathString]
 
@@ -39,10 +39,10 @@ extension BuildPlan {
                         clangTarget.additionalFlags += ["-fmodule-map-file=\(moduleMap.pathString)"]
                     }
                 }
-            case let target as SystemLibraryTarget:
+            case let target as SystemLibraryModule:
                 clangTarget.additionalFlags += ["-fmodule-map-file=\(target.moduleMapPath.pathString)"]
                 clangTarget.additionalFlags += try pkgConfig(for: target).cFlags
-            case let target as BinaryTarget:
+            case let target as BinaryModule:
                 if case .xcframework = target.kind {
                     let libraries = try self.parseXCFramework(for: target, triple: clangTarget.buildParameters.triple)
                     for library in libraries {

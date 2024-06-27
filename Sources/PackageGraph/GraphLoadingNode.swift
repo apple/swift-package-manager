@@ -29,10 +29,19 @@ public struct GraphLoadingNode: Equatable, Hashable {
     /// The product filter applied to the package.
     public let productFilter: ProductFilter
 
-    public init(identity: PackageIdentity, manifest: Manifest, productFilter: ProductFilter) {
+    /// The enabled traits for this package.
+    package var enabledTraits: Set<String>
+
+    public init(
+        identity: PackageIdentity,
+        manifest: Manifest,
+        productFilter: ProductFilter,
+        enabledTraits: Set<String>
+    ) throws {
         self.identity = identity
         self.manifest = manifest
         self.productFilter = productFilter
+        self.enabledTraits = enabledTraits
     }
 
     /// Returns the dependencies required by this node.
@@ -50,8 +59,4 @@ extension GraphLoadingNode: CustomStringConvertible {
             return "\(self.identity.description)[\(set.sorted().joined(separator: ", "))]"
         }
     }
-}
-
-extension GraphLoadingNode: Identifiable {
-    public var id: PackageIdentity { self.identity }
 }

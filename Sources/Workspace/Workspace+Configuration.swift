@@ -19,7 +19,6 @@ import PackageModel
 import PackageRegistry
 
 import struct TSCBasic.ByteString
-import enum TSCBasic.ProcessEnv
 
 import protocol TSCUtility.SimplePersistanceProtocol
 import class TSCUtility.SimplePersistence
@@ -89,7 +88,7 @@ extension Workspace {
         public var localMirrorsConfigurationFile: AbsolutePath {
             get throws {
                 // backwards compatibility
-                if let customPath = ProcessEnv.block["SWIFTPM_MIRROR_CONFIG"] {
+                if let customPath = Environment.current["SWIFTPM_MIRROR_CONFIG"] {
                     return try AbsolutePath(validating: customPath)
                 }
                 return DefaultLocations.mirrorsConfigurationFile(at: self.localConfigurationDirectory)

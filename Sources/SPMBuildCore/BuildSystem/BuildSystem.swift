@@ -14,7 +14,6 @@ import Basics
 import PackageGraph
 
 import protocol TSCBasic.OutputByteStream
-import enum TSCBasic.ProcessEnv
 
 /// An enum representing what subset of the package to build.
 public enum BuildSubset {
@@ -24,11 +23,13 @@ public enum BuildSubset {
     /// Represents the subset of all products and targets.
     case allIncludingTests
 
-    /// Represents a specific product.
-    case product(String, for: BuildParameters.Destination = .target)
+    /// Represents a specific product. Allows to set a specific
+    /// destination if it's known.
+    case product(String, for: BuildParameters.Destination? = .none)
 
-    /// Represents a specific target.
-    case target(String, for: BuildParameters.Destination = .target)
+    /// Represents a specific target. Allows to set a specific
+    /// destination if it's known.
+    case target(String, for: BuildParameters.Destination? = .none)
 }
 
 /// A protocol that represents a build system used by SwiftPM for all build operations. This allows factoring out the
@@ -99,6 +100,7 @@ public protocol BuildPlan {
 public protocol BuildSystemFactory {
     func makeBuildSystem(
         explicitProduct: String?,
+        traitConfiguration: TraitConfiguration,
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
@@ -125,6 +127,7 @@ public struct BuildSystemProvider {
     public func createBuildSystem(
         kind: Kind,
         explicitProduct: String? = .none,
+        traitConfiguration: TraitConfiguration,
         cacheBuildManifest: Bool = true,
         productsBuildParameters: BuildParameters? = .none,
         toolsBuildParameters: BuildParameters? = .none,
@@ -138,6 +141,7 @@ public struct BuildSystemProvider {
         }
         return try buildSystemFactory.makeBuildSystem(
             explicitProduct: explicitProduct,
+            traitConfiguration: traitConfiguration,
             cacheBuildManifest: cacheBuildManifest,
             productsBuildParameters: productsBuildParameters,
             toolsBuildParameters: toolsBuildParameters,
@@ -157,8 +161,8 @@ public enum BuildSystemUtilities {
     /// Returns the build path from the environment, if present.
     public static func getEnvBuildPath(workingDir: AbsolutePath) throws -> AbsolutePath? {
         // Don't rely on build path from env for SwiftPM's own tests.
-        guard ProcessEnv.block["SWIFTPM_TESTS_MODULECACHE"] == nil else { return nil }
-        guard let env = ProcessEnv.block["SWIFTPM_BUILD_DIR"] else { return nil }
+        guard Environment.current["SWIFTPM_TESTS_MODULECACHE"] == nil else { return nil }
+        guard let env = Environment.current["SWIFTPM_BUILD_DIR"] else { return nil }
         return try AbsolutePath(validating: env, relativeTo: workingDir)
     }
 }

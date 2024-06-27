@@ -12,7 +12,7 @@
 
 import Basics
 @testable import PackageCollections
-import SPMTestSupport
+import _InternalTestSupport
 import tsan_utils
 import XCTest
 

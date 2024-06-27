@@ -14,7 +14,7 @@ import class Basics.ObservabilitySystem
 import struct Foundation.Data
 @testable import QueryEngine
 import struct SystemPackage.FilePath
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 private let encoder = JSONEncoder()

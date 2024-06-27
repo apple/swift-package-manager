@@ -12,9 +12,7 @@
 
 import Basics
 
-import class TSCBasic.Process
-import struct TSCBasic.ProcessResult
-
+import class Basics.AsyncProcess
 
 public struct MinimumDeploymentTarget {
     private struct MinimumDeploymentTargetKey: Hashable {
@@ -47,7 +45,7 @@ public struct MinimumDeploymentTarget {
             return nil
         }
 
-        let runResult = try Process.popen(arguments: ["/usr/bin/xcrun", "vtool", "-show-build", binaryPath.pathString])
+        let runResult = try AsyncProcess.popen(arguments: ["/usr/bin/xcrun", "vtool", "-show-build", binaryPath.pathString])
         var lines = try runResult.utf8Output().components(separatedBy: "\n")
         while !lines.isEmpty {
             let first = lines.removeFirst()
@@ -58,7 +56,7 @@ public struct MinimumDeploymentTarget {
         return nil
     }
 
-    static func computeXCTestMinimumDeploymentTarget(with runResult: ProcessResult, platform: PackageModel.Platform) throws -> PlatformVersion? {
+    static func computeXCTestMinimumDeploymentTarget(with runResult: AsyncProcessResult, platform: PackageModel.Platform) throws -> PlatformVersion? {
         guard let output = try runResult.utf8Output().spm_chuzzle() else { return nil }
         let sdkPath = try AbsolutePath(validating: output)
         let xcTestPath = try AbsolutePath(validating: "Developer/Library/Frameworks/XCTest.framework/XCTest", relativeTo: sdkPath)
@@ -73,7 +71,7 @@ public struct MinimumDeploymentTarget {
         // On macOS, we are determining the deployment target by looking at the XCTest binary.
         #if os(macOS)
         do {
-            let runResult = try Process.popen(arguments: ["/usr/bin/xcrun", "--sdk", sdkName, "--show-sdk-platform-path"])
+            let runResult = try AsyncProcess.popen(arguments: ["/usr/bin/xcrun", "--sdk", sdkName, "--show-sdk-platform-path"])
 
             if let version = try computeXCTestMinimumDeploymentTarget(with: runResult, platform: platform) {
                 return version

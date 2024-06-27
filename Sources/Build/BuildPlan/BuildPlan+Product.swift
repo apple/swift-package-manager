@@ -15,14 +15,14 @@ import struct Basics.Triple
 import struct Basics.InternalError
 import struct PackageGraph.ResolvedProduct
 import struct PackageGraph.ResolvedModule
-import class PackageModel.BinaryTarget
-import class PackageModel.ClangTarget
+import class PackageModel.BinaryModule
+import class PackageModel.ClangModule
 
 @_spi(SwiftPMInternal)
-import class PackageModel.Target
+import class PackageModel.Module
 
-import class PackageModel.SwiftTarget
-import class PackageModel.SystemLibraryTarget
+import class PackageModel.SwiftModule
+import class PackageModel.SystemLibraryModule
 import struct SPMBuildCore.BuildParameters
 import struct SPMBuildCore.ExecutableInfo
 import func TSCBasic.topologicalSort
@@ -38,7 +38,7 @@ extension BuildPlan {
 
         // Add flags for system targets.
         for systemModule in dependencies.systemModules {
-            guard case let target as SystemLibraryTarget = systemModule.underlying else {
+            guard case let target as SystemLibraryModule = systemModule.underlying else {
                 throw InternalError("This should not be possible.")
             }
             // Add pkgConfig libs arguments.
@@ -59,11 +59,11 @@ extension BuildPlan {
         // Don't link libc++ or libstd++ when building for Embedded Swift.
         // Users can still link it manually for embedded platforms when needed,
         // by providing `-Xlinker -lc++` options via CLI or `Package.swift`.
-        if !buildProduct.product.targets.contains(where: \.underlying.isEmbeddedSwiftTarget) {
+        if !buildProduct.product.modules.contains(where: \.underlying.isEmbeddedSwiftTarget) {
             // Link C++ if needed.
             // Note: This will come from build settings in future.
             for target in dependencies.staticTargets {
-                if case let target as ClangTarget = target.underlying, target.isCXX {
+                if case let target as ClangModule = target.underlying, target.isCXX {
                     let triple = buildProduct.buildParameters.triple
                     if triple.isDarwin() {
                         buildProduct.additionalFlags += ["-lc++"]
@@ -79,7 +79,7 @@ extension BuildPlan {
 
         for target in dependencies.staticTargets {
             switch target.underlying {
-            case is SwiftTarget:
+            case is SwiftModule:
                 // Swift targets are guaranteed to have a corresponding Swift description.
                 guard case .swift(let description) = self.targetMap[target.id] else {
                     throw InternalError("unknown target \(target)")
@@ -143,13 +143,13 @@ extension BuildPlan {
         }
 
         // For test targets, we need to consider the first level of transitive dependencies since the first level is always test targets.
-        let topLevelDependencies: [PackageModel.Target]
+        let topLevelDependencies: [PackageModel.Module]
         if product.type == .test {
-            topLevelDependencies = product.targets.flatMap { $0.underlying.dependencies }.compactMap {
+            topLevelDependencies = product.modules.flatMap { $0.underlying.dependencies }.compactMap {
                 switch $0 {
                 case .product:
                     return nil
-                case .target(let target, _):
+                case .module(let target, _):
                     return target
                 }
             }
@@ -164,12 +164,12 @@ extension BuildPlan {
         }
 
         // Sort the product targets in topological order.
-        let nodes: [ResolvedModule.Dependency] = product.targets.map { .target($0, conditions: []) }
+        let nodes: [ResolvedModule.Dependency] = product.modules.map { .module($0, conditions: []) }
         let allTargets = try topologicalSort(nodes, successors: { dependency in
             switch dependency {
             // Include all the dependencies of a target.
-            case .target(let target, _):
-                let isTopLevel = topLevelDependencies.contains(target.underlying) || product.targets.contains(id: target.id)
+            case .module(let target, _):
+                let isTopLevel = topLevelDependencies.contains(target.underlying) || product.modules.contains(id: target.id)
                 let topLevelIsMacro = isTopLevel && product.type == .macro
                 let topLevelIsPlugin = isTopLevel && product.type == .plugin
                 let topLevelIsTest = isTopLevel && product.type == .test
@@ -189,7 +189,7 @@ extension BuildPlan {
                     return []
                 }
 
-                let productDependencies: [ResolvedModule.Dependency] = product.targets.map { .target($0, conditions: []) }
+                let productDependencies: [ResolvedModule.Dependency] = product.modules.map { .module($0, conditions: []) }
                 switch product.type {
                 case .library(.automatic), .library(.static):
                     return productDependencies
@@ -213,7 +213,7 @@ extension BuildPlan {
 
         for dependency in allTargets {
             switch dependency {
-            case .target(let target, _):
+            case .module(let target, _):
                 switch target.type {
                 // Executable target have historically only been included if they are directly in the product's
                 // target list.  Otherwise they have always been just build-time dependencies.
@@ -221,18 +221,18 @@ extension BuildPlan {
                 // any test products... this is to allow testing of executables.  Note that they are also still
                 // built as separate products that the test can invoke as subprocesses.
                 case .executable, .snippet, .macro:
-                    if product.targets.contains(id: target.id) {
+                    if product.modules.contains(id: target.id) {
                         staticTargets.append(target)
-                    } else if product.type == .test && (target.underlying as? SwiftTarget)?.supportsTestableExecutablesFeature == true {
+                    } else if product.type == .test && (target.underlying as? SwiftModule)?.supportsTestableExecutablesFeature == true {
                         // Only "top-level" targets should really be considered here, not transitive ones.
-                        let isTopLevel = topLevelDependencies.contains(target.underlying) || product.targets.contains(id: target.id)
+                        let isTopLevel = topLevelDependencies.contains(target.underlying) || product.modules.contains(id: target.id)
                         if let toolsVersion = graph.package(for: product)?.manifest.toolsVersion, toolsVersion >= .v5_5, isTopLevel {
                             staticTargets.append(target)
                         }
                     }
                 // Test targets should be included only if they are directly in the product's target list.
                 case .test:
-                    if product.targets.contains(id: target.id) {
+                    if product.modules.contains(id: target.id) {
                         staticTargets.append(target)
                     }
                 // Library targets should always be included for the same build triple.
@@ -245,7 +245,7 @@ extension BuildPlan {
                     systemModules.append(target)
                 // Add binary to binary paths set.
                 case .binary:
-                    guard let binaryTarget = target.underlying as? BinaryTarget else {
+                    guard let binaryTarget = target.underlying as? BinaryModule else {
                         throw InternalError("invalid binary target '\(target.name)'")
                     }
                     switch binaryTarget.kind {
@@ -285,7 +285,7 @@ extension BuildPlan {
     }
 
     /// Extracts the artifacts  from an artifactsArchive
-    private func parseArtifactsArchive(for binaryTarget: BinaryTarget, triple: Triple) throws -> [ExecutableInfo] {
+    private func parseArtifactsArchive(for binaryTarget: BinaryModule, triple: Triple) throws -> [ExecutableInfo] {
         try self.externalExecutablesCache.memoize(key: binaryTarget) {
             let execInfos = try binaryTarget.parseArtifactArchives(for: triple, fileSystem: self.fileSystem)
             return execInfos.filter{!$0.supportedTriples.isEmpty}

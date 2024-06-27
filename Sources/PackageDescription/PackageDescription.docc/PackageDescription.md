@@ -40,7 +40,7 @@ The package manifest also allows you to define executable products, as well as p
 
 For more information about adding a package dependency to your app project and creating Swift packages with Xcode, see [Adding Package Dependencies to Your App](https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app), [Creating a Standalone Swift Package with Xcode](https://developer.apple.com/documentation/xcode/creating-a-standalone-swift-package-with-xcode), and [Swift Packages](https://developer.apple.com/documentation/xcode/swift-packages).
 
-Support for Swift packages in Xcode builds on the open-source Swift Package Manager project. To learn more about the Swift Package Manager, visit [Swift.org](https://www.swift.org/package-manager/) and the Swift Package Manager repository on [GitHub](https://github.com/apple/swift-package-manager).
+Support for Swift packages in Xcode builds on the open-source Swift Package Manager project. To learn more about the Swift Package Manager, visit [Swift.org](https://www.swift.org/package-manager/) and the Swift Package Manager repository on [GitHub](https://github.com/swiftlang/swift-package-manager).
 
 ## Topics
 

@@ -17,8 +17,8 @@ import Foundation
 import X509
 
 // Set `REAL_CERT_USER_ID` and `REAL_CERT_ORG_UNIT` env vars when running ENABLE_REAL_CERT_TEST tests
-let expectedSubjectUserID = ProcessInfo.processInfo.environment["REAL_CERT_USER_ID"] ?? "<USER ID>"
-let expectedSubjectOrgUnit = ProcessInfo.processInfo.environment["REAL_CERT_ORG_UNIT"] ?? "<ORG UNIT>"
+let expectedSubjectUserID = Environment.current["REAL_CERT_USER_ID"] ?? "<USER ID>"
+let expectedSubjectOrgUnit = Environment.current["REAL_CERT_ORG_UNIT"] ?? "<ORG UNIT>"
 
 // MARK: - CertificatePolicy for test certs
 

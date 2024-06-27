@@ -13,7 +13,6 @@
 import Dispatch
 
 import class Foundation.JSONDecoder
-import class TSCBasic.Process
 
 private let defaultImports = ["Swift", "SwiftOnoneSupport", "_Concurrency",
                               "_StringProcessing", "_SwiftConcurrencyShims"]
@@ -22,17 +21,17 @@ private struct Imports: Decodable {
     let imports: [String]
 }
 
-public protocol ImportScanner {
+package protocol ImportScanner {
     func scanImports(_ filePathToScan: AbsolutePath) async throws -> [String]
 }
 
 public struct SwiftcImportScanner: ImportScanner {
-    private let swiftCompilerEnvironment: EnvironmentVariables
+    private let swiftCompilerEnvironment: Environment
     private let swiftCompilerFlags: [String]
     private let swiftCompilerPath: AbsolutePath
 
-    public init(
-        swiftCompilerEnvironment: EnvironmentVariables,
+    package init(
+        swiftCompilerEnvironment: Environment,
         swiftCompilerFlags: [String],
         swiftCompilerPath: AbsolutePath
     ) {
@@ -46,7 +45,7 @@ public struct SwiftcImportScanner: ImportScanner {
                    filePathToScan.pathString,
                    "-scan-dependencies", "-Xfrontend", "-import-prescan"] + self.swiftCompilerFlags
 
-        let result = try await TSCBasic.Process.popen(arguments: cmd, environment: self.swiftCompilerEnvironment)
+        let result = try await AsyncProcess.popen(arguments: cmd, environment: self.swiftCompilerEnvironment)
 
         let stdout = try result.utf8Output()
         return try JSONDecoder.makeWithDefaults().decode(Imports.self, from: stdout).imports

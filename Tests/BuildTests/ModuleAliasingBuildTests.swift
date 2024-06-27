@@ -19,7 +19,7 @@ import Basics
 import PackageLoading
 @testable import PackageModel
 import SPMBuildCore
-import SPMTestSupport
+import _InternalTestSupport
 import SwiftDriver
 import Workspace
 import XCTest
@@ -730,9 +730,9 @@ final class ModuleAliasingBuildTests: XCTestCase {
                 .contains { $0.target.name == "Logging" && $0.target.moduleAliases == nil }
         )
 
-        let fooLoggingArgs = try result.target(for: "FooLogging").swiftTarget().compileArguments()
-        let barLoggingArgs = try result.target(for: "BarLogging").swiftTarget().compileArguments()
-        let loggingArgs = try result.target(for: "Logging").swiftTarget().compileArguments()
+        let fooLoggingArgs = try result.moduleBuildDescription(for: "FooLogging").swift().compileArguments()
+        let barLoggingArgs = try result.moduleBuildDescription(for: "BarLogging").swift().compileArguments()
+        let loggingArgs = try result.moduleBuildDescription(for: "Logging").swift().compileArguments()
         #if os(macOS)
         XCTAssertMatch(
             fooLoggingArgs,
@@ -850,8 +850,8 @@ final class ModuleAliasingBuildTests: XCTestCase {
                 .contains { $0.target.name == "Logging" && $0.target.moduleAliases == nil }
         )
 
-        let otherLoggingArgs = try result.target(for: "OtherLogging").swiftTarget().compileArguments()
-        let loggingArgs = try result.target(for: "Logging").swiftTarget().compileArguments()
+        let otherLoggingArgs = try result.moduleBuildDescription(for: "OtherLogging").swift().compileArguments()
+        let loggingArgs = try result.moduleBuildDescription(for: "Logging").swift().compileArguments()
 
         #if os(macOS)
         XCTAssertMatch(

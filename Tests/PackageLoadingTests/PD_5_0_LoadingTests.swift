@@ -13,7 +13,7 @@
 import Basics
 import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import struct TSCBasic.ByteString
@@ -610,7 +610,7 @@ final class PackageDescription5_0LoadingTests: PackageDescriptionLoadingTests {
             )
 
             let moduleTraceFilePath = path.appending("swift-module-trace")
-            var env = EnvironmentVariables.process()
+            var env = Environment.current
             env["SWIFT_LOADED_MODULE_TRACE_FILE"] = moduleTraceFilePath.pathString
             let toolchain = try UserToolchain(swiftSDK: SwiftSDK.default, environment: env)
             let manifestLoader = ManifestLoader(

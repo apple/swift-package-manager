@@ -13,7 +13,7 @@
 import Basics
 import PackageModel
 import PackageLoading
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import enum TSCBasic.PathValidationError
@@ -505,17 +505,6 @@ final class PackageDescription5_3LoadingTests: PackageDescriptionLoadingTests {
 
     func testNonZeroExitStatusDoesNotAssert() async throws {
         let content = """
-            #if canImport(Glibc)
-            import Glibc
-            #elseif canImport(Musl)
-            import Musl
-            #elseif os(Windows)
-            import MSVCRT
-            import WinSDK
-            #else
-            import Darwin.C
-            #endif
-
             print("crash")
             exit(1)
             """

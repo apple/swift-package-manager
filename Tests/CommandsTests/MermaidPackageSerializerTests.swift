@@ -19,7 +19,7 @@ import class PackageModel.Manifest
 import struct PackageModel.ProductDescription
 import struct PackageModel.TargetDescription
 import class TSCBasic.InMemoryFileSystem
-import func SPMTestSupport.XCTAssertNoDiagnostics
+import func _InternalTestSupport.XCTAssertNoDiagnostics
 
 @testable
 import Commands

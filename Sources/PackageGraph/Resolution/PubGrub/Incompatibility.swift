@@ -63,7 +63,7 @@ extension Incompatibility: CustomStringConvertible {
     }
 }
 
-public extension Incompatibility {
+extension Incompatibility {
     /// Every incompatibility has a cause to explain its presence in the
     /// derivation graph. Only the root incompatibility uses `.root`. All other
     /// incompatibilities are either obtained from dependency constraints,
@@ -89,7 +89,7 @@ public extension Incompatibility {
     ///         │{root 1.0.0}│
     ///         └────────────┘
     /// ```
-    indirect enum Cause: Equatable, Hashable {
+    public indirect enum Cause: Equatable, Hashable {
         public struct ConflictCause: Hashable {
             public let conflict: Incompatibility
             public let other: Incompatibility
@@ -110,7 +110,10 @@ public extension Incompatibility {
         case noAvailableVersion
 
         /// A version-based dependency contains unversioned-based dependency.
-        case versionBasedDependencyContainsUnversionedDependency(versionedDependency: PackageReference, unversionedDependency: PackageReference)
+        case versionBasedDependencyContainsUnversionedDependency(
+            versionedDependency: PackageReference,
+            unversionedDependency: PackageReference
+        )
 
         /// The package's tools version is incompatible.
         case incompatibleToolsVersion(ToolsVersion)

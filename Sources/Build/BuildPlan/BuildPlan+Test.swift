@@ -20,8 +20,8 @@ import struct PackageGraph.ResolvedPackage
 import struct PackageGraph.ResolvedProduct
 import struct PackageGraph.ResolvedModule
 import struct PackageModel.Sources
-import class PackageModel.SwiftTarget
-import class PackageModel.Target
+import class PackageModel.SwiftModule
+import class PackageModel.Module
 import struct SPMBuildCore.BuildParameters
 import protocol TSCBasic.FileSystem
 
@@ -33,7 +33,7 @@ extension BuildPlan {
         shouldDisableSandbox: Bool,
         _ fileSystem: FileSystem,
         _ observabilityScope: ObservabilityScope
-    ) throws -> [(product: ResolvedProduct, discoveryTargetBuildDescription: SwiftTargetBuildDescription?, entryPointTargetBuildDescription: SwiftTargetBuildDescription)] {
+    ) throws -> [(product: ResolvedProduct, discoveryTargetBuildDescription: SwiftModuleBuildDescription?, entryPointTargetBuildDescription: SwiftModuleBuildDescription)] {
         guard destinationBuildParameters.testingParameters.testProductStyle.requiresAdditionalDerivedTestTargets,
               case .entryPointExecutable(let explicitlyEnabledDiscovery, let explicitlySpecifiedPath) =
                 destinationBuildParameters.testingParameters.testProductStyle
@@ -44,11 +44,11 @@ extension BuildPlan {
         let isEntryPointPathSpecifiedExplicitly = explicitlySpecifiedPath != nil
 
         var isDiscoveryEnabledRedundantly = explicitlyEnabledDiscovery && !isEntryPointPathSpecifiedExplicitly
-        var result: [(ResolvedProduct, SwiftTargetBuildDescription?, SwiftTargetBuildDescription)] = []
+        var result: [(ResolvedProduct, SwiftModuleBuildDescription?, SwiftModuleBuildDescription)] = []
         for (testProduct, testBuildDescription) in testProducts {
             let package = testBuildDescription.package
 
-            isDiscoveryEnabledRedundantly = isDiscoveryEnabledRedundantly && nil == testProduct.testEntryPointTarget
+            isDiscoveryEnabledRedundantly = isDiscoveryEnabledRedundantly && nil == testProduct.testEntryPointModule
             // If a non-explicitly specified test entry point file exists, prefer that over test discovery.
             // This is designed as an escape hatch when test discovery is not appropriate and for backwards
             // compatibility for projects that have existing test entry point files (e.g. XCTMain.swift, LinuxMain.swift).
@@ -59,45 +59,45 @@ extension BuildPlan {
             // `--experimental-test-entry-point-path <file>`. The latter is useful because it still performs test discovery and places the discovered
             // tests into a separate target/module named "<PackageName>PackageDiscoveredTests". Then, that entry point file may import that module and
             // obtain that list to pass it to the `XCTMain(...)` function and avoid needing to maintain a list of tests itself.
-            if testProduct.testEntryPointTarget != nil && explicitlyEnabledDiscovery && !isEntryPointPathSpecifiedExplicitly {
-                let testEntryPointName = testProduct.underlying.testEntryPointPath?.basename ?? SwiftTarget.defaultTestEntryPointName
+            if testProduct.testEntryPointModule != nil && explicitlyEnabledDiscovery && !isEntryPointPathSpecifiedExplicitly {
+                let testEntryPointName = testProduct.underlying.testEntryPointPath?.basename ?? SwiftModule.defaultTestEntryPointName
                 observabilityScope.emit(warning: "'--enable-test-discovery' was specified so the '\(testEntryPointName)' entry point file for '\(testProduct.name)' will be ignored and an entry point will be generated automatically. To use test discovery with a custom entry point file, pass '--experimental-test-entry-point-path <file>'.")
-            } else if testProduct.testEntryPointTarget == nil, let testEntryPointPath = explicitlySpecifiedPath, !fileSystem.exists(testEntryPointPath) {
+            } else if testProduct.testEntryPointModule == nil, let testEntryPointPath = explicitlySpecifiedPath, !fileSystem.exists(testEntryPointPath) {
                 observabilityScope.emit(error: "'--experimental-test-entry-point-path' was specified but the file '\(testEntryPointPath)' could not be found.")
             }
 
-            /// Generates test discovery targets, which contain derived sources listing the discovered tests.
-            func generateDiscoveryTargets() throws -> (target: SwiftTarget, resolved: ResolvedModule, buildDescription: SwiftTargetBuildDescription) {
+            /// Generates test discovery modules, which contain derived sources listing the discovered tests.
+            func generateDiscoveryTargets() throws -> (target: SwiftModule, resolved: ResolvedModule, buildDescription: SwiftModuleBuildDescription) {
                 let discoveryTargetName = "\(package.manifest.displayName)PackageDiscoveredTests"
                 let discoveryDerivedDir = destinationBuildParameters.buildPath.appending(components: "\(discoveryTargetName).derived")
                 let discoveryMainFile = discoveryDerivedDir.appending(component: TestDiscoveryTool.mainFileName)
 
                 var discoveryPaths: [AbsolutePath] = []
                 discoveryPaths.append(discoveryMainFile)
-                for testTarget in testProduct.targets {
+                for testTarget in testProduct.modules {
                     let path = discoveryDerivedDir.appending(components: testTarget.name + ".swift")
                     discoveryPaths.append(path)
                 }
 
-                let discoveryTarget = SwiftTarget(
+                let discoveryTarget = SwiftModule(
                     name: discoveryTargetName,
-                    dependencies: testProduct.underlying.targets.map { .target($0, conditions: []) },
+                    dependencies: testProduct.underlying.modules.map { .module($0, conditions: []) },
                     packageAccess: true, // test target is allowed access to package decls by default
                     testDiscoverySrc: Sources(paths: discoveryPaths, root: discoveryDerivedDir)
                 )
-                var discoveryResolvedTarget = ResolvedModule(
+                var discoveryResolvedModule = ResolvedModule(
                     packageIdentity: testProduct.packageIdentity,
                     underlying: discoveryTarget,
-                    dependencies: testProduct.targets.map { .target($0, conditions: []) },
+                    dependencies: testProduct.modules.map { .module($0, conditions: []) },
                     defaultLocalization: testProduct.defaultLocalization,
                     supportedPlatforms: testProduct.supportedPlatforms,
                     platformVersionProvider: testProduct.platformVersionProvider
                 )
-                discoveryResolvedTarget.buildTriple = testProduct.buildTriple
+                discoveryResolvedModule.buildTriple = testProduct.buildTriple
 
-                let discoveryTargetBuildDescription = try SwiftTargetBuildDescription(
+                let discoveryTargetBuildDescription = try SwiftModuleBuildDescription(
                     package: package,
-                    target: discoveryResolvedTarget,
+                    target: discoveryResolvedModule,
                     toolsVersion: toolsVersion,
                     buildParameters: testBuildDescription.buildParameters,
                     testTargetRole: .discovery,
@@ -106,38 +106,38 @@ extension BuildPlan {
                     observabilityScope: observabilityScope
                 )
 
-                return (discoveryTarget, discoveryResolvedTarget, discoveryTargetBuildDescription)
+                return (discoveryTarget, discoveryResolvedModule, discoveryTargetBuildDescription)
             }
 
             /// Generates a synthesized test entry point target, consisting of a single "main" file which calls the test entry
             /// point API and leverages the test discovery target to reference which tests to run.
             func generateSynthesizedEntryPointTarget(
-                swiftTargetDependencies: [Target.Dependency],
+                swiftTargetDependencies: [Module.Dependency],
                 resolvedTargetDependencies: [ResolvedModule.Dependency]
-            ) throws -> SwiftTargetBuildDescription {
+            ) throws -> SwiftModuleBuildDescription {
                 let entryPointDerivedDir = destinationBuildParameters.buildPath.appending(components: "\(testProduct.name).derived")
                 let entryPointMainFileName = TestEntryPointTool.mainFileName(for: destinationBuildParameters.testingParameters.library)
                 let entryPointMainFile = entryPointDerivedDir.appending(component: entryPointMainFileName)
                 let entryPointSources = Sources(paths: [entryPointMainFile], root: entryPointDerivedDir)
 
-                let entryPointTarget = SwiftTarget(
+                let entryPointTarget = SwiftModule(
                     name: testProduct.name,
                     type: .library,
-                    dependencies: testProduct.underlying.targets.map { .target($0, conditions: []) } + swiftTargetDependencies,
+                    dependencies: testProduct.underlying.modules.map { .module($0, conditions: []) } + swiftTargetDependencies,
                     packageAccess: true, // test target is allowed access to package decls
                     testEntryPointSources: entryPointSources
                 )
                 var entryPointResolvedTarget = ResolvedModule(
                     packageIdentity: testProduct.packageIdentity,
                     underlying: entryPointTarget,
-                    dependencies: testProduct.targets.map { .target($0, conditions: []) } + resolvedTargetDependencies,
+                    dependencies: testProduct.modules.map { .module($0, conditions: []) } + resolvedTargetDependencies,
                     defaultLocalization: testProduct.defaultLocalization,
                     supportedPlatforms: testProduct.supportedPlatforms,
                     platformVersionProvider: testProduct.platformVersionProvider
                 )
                 entryPointResolvedTarget.buildTriple = testProduct.buildTriple
 
-                return try SwiftTargetBuildDescription(
+                return try SwiftModuleBuildDescription(
                     package: package,
                     target: entryPointResolvedTarget,
                     toolsVersion: toolsVersion,
@@ -149,26 +149,26 @@ extension BuildPlan {
                 )
             }
 
-            let discoveryTargets: (target: SwiftTarget, resolved: ResolvedModule, buildDescription: SwiftTargetBuildDescription)?
-            let swiftTargetDependencies: [Target.Dependency]
+            let discoveryTargets: (target: SwiftModule, resolved: ResolvedModule, buildDescription: SwiftModuleBuildDescription)?
+            let swiftTargetDependencies: [Module.Dependency]
             let resolvedTargetDependencies: [ResolvedModule.Dependency]
 
             switch destinationBuildParameters.testingParameters.library {
             case .xctest:
                 discoveryTargets = try generateDiscoveryTargets()
-                swiftTargetDependencies = [.target(discoveryTargets!.target, conditions: [])]
-                resolvedTargetDependencies = [.target(discoveryTargets!.resolved, conditions: [])]
+                swiftTargetDependencies = [.module(discoveryTargets!.target, conditions: [])]
+                resolvedTargetDependencies = [.module(discoveryTargets!.resolved, conditions: [])]
             case .swiftTesting:
                 discoveryTargets = nil
-                swiftTargetDependencies = testProduct.targets.map { .target($0.underlying, conditions: []) }
-                resolvedTargetDependencies = testProduct.targets.map { .target($0, conditions: []) }
+                swiftTargetDependencies = testProduct.modules.map { .module($0.underlying, conditions: []) }
+                resolvedTargetDependencies = testProduct.modules.map { .module($0, conditions: []) }
             }
 
-            if let entryPointResolvedTarget = testProduct.testEntryPointTarget {
+            if let entryPointResolvedTarget = testProduct.testEntryPointModule {
                 if isEntryPointPathSpecifiedExplicitly || explicitlyEnabledDiscovery {
                     if isEntryPointPathSpecifiedExplicitly {
-                        // Allow using the explicitly-specified test entry point target, but still perform test discovery and thus declare a dependency on the discovery targets.
-                        let entryPointTarget = SwiftTarget(
+                        // Allow using the explicitly-specified test entry point target, but still perform test discovery and thus declare a dependency on the discovery modules.
+                        let entryPointTarget = SwiftModule(
                             name: entryPointResolvedTarget.underlying.name,
                             dependencies: entryPointResolvedTarget.underlying.dependencies + swiftTargetDependencies,
                             packageAccess: entryPointResolvedTarget.packageAccess,
@@ -182,7 +182,7 @@ extension BuildPlan {
                             supportedPlatforms: testProduct.supportedPlatforms,
                             platformVersionProvider: testProduct.platformVersionProvider
                         )
-                        let entryPointTargetBuildDescription = try SwiftTargetBuildDescription(
+                        let entryPointTargetBuildDescription = try SwiftModuleBuildDescription(
                             package: package,
                             target: entryPointResolvedTarget,
                             toolsVersion: toolsVersion,
@@ -204,7 +204,7 @@ extension BuildPlan {
                     }
                 } else {
                     // Use the test entry point as-is, without performing test discovery.
-                    let entryPointTargetBuildDescription = try SwiftTargetBuildDescription(
+                    let entryPointTargetBuildDescription = try SwiftModuleBuildDescription(
                         package: package,
                         target: entryPointResolvedTarget,
                         toolsVersion: toolsVersion,
@@ -234,12 +234,12 @@ extension BuildPlan {
     }
 }
 
-private extension PackageModel.SwiftTarget {
+private extension PackageModel.SwiftModule {
     /// Initialize a SwiftTarget representing a test entry point.
     convenience init(
         name: String,
-        type: PackageModel.Target.Kind? = nil,
-        dependencies: [PackageModel.Target.Dependency],
+        type: PackageModel.Module.Kind? = nil,
+        dependencies: [PackageModel.Module.Dependency],
         packageAccess: Bool,
         testEntryPointSources sources: Sources
     ) {

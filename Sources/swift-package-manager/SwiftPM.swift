@@ -29,7 +29,7 @@ struct SwiftPM {
         // into the same test bundle. We're then linking single `swift-package-manager` binary instead and passing
         // executable name via `SWIFTPM_EXEC_NAME`.
         if baseNameWithoutExtension == "swift-package-manager" {
-            await main(execName: EnvironmentVariables.process()["SWIFTPM_EXEC_NAME"])
+            await main(execName: Environment.current["SWIFTPM_EXEC_NAME"])
         } else {
             await main(execName: baseNameWithoutExtension)
         }

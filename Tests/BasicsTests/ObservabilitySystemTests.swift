@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @testable import Basics
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 // TODO: remove when transition to new diagnostics system is complete

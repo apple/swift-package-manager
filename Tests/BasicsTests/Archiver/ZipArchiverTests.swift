@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basics
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 import TSCclibc // for SPM_posix_spawn_file_actions_addchdir_np_supported
 

@@ -15,7 +15,7 @@ import Basics
 import PackageModel
 import SPMBuildCore
 import XCBuildSupport
-import SPMTestSupport
+import _InternalTestSupport
 
 import enum TSCBasic.JSON
 

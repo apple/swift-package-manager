@@ -746,7 +746,11 @@ public struct PubGrubDependencyResolver {
                 }
 
                 if pkgTerm.requirement.contains(library.version) {
-                    self.delegate?.didResolve(term: pkgTerm, version: library.version, duration: start.distance(to: .now()))
+                    self.delegate?.didResolve(
+                        term: pkgTerm,
+                        version: library.version,
+                        duration: start.distance(to: .now())
+                    )
                     state.decide(pkgTerm.node, at: library.version)
                     return completion(.success(pkgTerm.node))
                 }
@@ -826,27 +830,27 @@ extension PubGrubDependencyResolver {
         public var description: String {
             switch self {
             case ._unresolvable(let rootCause, _):
-                return rootCause.description
+                rootCause.description
             case .unresolvable(let error):
-                return error
+                error
             }
         }
 
         var rootCause: Incompatibility? {
             switch self {
             case ._unresolvable(let rootCause, _):
-                return rootCause
+                rootCause
             case .unresolvable:
-                return nil
+                nil
             }
         }
 
         var incompatibilities: [DependencyResolutionNode: [Incompatibility]]? {
             switch self {
             case ._unresolvable(_, let incompatibilities):
-                return incompatibilities
+                incompatibilities
             case .unresolvable:
-                return nil
+                nil
             }
         }
     }
@@ -865,11 +869,11 @@ extension PubGrubDependencyResolver {
         static func constraints(_ constraint: Constraint) -> [VersionBasedConstraint]? {
             switch constraint.requirement {
             case .versionSet(let req):
-                return constraint.nodes().map { VersionBasedConstraint(node: $0, req: req) }
+                constraint.nodes().map { VersionBasedConstraint(node: $0, req: req) }
             case .revision:
-                return nil
+                nil
             case .unversioned:
-                return nil
+                nil
             }
         }
     }
@@ -885,9 +889,9 @@ extension PackageRequirement {
     fileprivate var isRevision: Bool {
         switch self {
         case .versionSet, .unversioned:
-            return false
+            false
         case .revision:
-            return true
+            true
         }
     }
 }
@@ -896,10 +900,10 @@ extension PackageReference {
     public func matchingPrebuiltLibrary(in availableLibraries: [ProvidedLibrary]) -> ProvidedLibrary? {
         switch self.kind {
         case .fileSystem, .localSourceControl, .root:
-            return nil // can never match a prebuilt library
+            nil // can never match a prebuilt library
         case .registry(let identity):
             if let registryIdentity = identity.registry {
-                return availableLibraries.first(
+                availableLibraries.first(
                     where: { $0.metadata.identities.contains(
                         where: { $0 == .packageIdentity(
                             scope: registryIdentity.scope.description,
@@ -910,10 +914,10 @@ extension PackageReference {
                     }
                 )
             } else {
-                return nil
+                nil
             }
         case .remoteSourceControl(let url):
-            return availableLibraries.first(where: {
+            availableLibraries.first(where: {
                 $0.metadata.identities.contains(where: { $0 == .sourceControl(url: url) })
             })
         }

@@ -16,6 +16,8 @@ import PackageModel
 import PackageLoading
 import PackageGraph
 
+import struct OrderedCollections.OrderedDictionary
+
 import protocol TSCBasic.DiagnosticLocation
 
 public enum PluginAction {
@@ -28,7 +30,17 @@ public enum PluginAction {
     case performCommand(package: ResolvedPackage, arguments: [String])
 }
 
-extension PluginTarget {
+public struct PluginTool {
+    let path: AbsolutePath
+    let triples: [String]?
+
+    init(path: AbsolutePath, triples: [String]? = nil) {
+        self.path = path
+        self.triples = triples
+    }
+}
+
+extension PluginModule {
     public func invoke(
         action: PluginAction,
         buildEnvironment: BuildEnvironment,
@@ -36,7 +48,7 @@ extension PluginTarget {
         workingDirectory: AbsolutePath,
         outputDirectory: AbsolutePath,
         toolSearchDirectories: [AbsolutePath],
-        accessibleTools: [String: (path: AbsolutePath, triples: [String]?)],
+        accessibleTools: [String: PluginTool],
         writableDirectories: [AbsolutePath],
         readOnlyDirectories: [AbsolutePath],
         allowNetworkConnections: [SandboxNetworkPermission],
@@ -102,7 +114,7 @@ extension PluginTarget {
         workingDirectory: AbsolutePath,
         outputDirectory: AbsolutePath,
         toolSearchDirectories: [AbsolutePath],
-        accessibleTools: [String: (path: AbsolutePath, triples: [String]?)],
+        accessibleTools: [String: PluginTool],
         writableDirectories: [AbsolutePath],
         readOnlyDirectories: [AbsolutePath],
         allowNetworkConnections: [SandboxNetworkPermission],
@@ -135,9 +147,9 @@ extension PluginTarget {
             )
             let pluginWorkDirId = try serializer.serialize(path: outputDirectory)
             let toolSearchDirIds = try toolSearchDirectories.map{ try serializer.serialize(path: $0) }
-            let accessibleTools = try accessibleTools.mapValues { (tool: (AbsolutePath, [String]?)) -> HostToPluginMessage.InputContext.Tool in
-                let path = try serializer.serialize(path: tool.0)
-                return .init(path: path, triples: tool.1)
+            let accessibleTools = try accessibleTools.mapValues { (tool) -> HostToPluginMessage.InputContext.Tool in
+                let path = try serializer.serialize(path: tool.path)
+                return .init(path: path, triples: tool.triples)
             }
             let actionMessage: HostToPluginMessage
             switch action {
@@ -204,7 +216,7 @@ extension PluginTarget {
                 self.observabilityScope = observabilityScope
             }
             
-            func willCompilePlugin(commandLine: [String], environment: EnvironmentVariables) {
+            func willCompilePlugin(commandLine: [String], environment: [String: String]) {
                 invocationDelegate.pluginCompilationStarted(commandLine: commandLine, environment: environment)
             }
             
@@ -371,8 +383,22 @@ fileprivate extension PluginToHostMessage {
 }
 
 extension ModulesGraph {
+    public func pluginsPerModule(
+        satisfying buildEnvironment: BuildEnvironment
+    ) -> [ResolvedModule.ID: [ResolvedModule]] {
+        var pluginsPerModule = [ResolvedModule.ID: [ResolvedModule]]()
+        for module in self.allModules.sorted(by: { $0.name < $1.name }) {
+            let pluginDependencies = module.pluginDependencies(
+                satisfying: buildEnvironment
+            )
+            if !pluginDependencies.isEmpty {
+                pluginsPerModule[module.id] = pluginDependencies
+            }
+        }
+        return pluginsPerModule
+    }
 
-    /// Traverses the graph of reachable targets in a package graph, and applies plugins to targets as needed. Each
+    /// Traverses the given set of targets with their plugin dependencies and applies plugins as needed. Each
     /// plugin is passed an input context that provides information about the target to which it is being applied
     /// (along with some information about that target's dependency closure). The plugin is expected to generate an
     /// output in the form of commands that will later be run before or during the build, and can also emit debug
@@ -393,6 +419,8 @@ extension ModulesGraph {
     ///
     // TODO: Convert this function to be asynchronous, taking a completion closure. This may require changes to the package graph APIs to make them accessible concurrently.
     public func invokeBuildToolPlugins(
+        pluginsPerTarget: [ResolvedModule.ID: [ResolvedModule]],
+        pluginTools: [ResolvedModule.ID: [String: PluginTool]],
         outputDir: AbsolutePath,
         buildParameters: BuildParameters,
         additionalFileRules: [FileRuleDescription],
@@ -400,59 +428,34 @@ extension ModulesGraph {
         pkgConfigDirectories: [AbsolutePath],
         pluginScriptRunner: PluginScriptRunner,
         observabilityScope: ObservabilityScope,
-        fileSystem: FileSystem,
-        builtToolHandler: (_ name: String, _ path: RelativePath) throws -> AbsolutePath? = { _, _ in return nil }
+        fileSystem: FileSystem
     ) throws -> [ResolvedModule.ID: (target: ResolvedModule, results: [BuildToolPluginInvocationResult])] {
         var pluginResultsByTarget: [ResolvedModule.ID: (target: ResolvedModule, results: [BuildToolPluginInvocationResult])] = [:]
-        for target in self.allTargets.sorted(by: { $0.name < $1.name }) {
-            // Infer plugins from the declared dependencies, and collect them as well as any regular dependencies. Although usage of build tool plugins is declared separately from dependencies in the manifest, in the internal model we currently consider both to be dependencies.
-            var pluginTargets: [PluginTarget] = []
-            var dependencyTargets: [Target] = []
-            for dependency in target.dependencies(satisfying: buildParameters.buildEnvironment) {
-                switch dependency {
-                case .target(let target, _):
-                    if let pluginTarget = target.underlying as? PluginTarget {
-                        assert(pluginTarget.capability == .buildTool)
-                        pluginTargets.append(pluginTarget)
-                    }
-                    else {
-                        dependencyTargets.append(target.underlying)
-                    }
-                case .product(let product, _):
-                    pluginTargets.append(contentsOf: product.targets.compactMap{ $0.underlying as? PluginTarget })
-                }
-            }
-
-            // Leave quickly in the common case of not using any plugins.
-            if pluginTargets.isEmpty {
-                continue
+        for (moduleID, plugins) in pluginsPerTarget {
+            guard let module = self.allModules[moduleID] else {
+                throw InternalError("could not find target for \(moduleID)")
             }
 
             /// Determine the package that contains the target.
-            guard let package = self.package(for: target) else {
-                throw InternalError("could not determine package for target \(target)")
+            guard let package = self.package(for: module) else {
+                throw InternalError("could not determine package for target \(module)")
             }
 
             // Apply each build tool plugin used by the target in order, creating a list of results (one for each plugin usage).
             var buildToolPluginResults: [BuildToolPluginInvocationResult] = []
-            for pluginTarget in pluginTargets {
+            for plugin  in plugins {
+                let pluginTarget = plugin.underlying as! PluginModule
                 // Determine the tools to which this plugin has access, and create a name-to-path mapping from tool
                 // names to the corresponding paths. Built tools are assumed to be in the build tools directory.
-                var builtToolNames: [String] = []
-                let accessibleTools = try pluginTarget.processAccessibleTools(packageGraph: self, fileSystem: fileSystem, environment: buildParameters.buildEnvironment, for: try pluginScriptRunner.hostTriple) { name, path in
-                    builtToolNames.append(name)
-                    if let result = try builtToolHandler(name, path) {
-                        return result
-                    } else {
-                        return buildParameters.buildPath.appending(path)
-                    }
+                guard let accessibleTools = pluginTools[plugin.id] else {
+                    throw InternalError("No tools found for plugin \(pluginTarget.name)")
                 }
                 
                 // Determine additional input dependencies for any plugin commands, based on any executables the plugin target depends on.
                 let toolPaths = accessibleTools.values.map { $0.path }.sorted()
 
                 // Assign a plugin working directory based on the package, target, and plugin.
-                let pluginOutputDir = outputDir.appending(components: package.identity.description, target.name, target.buildTriple.rawValue, pluginTarget.name)
+                let pluginOutputDir = outputDir.appending(components: package.identity.description, module.name, module.buildTriple.rawValue, pluginTarget.name)
 
                 // Determine the set of directories under which plugins are allowed to write. We always include just the output directory, and for now there is no possibility of opting into others.
                 let writableDirectories = [outputDir]
@@ -479,7 +482,7 @@ extension ModulesGraph {
                         self.builtToolNames = builtToolNames
                     }
                     
-                    func pluginCompilationStarted(commandLine: [String], environment: EnvironmentVariables) {
+                    func pluginCompilationStarted(commandLine: [String], environment: [String: String]) {
                     }
                     
                     func pluginCompilationEnded(result: PluginCompilationResult) {
@@ -500,20 +503,20 @@ extension ModulesGraph {
                         diagnostics.append(diagnostic)
                     }
 
-                    func pluginDefinedBuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String : String], workingDirectory: AbsolutePath?, inputFiles: [AbsolutePath], outputFiles: [AbsolutePath]) {
+                    func pluginDefinedBuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String: String], workingDirectory: AbsolutePath?, inputFiles: [AbsolutePath], outputFiles: [AbsolutePath]) {
                         dispatchPrecondition(condition: .onQueue(delegateQueue))
                         buildCommands.append(.init(
                             configuration: .init(
                                 displayName: displayName,
                                 executable: executable,
                                 arguments: arguments,
-                                environment: environment,
+                                environment: .init(environment),
                                 workingDirectory: workingDirectory),
                             inputFiles: toolPaths + inputFiles,
                             outputFiles: outputFiles))
                     }
                     
-                    func pluginDefinedPrebuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String : String], workingDirectory: AbsolutePath?, outputFilesDirectory: AbsolutePath) -> Bool {
+                    func pluginDefinedPrebuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String: String], workingDirectory: AbsolutePath?, outputFilesDirectory: AbsolutePath) -> Bool {
                         dispatchPrecondition(condition: .onQueue(delegateQueue))
                         // executable must exist before running prebuild command
                         if builtToolNames.contains(executable.basename) {
@@ -525,13 +528,18 @@ extension ModulesGraph {
                                 displayName: displayName,
                                 executable: executable,
                                 arguments: arguments,
-                                environment: environment,
+                                environment: .init(environment),
                                 workingDirectory: workingDirectory),
                             outputFilesDirectory: outputFilesDirectory))
                         return true
                     }
                 }
-                let delegate = PluginDelegate(fileSystem: fileSystem, delegateQueue: delegateQueue, toolPaths: toolPaths, builtToolNames: builtToolNames)
+                let delegate = PluginDelegate(
+                    fileSystem: fileSystem,
+                    delegateQueue: delegateQueue,
+                    toolPaths: toolPaths,
+                    builtToolNames: accessibleTools.map { $0.key }
+                )
 
                 // In tools version 6.0 and newer, we vend the list of files generated by previous plugins.
                 let pluginDerivedSources: Sources
@@ -541,7 +549,7 @@ extension ModulesGraph {
                     let observability = ObservabilitySystem({ _, _ in })
                     // Compute the generated files based on all results we have computed so far.
                     (pluginDerivedSources, pluginDerivedResources) = Self.computePluginGeneratedFiles(
-                        target: target,
+                        target: module,
                         toolsVersion: package.manifest.toolsVersion,
                         additionalFileRules: additionalFileRules,
                         buildParameters: buildParameters,
@@ -559,7 +567,7 @@ extension ModulesGraph {
                 let success = try temp_await { pluginTarget.invoke(
                     action: .createBuildToolCommands(
                         package: package,
-                        target: target,
+                        target: module,
                         pluginGeneratedSources: pluginDerivedSources.paths,
                         pluginGeneratedResources: pluginDerivedResources.map { $0.path }
                     ),
@@ -587,7 +595,7 @@ extension ModulesGraph {
                     plugin: pluginTarget,
                     pluginOutputDirectory: pluginOutputDir,
                     package: package,
-                    target: target,
+                    target: module,
                     succeeded: success,
                     duration: duration,
                     diagnostics: delegate.diagnostics,
@@ -597,7 +605,7 @@ extension ModulesGraph {
             }
 
             // Associate the list of results with the target. The list will have one entry for each plugin used by the target.
-            pluginResultsByTarget[target.id] = (target, buildToolPluginResults)
+            pluginResultsByTarget[module.id] = (module, buildToolPluginResults)
         }
         return pluginResultsByTarget
     }
@@ -658,89 +666,86 @@ public enum PluginAccessibleTool: Hashable {
     case vendedTool(name: String, path: AbsolutePath, supportedTriples: [String])
 }
 
-public extension PluginTarget {
-
-    func dependencies(satisfying environment: BuildEnvironment) -> [Dependency] {
-        return self.dependencies.filter { $0.satisfies(environment) }
-    }
-
-    /// The set of tools that are accessible to this plugin.
-    private func accessibleTools(packageGraph: ModulesGraph, fileSystem: FileSystem, environment: BuildEnvironment, for hostTriple: Triple) throws -> Set<PluginAccessibleTool> {
-        return try Set(self.dependencies(satisfying: environment).flatMap { dependency -> [PluginAccessibleTool] in
-            let builtToolName: String
-            let executableOrBinaryTarget: Target
-            switch dependency {
-            case .target(let target, _):
-                builtToolName = target.name
-                executableOrBinaryTarget = target
-            case .product(let productRef, _):
-                guard
-                    let product = packageGraph.product(for: productRef.name, destination: .tools),
-                    let executableTarget = product.targets.map({ $0.underlying }).executables.spm_only
-                else {
-                    throw StringError("no product named \(productRef.name)")
-                }
-                builtToolName = productRef.name
-                executableOrBinaryTarget = executableTarget
-            }
-
-            // For a binary target we create a `vendedTool`.
-            if let target = executableOrBinaryTarget as? BinaryTarget {
-                // TODO: Memoize this result for the host triple
-                let execInfos = try target.parseArtifactArchives(for: hostTriple, fileSystem: fileSystem)
-                return try execInfos.map{ .vendedTool(name: $0.name, path: $0.executablePath, supportedTriples: try $0.supportedTriples.map{ try $0.withoutVersion().tripleString }) }
-            }
-            // For an executable target we create a `builtTool`.
-            else if executableOrBinaryTarget.type == .executable {
-                return try [.builtTool(name: builtToolName, path: RelativePath(validating: executableOrBinaryTarget.name))]
-            }
+/// The set of tools that are accessible to this plugin.
+fileprivate func collectAccessibleTools(
+    plugin: ResolvedModule,
+    fileSystem: FileSystem,
+    environment: BuildEnvironment,
+    for hostTriple: Triple
+) throws -> Set<PluginAccessibleTool> {
+    precondition(plugin.underlying is PluginModule)
+    return try Set(plugin.dependencies(satisfying: environment).flatMap { dependency -> [PluginAccessibleTool] in
+        let builtToolName: String
+        let executableOrBinaryModule: Module
+        switch dependency {
+        case .module(let module, _):
+            builtToolName = module.name
+            executableOrBinaryModule = module.underlying
+        case .product(let product, _):
+            guard let executableModule = product.modules.map({ $0.underlying }).executables.spm_only
             else {
-                return []
+                throw StringError("no product named \(product.name)")
             }
-        })
-    }
+            builtToolName = product.name
+            executableOrBinaryModule = executableModule
+        }
 
-    func processAccessibleTools(packageGraph: ModulesGraph, fileSystem: FileSystem, environment: BuildEnvironment, for hostTriple: Triple, builtToolHandler: (_ name: String, _ path: RelativePath) throws -> AbsolutePath?) throws -> [String: (path: AbsolutePath, triples: [String]?)] {
-        var pluginAccessibleTools: [String: (path: AbsolutePath, triples: [String]?)] = [:]
+        // For a binary target we create a `vendedTool`.
+        if let module = executableOrBinaryModule as? BinaryModule {
+            // TODO: Memoize this result for the host triple
+            let execInfos = try module.parseArtifactArchives(for: hostTriple, fileSystem: fileSystem)
+            return try execInfos.map{ .vendedTool(name: $0.name, path: $0.executablePath, supportedTriples: try $0.supportedTriples.map{ try $0.withoutVersion().tripleString }) }
+        }
+        // For an executable target we create a `builtTool`.
+        else if executableOrBinaryModule.type == .executable {
+            return try [.builtTool(name: builtToolName, path: RelativePath(validating: executableOrBinaryModule.name))]
+        }
+        else {
+            return []
+        }
+    })
+}
 
-        for dep in try accessibleTools(packageGraph: packageGraph, fileSystem: fileSystem, environment: environment, for: hostTriple) {
-            switch dep {
+public extension ResolvedModule {
+    func preparePluginTools(
+        fileSystem: FileSystem,
+        environment: BuildEnvironment,
+        for hostTriple: Triple,
+        builtToolHandler: (_ name: String, _ path: RelativePath) throws -> AbsolutePath?
+    ) throws -> [String: PluginTool] {
+        precondition(self.underlying is PluginModule)
+
+        var tools: [String: PluginTool] = [:]
+
+        for tool in try collectAccessibleTools(
+            plugin: self,
+            fileSystem: fileSystem,
+            environment: environment,
+            for: hostTriple
+        ) {
+            switch tool {
             case .builtTool(let name, let path):
                 if let path = try builtToolHandler(name, path) {
-                    pluginAccessibleTools[name] = (path, nil)
+                    tools[name] = PluginTool(path: path)
                 }
             case .vendedTool(let name, let path, let triples):
                 // Avoid having the path of an unsupported tool overwrite a supported one.
-                guard !triples.isEmpty || pluginAccessibleTools[name] == nil else {
+                guard !triples.isEmpty || tools[name] == nil else {
                     continue
                 }
-                let priorTriples = pluginAccessibleTools[name]?.triples ?? []
-                pluginAccessibleTools[name] = (path, priorTriples + triples)
+                let priorTriples = tools[name]?.triples ?? []
+                tools[name] = PluginTool(path: path, triples: priorTriples + triples)
             }
         }
 
-        return pluginAccessibleTools
+        return tools
     }
 }
-
-fileprivate extension Target.Dependency {
-    var conditions: [PackageCondition] {
-        switch self {
-        case .target(_, let conditions): return conditions
-        case .product(_, let conditions): return conditions
-        }
-    }
-
-    func satisfies(_ environment: BuildEnvironment) -> Bool {
-        conditions.allSatisfy { $0.satisfies(environment) }
-    }
-}
-
 
 /// Represents the result of invoking a build tool plugin for a particular target. The result includes generated build commands and prebuild commands as well as any diagnostics and stdout/stderr output emitted by the plugin.
 public struct BuildToolPluginInvocationResult {
     /// The plugin that produced the results.
-    public var plugin: PluginTarget
+    public var plugin: PluginModule
 
     /// The directory given to the plugin as a place in which it and the commands are allowed to write.
     public var pluginOutputDirectory: AbsolutePath
@@ -788,7 +793,7 @@ public struct BuildToolPluginInvocationResult {
         public var displayName: String?
         public var executable: AbsolutePath
         public var arguments: [String]
-        public var environment: [String: String]
+        public var environment: Environment
         public var workingDirectory: AbsolutePath?
     }
 
@@ -815,8 +820,8 @@ public enum PluginEvaluationError: Swift.Error {
 
 public protocol PluginInvocationDelegate {
     /// Called before a plugin is compiled. This call is always followed by a `pluginCompilationEnded()`, but is mutually exclusive with `pluginCompilationWasSkipped()` (which is called if the plugin didn't need to be recompiled).
-    func pluginCompilationStarted(commandLine: [String], environment: EnvironmentVariables)
-    
+    func pluginCompilationStarted(commandLine: [String], environment: [String: String])
+
     /// Called after a plugin is compiled. This call always follows a `pluginCompilationStarted()`, but is mutually exclusive with `pluginCompilationWasSkipped()` (which is called if the plugin didn't need to be recompiled).
     func pluginCompilationEnded(result: PluginCompilationResult)
     
@@ -837,7 +842,7 @@ public protocol PluginInvocationDelegate {
 
     /// Called when a plugin defines a prebuild command through the PackagePlugin APIs.
     func pluginDefinedPrebuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String: String], workingDirectory: AbsolutePath?, outputFilesDirectory: AbsolutePath) -> Bool
-    
+
     /// Called when a plugin requests a build operation through the PackagePlugin APIs.
     func pluginRequestedBuildOperation(subset: PluginInvocationBuildSubset, parameters: PluginInvocationBuildParameters, completion: @escaping (Result<PluginInvocationBuildResult, Error>) -> Void)
 
@@ -960,9 +965,9 @@ public struct PluginInvocationTestResult {
 }
 
 public extension PluginInvocationDelegate {
-    func pluginDefinedBuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String : String], workingDirectory: AbsolutePath?, inputFiles: [AbsolutePath], outputFiles: [AbsolutePath]) {
+    func pluginDefinedBuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String: String], workingDirectory: AbsolutePath?, inputFiles: [AbsolutePath], outputFiles: [AbsolutePath]) {
     }
-    func pluginDefinedPrebuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String : String], workingDirectory: AbsolutePath?, outputFilesDirectory: AbsolutePath) -> Bool {
+    func pluginDefinedPrebuildCommand(displayName: String?, executable: AbsolutePath, arguments: [String], environment: [String: String], workingDirectory: AbsolutePath?, outputFilesDirectory: AbsolutePath) -> Bool {
         return true
     }
     func pluginRequestedBuildOperation(subset: PluginInvocationBuildSubset, parameters: PluginInvocationBuildParameters, completion: @escaping (Result<PluginInvocationBuildResult, Error>) -> Void) {

@@ -90,7 +90,7 @@ extension SwiftPackageCommand {
             }
 
             // Map the target type.
-            let type: TargetDescription.TargetType = switch self.type {
+            let type: TargetDescription.TargetKind = switch self.type {
                 case .library: .regular
                 case .executable: .executable
                 case .test: .test

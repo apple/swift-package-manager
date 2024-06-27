@@ -39,12 +39,14 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 import func TSCBasic.exec
 import class TSCBasic.FileLock
 import protocol TSCBasic.OutputByteStream
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 import enum TSCBasic.ProcessEnv
 import enum TSCBasic.ProcessLockError
 import var TSCBasic.stderrStream
@@ -265,7 +267,7 @@ public final class SwiftCommandState {
 
     fileprivate var buildSystemProvider: BuildSystemProvider?
 
-    private let environment: EnvironmentVariables
+    private let environment: Environment
 
     private let hostTriple: Basics.Triple?
 
@@ -301,7 +303,7 @@ public final class SwiftCommandState {
         workspaceLoaderProvider: @escaping WorkspaceLoaderProvider,
         hostTriple: Basics.Triple? = nil,
         fileSystem: any FileSystem = localFileSystem,
-        environment: EnvironmentVariables = ProcessEnv.vars
+        environment: Environment = .current
     ) throws {
         self.hostTriple = hostTriple
         self.fileSystem = fileSystem
@@ -370,7 +372,7 @@ public final class SwiftCommandState {
         )
 
         // set global process logging handler
-        Process.loggingHandler = { self.observabilityScope.emit(debug: $0) }
+        AsyncProcess.loggingHandler = { self.observabilityScope.emit(debug: $0) }
     }
 
     static func postprocessArgParserResult(options: GlobalOptions, observabilityScope: ObservabilityScope) throws {
@@ -613,6 +615,24 @@ public final class SwiftCommandState {
         explicitProduct: String? = nil,
         testEntryPointPath: AbsolutePath? = nil
     ) throws -> ModulesGraph {
+        try self.loadPackageGraph(
+            explicitProduct: explicitProduct,
+            traitConfiguration: nil,
+            testEntryPointPath: testEntryPointPath
+        )
+    }
+
+    /// Fetch and load the complete package graph.
+    ///
+    /// - Parameters:
+    ///   - explicitProduct: The product specified on the command line to a “swift run” or “swift build” command. This
+    /// allows executables from dependencies to be run directly without having to hook them up to any particular target.
+    @discardableResult
+    package func loadPackageGraph(
+        explicitProduct: String? = nil,
+        traitConfiguration: TraitConfiguration? = nil,
+        testEntryPointPath: AbsolutePath? = nil
+    ) throws -> ModulesGraph {
         do {
             let workspace = try getActiveWorkspace()
 
@@ -620,6 +640,7 @@ public final class SwiftCommandState {
             let graph = try workspace.loadPackageGraph(
                 rootInput: getWorkspaceRoot(),
                 explicitProduct: explicitProduct,
+                traitConfiguration: traitConfiguration,
                 forceResolvedVersions: options.resolver.forceResolvedVersions,
                 testEntryPointPath: testEntryPointPath,
                 observabilityScope: self.observabilityScope
@@ -697,6 +718,7 @@ public final class SwiftCommandState {
     public func createBuildSystem(
         explicitBuildSystem: BuildSystemProvider.Kind? = .none,
         explicitProduct: String? = .none,
+        traitConfiguration: TraitConfiguration,
         cacheBuildManifest: Bool = true,
         shouldLinkStaticSwiftStdlib: Bool = false,
         productsBuildParameters: BuildParameters? = .none,
@@ -716,6 +738,7 @@ public final class SwiftCommandState {
         let buildSystem = try buildSystemProvider.createBuildSystem(
             kind: explicitBuildSystem ?? options.build.buildSystem,
             explicitProduct: explicitProduct,
+            traitConfiguration: traitConfiguration,
             cacheBuildManifest: cacheBuildManifest,
             productsBuildParameters: productsParameters,
             toolsBuildParameters: toolsBuildParameters,

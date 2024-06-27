@@ -13,10 +13,14 @@
 import Build
 import Foundation
 import LLBuildManifest
-@_spi(SwiftPMInternal)
-import SPMTestSupport
+import _InternalTestSupport
 import TSCBasic
 import XCTest
+import class Basics.ObservabilitySystem
+@_spi(DontAdoptOutsideOfSwiftPMExposedForBenchmarksAndTestsOnly)
+import func PackageGraph.loadModulesGraph
+import class PackageModel.Manifest
+import struct PackageModel.TargetDescription
 
 class PrepareForIndexTests: XCTestCase {
     func testPrepare() throws {
@@ -78,8 +82,78 @@ class PrepareForIndexTests: XCTestCase {
         let manifest = try builder.generatePrepareManifest(at: "/manifest")
 
         // Ensure our C module is here.
-        let lib = try XCTUnwrap(graph.target(for: "lib", destination: .destination))
+        let lib = try XCTUnwrap(graph.module(for: "lib", destination: .destination))
         let name = lib.getLLBuildTargetName(buildParameters: plan.destinationBuildParameters)
         XCTAssertTrue(manifest.targets.keys.contains(name))
+    }
+
+    // enable-testing requires the non-exportable-decls, make sure they aren't skipped.
+    func testEnableTesting() throws {
+        let fs = InMemoryFileSystem(
+            emptyFiles:
+            "/Pkg/Sources/lib/lib.swift",
+            "/Pkg/Tests/test/TestCase.swift"
+        )
+
+        let observability = ObservabilitySystem.makeForTesting()
+        let scope = observability.topScope
+
+        let graph = try loadModulesGraph(
+            fileSystem: fs,
+            manifests: [
+                Manifest.createRootManifest(
+                    displayName: "Pkg",
+                    path: "/Pkg",
+                    targets: [
+                        TargetDescription(name: "lib", dependencies: []),
+                        TargetDescription(name: "test", dependencies: ["lib"], type: .test),
+                    ]
+                ),
+            ],
+            observabilityScope: scope
+        )
+        XCTAssertNoDiagnostics(observability.diagnostics)
+
+        // Under debug, enable-testing is turned on by default. Make sure the flag is not added.
+        let debugPlan = try BuildPlan(
+            destinationBuildParameters: mockBuildParameters(destination: .target, config: .debug, prepareForIndexing: true),
+            toolsBuildParameters: mockBuildParameters(destination: .host, prepareForIndexing: false),
+            graph: graph,
+            fileSystem: fs,
+            observabilityScope: observability.topScope
+        )
+        let debugBuilder = LLBuildManifestBuilder(debugPlan, fileSystem: fs, observabilityScope: scope)
+        let debugManifest = try debugBuilder.generatePrepareManifest(at: "/manifest")
+
+        XCTAssertNil(debugManifest.commands.values.first(where: {
+            guard let swiftCommand = $0.tool as? SwiftCompilerTool,
+                swiftCommand.outputs.contains(where: { $0.name.hasSuffix("/lib.swiftmodule")})
+            else {
+                return false
+            }
+            return swiftCommand.otherArguments.contains("-experimental-skip-non-exportable-decls")
+                && !swiftCommand.otherArguments.contains("-enable-testing")
+        }))
+
+        // Under release, enable-testing is turned off by default so we should see our flag
+        let releasePlan = try BuildPlan(
+            destinationBuildParameters: mockBuildParameters(destination: .target, config: .release, prepareForIndexing: true),
+            toolsBuildParameters: mockBuildParameters(destination: .host, prepareForIndexing: false),
+            graph: graph,
+            fileSystem: fs,
+            observabilityScope: observability.topScope
+        )
+        let releaseBuilder = LLBuildManifestBuilder(releasePlan, fileSystem: fs, observabilityScope: scope)
+        let releaseManifest = try releaseBuilder.generatePrepareManifest(at: "/manifest")
+
+        XCTAssertEqual(releaseManifest.commands.values.filter({
+            guard let swiftCommand = $0.tool as? SwiftCompilerTool,
+                swiftCommand.outputs.contains(where: { $0.name.hasSuffix("/lib.swiftmodule")})
+            else {
+                return false
+            }
+            return swiftCommand.otherArguments.contains("-experimental-skip-non-exportable-decls")
+                && !swiftCommand.otherArguments.contains("-enable-testing")
+        }).count, 1)
     }
 }

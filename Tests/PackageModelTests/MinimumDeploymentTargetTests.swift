@@ -13,19 +13,21 @@
 @testable import PackageModel
 import XCTest
 
-import struct TSCBasic.ProcessResult
+import struct Basics.AsyncProcessResult
 
-class MinimumDeploymentTargetTests: XCTestCase {
+final class MinimumDeploymentTargetTests: XCTestCase {
     func testDoesNotAssertWithNoOutput() throws {
         #if !os(macOS)
         // these tests eventually call `xcrun`.
         try XCTSkipIf(true, "test is only supported on macOS")
         #endif
-        let result = ProcessResult(arguments: [],
-                                   environmentBlock: [:],
-                                   exitStatus: .terminated(code: 0),
-                                   output: "".asResult,
-                                   stderrOutput: "xcodebuild: error: SDK \"macosx\" cannot be located.".asResult)
+        let result = AsyncProcessResult(
+            arguments: [],
+            environment: [:],
+            exitStatus: .terminated(code: 0),
+            output: "".asResult,
+            stderrOutput: "xcodebuild: error: SDK \"macosx\" cannot be located.".asResult
+        )
 
         XCTAssertNil(try MinimumDeploymentTarget.computeXCTestMinimumDeploymentTarget(with: result, platform: .macOS))
     }
@@ -35,13 +37,18 @@ class MinimumDeploymentTargetTests: XCTestCase {
         // these tests eventually call `xcrun`.
         try XCTSkipIf(true, "test is only supported on macOS")
         #endif
-        let result = ProcessResult(arguments: [],
-                                   environmentBlock: [:],
-                                   exitStatus: .terminated(code: 0),
-                                   output: "some string".asResult,
-                                   stderrOutput: "".asResult)
+        let result = AsyncProcessResult(
+            arguments: [],
+            environment: [:],
+            exitStatus: .terminated(code: 0),
+            output: "some string".asResult,
+            stderrOutput: "".asResult
+        )
 
-        XCTAssertThrowsError(try MinimumDeploymentTarget.computeXCTestMinimumDeploymentTarget(with: result, platform: .macOS))
+        XCTAssertThrowsError(try MinimumDeploymentTarget.computeXCTestMinimumDeploymentTarget(
+            with: result,
+            platform: .macOS
+        ))
     }
 
     func testThrowsWithErrorForOutput() throws {
@@ -49,21 +56,25 @@ class MinimumDeploymentTargetTests: XCTestCase {
         // these tests eventually call `xcrun`.
         try XCTSkipIf(true, "test is only supported on macOS")
         #endif
-        let result = ProcessResult(arguments: [],
-                                   environmentBlock: [:],
-                                   exitStatus: .terminated(code: 0),
-                                   output: .failure(DummyError()),
-                                   stderrOutput: "".asResult)
+        let result = AsyncProcessResult(
+            arguments: [],
+            environment: [:],
+            exitStatus: .terminated(code: 0),
+            output: .failure(DummyError()),
+            stderrOutput: "".asResult
+        )
 
-        XCTAssertThrowsError(try MinimumDeploymentTarget.computeXCTestMinimumDeploymentTarget(with: result, platform: .macOS))
+        XCTAssertThrowsError(try MinimumDeploymentTarget.computeXCTestMinimumDeploymentTarget(
+            with: result,
+            platform: .macOS
+        ))
     }
 }
 
-private struct DummyError: Error {
-}
+private struct DummyError: Error {}
 
-private extension String {
-    var asResult: Result<[UInt8], Error> {
-        return .success(Array(utf8))
+extension String {
+    fileprivate var asResult: Result<[UInt8], Error> {
+        .success(Array(utf8))
     }
 }

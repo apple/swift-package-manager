@@ -51,7 +51,7 @@ internal struct PluginContextDeserializer {
     }
 
     /// Returns the `Target` that corresponds to the given ID (a small integer),
-    /// or throws an error if the ID is invalid. The target is deserialized on-
+    /// or throws an error if the ID is invalid. The module is deserialized on-
     /// demand if it hasn't already been deserialized.
     mutating func target(for id: WireInput.Target.Id, pluginGeneratedSources: [URL] = [], pluginGeneratedResources: [URL] = []) throws -> Target {
         if let target = targetsById[id],

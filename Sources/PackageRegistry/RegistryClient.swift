@@ -28,7 +28,7 @@ public protocol RegistryClientDelegate {
 }
 
 /// Package registry client.
-/// API specification: https://github.com/apple/swift-package-manager/blob/main/Documentation/PackageRegistry/Registry.md
+/// API specification: https://github.com/swiftlang/swift-package-manager/blob/main/Documentation/PackageRegistry/Registry.md
 public final class RegistryClient: Cancellable {
     public typealias Delegate = RegistryClientDelegate
 

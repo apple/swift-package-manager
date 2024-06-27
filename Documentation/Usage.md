@@ -81,7 +81,7 @@ SwiftPM can generate boilerplate for custom macros:
     The value 42 was produced by the code "a + b"
 
 This creates a package with a `.macro` type target with its required dependencies
-on [swift-syntax](https://github.com/apple/swift-syntax), a library `.target` 
+on [swift-syntax](https://github.com/swiftlang/swift-syntax), a library `.target` 
 containing the macro's code, and an `.executableTarget` and `.testTarget` for 
 running the macro. The sample macro, `StringifyMacro`, is documented in the Swift 
 Evolution proposal for [Expression Macros](https://github.com/apple/swift-evolution/blob/main/proposals/0382-expression-macros.md)

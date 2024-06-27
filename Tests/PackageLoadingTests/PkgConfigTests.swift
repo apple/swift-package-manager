@@ -13,12 +13,10 @@
 import Basics
 @testable import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
-import func TSCTestSupport.withCustomEnv
-
-extension SystemLibraryTarget {
+extension SystemLibraryModule {
     convenience init(pkgConfig: String, providers: [SystemPackageProviderDescription] = []) {
         self.init(
             name: "Foo",
@@ -37,7 +35,7 @@ class PkgConfigTests: XCTestCase {
         // No pkgConfig name.
         do {
             let result = try pkgConfigArgs(
-                for: SystemLibraryTarget(pkgConfig: ""),
+                for: SystemLibraryModule(pkgConfig: ""),
                 pkgConfigDirectories: [],
                 fileSystem: fs,
                 observabilityScope: observability.topScope
@@ -47,7 +45,7 @@ class PkgConfigTests: XCTestCase {
 
         // No pc file.
         do {
-            let target = SystemLibraryTarget(
+            let target = SystemLibraryModule(
                 pkgConfig: "Foo",
                 providers: [
                     .brew(["libFoo"]),
@@ -88,9 +86,9 @@ class PkgConfigTests: XCTestCase {
 
     func testEnvVar() throws {
         // Pc file.
-        try withCustomEnv(["PKG_CONFIG_PATH": inputsDir.pathString]) {
+        try Environment.makeCustom(["PKG_CONFIG_PATH": inputsDir.pathString]) {
             for result in try pkgConfigArgs(
-                for: SystemLibraryTarget(pkgConfig: "Foo"),
+                for: SystemLibraryModule(pkgConfig: "Foo"),
                 pkgConfigDirectories: [],
                 fileSystem: fs,
                 observabilityScope: observability.topScope
@@ -105,9 +103,9 @@ class PkgConfigTests: XCTestCase {
         }
 
         // Pc file with prohibited flags.
-        try withCustomEnv(["PKG_CONFIG_PATH": inputsDir.pathString]) {
+        try Environment.makeCustom(["PKG_CONFIG_PATH": inputsDir.pathString]) {
             for result in try pkgConfigArgs(
-                for: SystemLibraryTarget(pkgConfig: "Bar"),
+                for: SystemLibraryModule(pkgConfig: "Bar"),
                 pkgConfigDirectories: [],
                 fileSystem: fs,
                 observabilityScope: observability.topScope
@@ -127,9 +125,9 @@ class PkgConfigTests: XCTestCase {
         }
 
         // Pc file with -framework Framework flag.
-        try withCustomEnv(["PKG_CONFIG_PATH": inputsDir.pathString]) {
+        try Environment.makeCustom(["PKG_CONFIG_PATH": inputsDir.pathString]) {
             for result in try pkgConfigArgs(
-                for: SystemLibraryTarget(pkgConfig: "Framework"),
+                for: SystemLibraryModule(pkgConfig: "Framework"),
                 pkgConfigDirectories: [],
                 fileSystem: fs,
                 observabilityScope: observability.topScope
@@ -152,7 +150,7 @@ class PkgConfigTests: XCTestCase {
     func testExplicitPkgConfigDirectories() throws {
         // Pc file.
         for result in try pkgConfigArgs(
-            for: SystemLibraryTarget(pkgConfig: "Foo"),
+            for: SystemLibraryModule(pkgConfig: "Foo"),
             pkgConfigDirectories: [inputsDir],
             fileSystem: fs,
             observabilityScope: observability.topScope
@@ -167,7 +165,7 @@ class PkgConfigTests: XCTestCase {
 
         // Pc file with prohibited flags.
         for result in try pkgConfigArgs(
-            for: SystemLibraryTarget(pkgConfig: "Bar"),
+            for: SystemLibraryModule(pkgConfig: "Bar"),
             pkgConfigDirectories: [inputsDir],
             fileSystem: fs,
             observabilityScope: observability.topScope
@@ -188,7 +186,7 @@ class PkgConfigTests: XCTestCase {
         // Pc file with -framework Framework flag.
         let observability = ObservabilitySystem.makeForTesting()
         for result in try pkgConfigArgs(
-            for: SystemLibraryTarget(pkgConfig: "Framework"),
+            for: SystemLibraryModule(pkgConfig: "Framework"),
             pkgConfigDirectories: [inputsDir],
             fileSystem: fs,
             observabilityScope: observability.topScope

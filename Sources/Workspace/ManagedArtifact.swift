@@ -30,14 +30,14 @@ extension Workspace {
         /// The path of the artifact on disk
         public let path: AbsolutePath
 
-        public let kind: BinaryTarget.Kind
+        public let kind: BinaryModule.Kind
 
         public init(
             packageRef: PackageReference,
             targetName: String,
             source: Source,
             path: AbsolutePath,
-            kind: BinaryTarget.Kind
+            kind: BinaryModule.Kind
         ) {
             self.packageRef = packageRef
             self.targetName = targetName
@@ -53,7 +53,7 @@ extension Workspace {
             url: String,
             checksum: String,
             path: AbsolutePath,
-            kind: BinaryTarget.Kind
+            kind: BinaryModule.Kind
         ) -> ManagedArtifact {
             return ManagedArtifact(
                 packageRef: packageRef,
@@ -69,7 +69,7 @@ extension Workspace {
             packageRef: PackageReference,
             targetName: String,
             path: AbsolutePath,
-            kind: BinaryTarget.Kind,
+            kind: BinaryModule.Kind,
             checksum: String? = nil
         ) -> ManagedArtifact {
             return ManagedArtifact(

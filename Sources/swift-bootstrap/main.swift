@@ -221,7 +221,7 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
         init(fileSystem: FileSystem, observabilityScope: ObservabilityScope, logLevel: Basics.Diagnostic.Severity) throws {
             self.identityResolver = DefaultIdentityResolver()
             self.dependencyMapper = DefaultDependencyMapper(identityResolver: self.identityResolver)
-            let environment = EnvironmentVariables.process()
+            let environment = Environment.current
             self.hostToolchain = try UserToolchain(
                 swiftSDK: SwiftSDK.hostSwiftSDK(
                     environment: environment,
@@ -324,6 +324,8 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
                     cacheBuildManifest: false,
                     packageGraphLoader: packageGraphLoader,
                     scratchDirectory: scratchDirectory,
+                    // When bootrapping no special trait build configuration is used
+                    traitConfiguration: nil,
                     additionalFileRules: [],
                     pkgConfigDirectories: [],
                     dependenciesByRootPackageIdentity: [:],
@@ -485,7 +487,7 @@ extension BuildConfiguration {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension AbsolutePath: ExpressibleByArgument {}
 extension BuildConfiguration: ExpressibleByArgument {}
 #else

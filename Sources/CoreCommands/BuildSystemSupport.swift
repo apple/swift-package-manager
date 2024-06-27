@@ -13,6 +13,7 @@
 import Build
 import SPMBuildCore
 import XCBuildSupport
+import PackageGraph
 
 import class Basics.ObservabilityScope
 import struct PackageGraph.ModulesGraph
@@ -24,6 +25,7 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
 
     func makeBuildSystem(
         explicitProduct: String?,
+        traitConfiguration: TraitConfiguration,
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
@@ -41,6 +43,7 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
             packageGraphLoader: packageGraphLoader ?? {
                 try self.swiftCommandState.loadPackageGraph(
                     explicitProduct: explicitProduct,
+                    traitConfiguration: traitConfiguration,
                     testEntryPointPath: testEntryPointPath
                 )
             },
@@ -50,6 +53,7 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
                 disableSandbox: self.swiftCommandState.shouldDisableSandbox
             ),
             scratchDirectory: self.swiftCommandState.scratchDirectory,
+            traitConfiguration: traitConfiguration,
             additionalFileRules: FileRuleDescription.swiftpmFileTypes,
             pkgConfigDirectories: self.swiftCommandState.options.locations.pkgConfigDirectories,
             dependenciesByRootPackageIdentity: rootPackageInfo.dependencies,
@@ -66,6 +70,7 @@ private struct XcodeBuildSystemFactory: BuildSystemFactory {
 
     func makeBuildSystem(
         explicitProduct: String?,
+        traitConfiguration: TraitConfiguration,
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,

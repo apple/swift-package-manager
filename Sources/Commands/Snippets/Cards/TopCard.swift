@@ -132,7 +132,7 @@ struct TopCard: Card {
     }
 }
 
-fileprivate extension Target.Kind {
+fileprivate extension Module.Kind {
     var pluralDescription: String {
         switch self {
         case .executable:

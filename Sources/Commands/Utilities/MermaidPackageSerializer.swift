@@ -13,7 +13,7 @@
 import struct OrderedCollections.OrderedDictionary
 import class PackageModel.Package
 import class PackageModel.Product
-import class PackageModel.Target
+import class PackageModel.Module
 
 struct MermaidPackageSerializer {
     let package: Package
@@ -23,7 +23,7 @@ struct MermaidPackageSerializer {
         var subgraphs = OrderedDictionary<String, [Edge]>()
         subgraphs[package.identity.description] = package.products.productTargetEdges
         
-        for edge in package.targets.targetDependencyEdges {
+        for edge in package.modules.targetDependencyEdges {
             if let subgraph = edge.to.subgraph {
                 subgraphs[subgraph, default: []].append(edge)
             } else {
@@ -102,11 +102,11 @@ extension MermaidPackageSerializer.Node {
         self.init(id: "product:\(product.name)", title: product.name, border: .doubled, subgraph: nil)
     }
 
-    init(target: Target) {
+    init(target: Module) {
         self.init(id: "target:\(target.name)", title: target.name)
     }
 
-    init(dependency: Target.Dependency) {
+    init(dependency: Module.Dependency) {
         switch dependency {
         case let .product(product, _):
             self.init(
@@ -115,7 +115,7 @@ extension MermaidPackageSerializer.Node {
                 border: .hexagon,
                 subgraph: product.package
             )
-        case let .target(target, _):
+        case let .module(target, _):
             self.init(target: target)
         }
     }
@@ -128,7 +128,7 @@ extension MermaidPackageSerializer.Node: CustomStringConvertible {
 }
 
 extension MermaidPackageSerializer.Edge {
-    init(product: Product, target: Target) {
+    init(product: Product, target: Module) {
         self.from = .init(product: product)
         self.to = .init(target: target)
     }
@@ -143,12 +143,12 @@ extension MermaidPackageSerializer.Edge: CustomStringConvertible {
 extension [Product] {
     fileprivate var productTargetEdges: [MermaidPackageSerializer.Edge] {
         self.flatMap { product in
-            product.targets.map { target in (product, target) }
+            product.modules.map { target in (product, target) }
         }.map(MermaidPackageSerializer.Edge.init)
     }
 }
 
-extension [Target] {
+extension [Module] {
     fileprivate var targetDependencyEdges: [MermaidPackageSerializer.Edge] {
         self.flatMap { target in
             target.dependencies.map {

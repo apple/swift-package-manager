@@ -14,7 +14,7 @@ import Basics
 import PackageGraph
 import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import Workspace
 import XCTest
 

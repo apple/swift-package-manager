@@ -14,7 +14,7 @@ import XCTest
 
 import PackageGraph
 @testable import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 
 private func XCTAssertEqualTargetIDs(
     _ lhs: [ResolvedModule],
@@ -31,8 +31,8 @@ final class ResolvedModuleDependencyTests: XCTestCase {
         let t2 = ResolvedModule.mock(packageIdentity: "pkg", name: "t2", deps: t1)
         let t3 = ResolvedModule.mock(packageIdentity: "pkg", name: "t3", deps: t2)
 
-        XCTAssertEqualTargetIDs(try t3.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t2.recursiveTargetDependencies(), [t1])
+        XCTAssertEqualTargetIDs(try t3.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t2.recursiveModuleDependencies(), [t1])
     }
 
     func test2() throws {
@@ -41,9 +41,9 @@ final class ResolvedModuleDependencyTests: XCTestCase {
         let t3 = ResolvedModule.mock(packageIdentity: "pkg", name: "t3", deps: t2, t1)
         let t4 = ResolvedModule.mock(packageIdentity: "pkg", name: "t4", deps: t2, t3, t1)
 
-        XCTAssertEqualTargetIDs(try t4.recursiveTargetDependencies(), [t3, t2, t1])
-        XCTAssertEqualTargetIDs(try t3.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t2.recursiveTargetDependencies(), [t1])
+        XCTAssertEqualTargetIDs(try t4.recursiveModuleDependencies(), [t3, t2, t1])
+        XCTAssertEqualTargetIDs(try t3.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t2.recursiveModuleDependencies(), [t1])
     }
 
     func test3() throws {
@@ -52,9 +52,9 @@ final class ResolvedModuleDependencyTests: XCTestCase {
         let t3 = ResolvedModule.mock(packageIdentity: "pkg", name: "t3", deps: t2, t1)
         let t4 = ResolvedModule.mock(packageIdentity: "pkg", name: "t4", deps: t1, t2, t3)
 
-        XCTAssertEqualTargetIDs(try t4.recursiveTargetDependencies(), [t3, t2, t1])
-        XCTAssertEqualTargetIDs(try t3.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t2.recursiveTargetDependencies(), [t1])
+        XCTAssertEqualTargetIDs(try t4.recursiveModuleDependencies(), [t3, t2, t1])
+        XCTAssertEqualTargetIDs(try t3.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t2.recursiveModuleDependencies(), [t1])
     }
 
     func test4() throws {
@@ -63,9 +63,9 @@ final class ResolvedModuleDependencyTests: XCTestCase {
         let t3 = ResolvedModule.mock(packageIdentity: "pkg", name: "t3", deps: t2)
         let t4 = ResolvedModule.mock(packageIdentity: "pkg", name: "t4", deps: t3)
 
-        XCTAssertEqualTargetIDs(try t4.recursiveTargetDependencies(), [t3, t2, t1])
-        XCTAssertEqualTargetIDs(try t3.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t2.recursiveTargetDependencies(), [t1])
+        XCTAssertEqualTargetIDs(try t4.recursiveModuleDependencies(), [t3, t2, t1])
+        XCTAssertEqualTargetIDs(try t3.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t2.recursiveModuleDependencies(), [t1])
     }
 
     func test5() throws {
@@ -77,17 +77,17 @@ final class ResolvedModuleDependencyTests: XCTestCase {
         let t6 = ResolvedModule.mock(packageIdentity: "pkg", name: "t6", deps: t5, t4)
 
         // precise order is not important, but it is important that the following are true
-        let t6rd = try t6.recursiveTargetDependencies().map(\.id)
+        let t6rd = try t6.recursiveModuleDependencies().map(\.id)
         XCTAssertEqual(t6rd.firstIndex(of: t3.id)!, t6rd.index(after: t6rd.firstIndex(of: t4.id)!))
         XCTAssert(t6rd.firstIndex(of: t5.id)! < t6rd.firstIndex(of: t2.id)!)
         XCTAssert(t6rd.firstIndex(of: t5.id)! < t6rd.firstIndex(of: t1.id)!)
         XCTAssert(t6rd.firstIndex(of: t2.id)! < t6rd.firstIndex(of: t1.id)!)
         XCTAssert(t6rd.firstIndex(of: t3.id)! < t6rd.firstIndex(of: t2.id)!)
 
-        XCTAssertEqualTargetIDs(try t5.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t4.recursiveTargetDependencies(), [t3, t2, t1])
-        XCTAssertEqualTargetIDs(try t3.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t2.recursiveTargetDependencies(), [t1])
+        XCTAssertEqualTargetIDs(try t5.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t4.recursiveModuleDependencies(), [t3, t2, t1])
+        XCTAssertEqualTargetIDs(try t3.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t2.recursiveModuleDependencies(), [t1])
     }
 
     func test6() throws {
@@ -104,17 +104,17 @@ final class ResolvedModuleDependencyTests: XCTestCase {
         ) // same as above, but these two swapped
 
         // precise order is not important, but it is important that the following are true
-        let t6rd = try t6.recursiveTargetDependencies().map(\.id)
+        let t6rd = try t6.recursiveModuleDependencies().map(\.id)
         XCTAssertEqual(t6rd.firstIndex(of: t3.id)!, t6rd.index(after: t6rd.firstIndex(of: t4.id)!))
         XCTAssert(t6rd.firstIndex(of: t5.id)! < t6rd.firstIndex(of: t2.id)!)
         XCTAssert(t6rd.firstIndex(of: t5.id)! < t6rd.firstIndex(of: t1.id)!)
         XCTAssert(t6rd.firstIndex(of: t2.id)! < t6rd.firstIndex(of: t1.id)!)
         XCTAssert(t6rd.firstIndex(of: t3.id)! < t6rd.firstIndex(of: t2.id)!)
 
-        XCTAssertEqualTargetIDs(try t5.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t4.recursiveTargetDependencies(), [t3, t2, t1])
-        XCTAssertEqualTargetIDs(try t3.recursiveTargetDependencies(), [t2, t1])
-        XCTAssertEqualTargetIDs(try t2.recursiveTargetDependencies(), [t1])
+        XCTAssertEqualTargetIDs(try t5.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t4.recursiveModuleDependencies(), [t3, t2, t1])
+        XCTAssertEqualTargetIDs(try t3.recursiveModuleDependencies(), [t2, t1])
+        XCTAssertEqualTargetIDs(try t2.recursiveModuleDependencies(), [t1])
     }
 
     func testConditions() throws {

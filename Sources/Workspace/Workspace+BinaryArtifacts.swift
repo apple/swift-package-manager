@@ -319,7 +319,7 @@ extension Workspace {
                                                         // strip first level component if needed
                                                         if try self.fileSystem.shouldStripFirstLevel(
                                                             archiveDirectory: tempExtractionDirectory,
-                                                            acceptableExtensions: BinaryTarget.Kind.allCases
+                                                            acceptableExtensions: BinaryModule.Kind.allCases
                                                                 .map(\.fileExtension)
                                                         ) {
                                                             observabilityScope
@@ -467,7 +467,7 @@ extension Workspace {
                                 // strip first level component if needed
                                 if try self.fileSystem.shouldStripFirstLevel(
                                     archiveDirectory: tempExtractionDirectory,
-                                    acceptableExtensions: BinaryTarget.Kind.allCases.map(\.fileExtension)
+                                    acceptableExtensions: BinaryModule.Kind.allCases.map(\.fileExtension)
                                 ) {
                                     observabilityScope
                                         .emit(debug: "stripping first level component from  \(tempExtractionDirectory)")
@@ -618,6 +618,9 @@ extension Workspace {
                 progress: progress,
                 completion: { result in
                     self.delegate?.willDownloadBinaryArtifact(from: artifact.url.absoluteString, fromCache: false)
+                    if case .failure = result {
+                        try? self.fileSystem.removeFileTree(cachedArtifactPath)
+                    }
                     completion(result.flatMap {
                         Result.init(catching: {
                             // copy from cache to destination
@@ -717,7 +720,7 @@ extension Workspace.BinaryArtifactsManager {
         fileSystem: FileSystem,
         path: AbsolutePath,
         observabilityScope: ObservabilityScope
-    ) throws -> (AbsolutePath, BinaryTarget.Kind)? {
+    ) throws -> (AbsolutePath, BinaryModule.Kind)? {
         let binaryArtifacts = try Self.deriveBinaryArtifacts(
             fileSystem: fileSystem,
             path: path,
@@ -743,7 +746,7 @@ extension Workspace.BinaryArtifactsManager {
         fileSystem: FileSystem,
         path: AbsolutePath,
         observabilityScope: ObservabilityScope
-    ) throws -> [(AbsolutePath, BinaryTarget.Kind)] {
+    ) throws -> [(AbsolutePath, BinaryModule.Kind)] {
         guard fileSystem.exists(path) else {
             return []
         }
@@ -762,7 +765,7 @@ extension Workspace.BinaryArtifactsManager {
         }
 
         // try to find a matching subdirectory
-        var results = [(AbsolutePath, BinaryTarget.Kind)]()
+        var results = [(AbsolutePath, BinaryModule.Kind)]()
         for subdirectory in subdirectories {
             observabilityScope.emit(debug: "searching for binary artifact in '\(path)'")
             let subdirectoryResults = try Self.deriveBinaryArtifacts(
@@ -780,7 +783,7 @@ extension Workspace.BinaryArtifactsManager {
         fileSystem: FileSystem,
         path: AbsolutePath,
         observabilityScope: ObservabilityScope
-    ) throws -> BinaryTarget.Kind? {
+    ) throws -> BinaryModule.Kind? {
         let files = try fileSystem.getDirectoryContents(path)
             .map { path.appending(component: $0) }
             .filter { fileSystem.isFile($0) }

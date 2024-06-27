@@ -47,7 +47,10 @@ public struct Context: Sendable {
 /// Information about the git status of a given package, if available.
 @available(_PackageDescription, introduced: 6.0)
 public struct GitInformation: Sendable {
+    /// The version tag currently checked out, if available.
     public let currentTag: String?
+    /// The commit currently checked out.
     public let currentCommit: String
+    /// Whether or not there are uncommitted changes in the current repository.
     public let hasUncommittedChanges: Bool
 }

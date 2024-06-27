@@ -13,7 +13,7 @@
 /// Namespace for build settings.
 public enum BuildSettings {
     /// Build settings declarations.
-    public struct Declaration: Hashable, Codable {
+    public struct Declaration: Hashable {
         // Swift.
         public static let SWIFT_ACTIVE_COMPILATION_CONDITIONS: Declaration =
             .init("SWIFT_ACTIVE_COMPILATION_CONDITIONS")
@@ -40,36 +40,31 @@ public enum BuildSettings {
     }
 
     /// An individual build setting assignment.
-    public struct Assignment: Codable, Equatable, Hashable {
+    public struct Assignment: Equatable, Hashable {
         /// The assignment value.
         public var values: [String]
 
-        // FIXME: This should use `Set` but we need to investigate potential build failures on Linux caused by using it.
-        /// The condition associated with this assignment.
-        public var conditions: [PackageCondition] {
-            get {
-                self._conditions.map(\.underlying)
-            }
-            set {
-                self._conditions = newValue.map { PackageConditionWrapper($0) }
-            }
-        }
-
-        private var _conditions: [PackageConditionWrapper]
+        public var conditions: [PackageCondition]
 
         /// Indicates whether this assignment represents a default
         /// that should be used only if no other assignments match.
         public let `default`: Bool
 
         public init(default: Bool = false) {
-            self._conditions = []
+            self.conditions = []
             self.values = []
             self.default = `default`
+        }
+
+        public init(values: [String] = [], conditions: [PackageCondition] = []) {
+            self.values = values
+            self.default = false // TODO(franz): Check again
+            self.conditions = conditions
         }
     }
 
     /// Build setting assignment table which maps a build setting to a list of assignments.
-    public struct AssignmentTable: Codable {
+    public struct AssignmentTable {
         public private(set) var assignments: [Declaration: [Assignment]]
 
         public init() {
@@ -86,7 +81,7 @@ public enum BuildSettings {
     /// Provides a view onto assignment table with a given set of bound parameters.
     ///
     /// This class can be used to get the assignments matching the bound parameters.
-    public final class Scope {
+    public struct Scope {
         /// The assignment table.
         public let table: AssignmentTable
 

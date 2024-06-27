@@ -13,8 +13,7 @@
 import Basics
 import Foundation
 
-import class TSCBasic.Process
-import enum TSCBasic.ProcessEnv
+import class Basics.AsyncProcess
 
 import struct TSCUtility.Version
 
@@ -497,7 +496,7 @@ public struct SwiftSDK: Equatable {
     public static func hostDestination(
         _ binDir: AbsolutePath? = nil,
         originalWorkingDirectory: AbsolutePath? = nil,
-        environment: [String: String]
+        environment: Environment
     ) throws -> SwiftSDK {
         try self.hostSwiftSDK(binDir, environment: environment)
     }
@@ -505,7 +504,7 @@ public struct SwiftSDK: Equatable {
     /// The Swift SDK for the host platform.
     public static func hostSwiftSDK(
         _ binDir: AbsolutePath? = nil,
-        environment: EnvironmentVariables = .process(),
+        environment: Environment = .current,
         observabilityScope: ObservabilityScope? = nil,
         fileSystem: any FileSystem = localFileSystem
     ) throws -> SwiftSDK {
@@ -524,7 +523,7 @@ public struct SwiftSDK: Equatable {
             sdkPath = try AbsolutePath(validating: value)
         } else {
             // No value in env, so search for it.
-            let sdkPathStr = try TSCBasic.Process.checkNonZeroExit(
+            let sdkPathStr = try AsyncProcess.checkNonZeroExit(
                 arguments: ["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-path"],
                 environment: environment
             ).spm_chomp()
@@ -575,12 +574,12 @@ public struct SwiftSDK: Equatable {
 
     /// Returns `macosx` sdk platform framework path.
     public static func sdkPlatformFrameworkPaths(
-        environment: EnvironmentVariables = .process()
+        environment: Environment = .current
     ) throws -> (fwk: AbsolutePath, lib: AbsolutePath) {
         if let path = _sdkPlatformFrameworkPath {
             return path
         }
-        let platformPath = try TSCBasic.Process.checkNonZeroExit(
+        let platformPath = try AsyncProcess.checkNonZeroExit(
             arguments: ["/usr/bin/xcrun", "--sdk", "macosx", "--show-sdk-platform-path"],
             environment: environment
         ).spm_chomp()

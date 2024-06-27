@@ -47,7 +47,12 @@ struct DumpSymbolGraph: SwiftCommand {
         // Build the current package.
         //
         // We turn build manifest caching off because we need the build plan.
-        let buildSystem = try swiftCommandState.createBuildSystem(explicitBuildSystem: .native, cacheBuildManifest: false)
+        let buildSystem = try swiftCommandState.createBuildSystem(
+            explicitBuildSystem: .native,
+            // We are enabling all traits for dumping the symbol graph.
+            traitConfiguration: .init(enableAllTraits: true),
+            cacheBuildManifest: false
+        )
         try buildSystem.build()
 
         // Configure the symbol graph extractor.
@@ -66,7 +71,7 @@ struct DumpSymbolGraph: SwiftCommand {
         // Run the tool once for every library and executable target in the root package.
         let buildPlan = try buildSystem.buildPlan
         let symbolGraphDirectory = buildPlan.destinationBuildParameters.dataPath.appending("symbolgraph")
-        let targets = try buildSystem.getPackageGraph().rootPackages.flatMap{ $0.targets }.filter{ $0.type == .library }
+        let targets = try buildSystem.getPackageGraph().rootPackages.flatMap{ $0.modules }.filter{ $0.type == .library }
         for target in targets {
             print("-- Emitting symbol graph for", target.name)
             let result = try symbolGraphExtractor.extractSymbolGraph(

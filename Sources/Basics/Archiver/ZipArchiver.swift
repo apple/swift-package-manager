@@ -12,7 +12,6 @@
 
 import Dispatch
 import struct TSCBasic.FileSystemError
-import class TSCBasic.Process
 
 /// An `Archiver` that handles ZIP archives using the command-line `zip` and `unzip` tools.
 public struct ZipArchiver: Archiver, Cancellable {
@@ -49,11 +48,9 @@ public struct ZipArchiver: Archiver, Cancellable {
             }
 
             #if os(Windows)
-            let process = TSCBasic
-                .Process(arguments: ["tar.exe", "xf", archivePath.pathString, "-C", destinationPath.pathString])
+            let process = AsyncProcess(arguments: ["tar.exe", "xf", archivePath.pathString, "-C", destinationPath.pathString])
             #else
-            let process = TSCBasic
-                .Process(arguments: ["unzip", archivePath.pathString, "-d", destinationPath.pathString])
+            let process = AsyncProcess(arguments: ["unzip", archivePath.pathString, "-d", destinationPath.pathString])
             #endif
             guard let registrationKey = self.cancellator.register(process) else {
                 throw CancellationError.failedToRegisterProcess(process)
@@ -85,10 +82,10 @@ public struct ZipArchiver: Archiver, Cancellable {
             }
 
             #if os(Windows)
-            let process = TSCBasic.Process(
+            let process = AsyncProcess(
                 // FIXME: are these the right arguments?
                 arguments: ["tar.exe", "-a", "-c", "-f", destinationPath.pathString, directory.basename],
-                workingDirectory: directory.parentDirectory.underlying
+                workingDirectory: directory.parentDirectory
             )
             #else
             // This is to work around `swift package-registry publish` tool failing on
@@ -97,7 +94,7 @@ public struct ZipArchiver: Archiver, Cancellable {
             // Instead of passing `workingDirectory` param to TSC.Process, which will trigger
             // SPM_posix_spawn_file_actions_addchdir_np_supported check, we shell out and
             // do `cd` explicitly before `zip`.
-            let process = TSCBasic.Process(
+            let process = AsyncProcess(
                 arguments: [
                     "/bin/sh",
                     "-c",
@@ -132,9 +129,9 @@ public struct ZipArchiver: Archiver, Cancellable {
             }
 
             #if os(Windows)
-            let process = TSCBasic.Process(arguments: ["tar.exe", "tf", path.pathString])
+            let process = AsyncProcess(arguments: ["tar.exe", "tf", path.pathString])
             #else
-            let process = TSCBasic.Process(arguments: ["unzip", "-t", path.pathString])
+            let process = AsyncProcess(arguments: ["unzip", "-t", path.pathString])
             #endif
             guard let registrationKey = self.cancellator.register(process) else {
                 throw CancellationError.failedToRegisterProcess(process)

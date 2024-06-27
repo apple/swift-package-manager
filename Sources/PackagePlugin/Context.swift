@@ -31,7 +31,7 @@ public struct PluginContext {
     /// write its outputs to that directory. The plugin may also create other
     /// directories for cache files and other file system content that either
     /// it or the command will need.
-    @available(_PackageDescription, deprecated: 6.0)
+    @available(_PackageDescription, deprecated: 6.0, renamed: "pluginWorkDirectoryURL")
     public let pluginWorkDirectory: Path
 
     /// The path of a writable directory into which the plugin or the build
@@ -65,12 +65,12 @@ public struct PluginContext {
             }
             return Tool(name: name, path: Path(url: tool.path), url: tool.path)
         } else {
-            for dir in toolSearchDirectoryURLs {
-#if os(Windows)
+            for dir in self.toolSearchDirectoryURLs {
+                #if os(Windows)
                 let hostExecutableSuffix = ".exe"
-#else
+                #else
                 let hostExecutableSuffix = ""
-#endif
+                #endif
                 let path = dir.appendingPathComponent(name + hostExecutableSuffix)
                 if FileManager.default.isExecutableFile(atPath: path.path) {
                     return Tool(name: name, path: Path(url: path), url: path)
@@ -86,7 +86,7 @@ public struct PluginContext {
 
     /// The paths of directories of in which to search for tools that aren't in
     /// the `toolNamesToPaths` map.
-    @available(_PackageDescription, deprecated: 6.0)
+    @available(_PackageDescription, deprecated: 6.0, renamed: "toolSearchDirectoryURLs")
     let toolSearchDirectories: [Path]
 
     /// The paths of directories of in which to search for tools that aren't in
@@ -100,7 +100,7 @@ public struct PluginContext {
         public let name: String
 
         /// Full path of the built or provided tool in the file system.
-        @available(_PackageDescription, deprecated: 6.0)
+        @available(_PackageDescription, deprecated: 6.0, renamed: "url")
         public let path: Path
 
         /// Full path of the built or provided tool in the file system.

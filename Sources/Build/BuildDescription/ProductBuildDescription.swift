@@ -66,7 +66,8 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
 
     /// Path to the temporary directory for this product.
     var tempsPath: AbsolutePath {
-        self.buildParameters.buildPath.appending(component: self.product.name + ".product")
+        let suffix = buildParameters.suffix
+        return self.buildParameters.buildPath.appending(component: "\(self.product.name)\(suffix).product")
     }
 
     /// Path to the link filelist file.
@@ -172,7 +173,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
             args += ["-profile-coverage-mapping", "-profile-generate"]
         }
 
-        let containsSwiftTargets = self.product.containsSwiftTargets
+        let containsSwiftTargets = self.product.containsSwiftModules
 
         let derivedProductType: ProductType
         switch self.product.type {
@@ -240,8 +241,8 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
             // we will instead have generated a source file containing the redirect.
             // Support for linking tests against executables is conditional on the tools
             // version of the package that defines the executable product.
-            let executableTarget = try product.executableTarget
-            if let target = executableTarget.underlying as? SwiftTarget, 
+            let executableTarget = try product.executableModule
+            if let target = executableTarget.underlying as? SwiftModule, 
                 self.toolsVersion >= .v5_5,
                 self.buildParameters.driverParameters.canRenameEntrypointFunctionName,
                 target.supportsTestableExecutablesFeature
@@ -280,7 +281,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
             // Pass experimental features to link jobs in addition to compile jobs. Preserve ordering while eliminating
             // duplicates with `OrderedSet`.
             var experimentalFeatures = OrderedSet<String>()
-            for target in self.product.targets {
+            for target in self.product.modules {
                 let swiftSettings = target.underlying.buildSettingsDescription.filter { $0.tool == .swift }
                 for case let .enableExperimentalFeature(feature) in swiftSettings.map(\.kind)  {
                     experimentalFeatures.append(feature)
@@ -327,7 +328,7 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         // setting is the package-level right now. We might need to figure out a better
         // answer for libraries if/when we support specifying deployment target at the
         // target-level.
-        args += try self.buildParameters.tripleArgs(for: self.product.targets[self.product.targets.startIndex])
+        args += try self.buildParameters.tripleArgs(for: self.product.modules[self.product.modules.startIndex])
 
         // Add arguments from declared build settings.
         args += self.buildSettingsFlags

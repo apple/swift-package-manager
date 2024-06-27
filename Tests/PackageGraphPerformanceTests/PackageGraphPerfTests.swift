@@ -18,7 +18,7 @@ import PackageGraph
 
 import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem
@@ -175,7 +175,7 @@ final class PackageGraphPerfTests: XCTestCasePerf {
         measure {
             do {
                 for _ in 0..<N {
-                    _ = try resolvedTarget.recursiveTargetDependencies()
+                    _ = try resolvedTarget.recursiveModuleDependencies()
                 }
             } catch {
                 XCTFail("Loading package graph is not expected to fail in this test.")

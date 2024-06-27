@@ -13,7 +13,7 @@
 import struct Basics.AbsolutePath
 import class Foundation.PropertyListDecoder
 @testable import LLBuildManifest
-import SPMTestSupport
+import _InternalTestSupport
 import class TSCBasic.InMemoryFileSystem
 import XCTest
 

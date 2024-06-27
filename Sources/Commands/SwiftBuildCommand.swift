@@ -23,7 +23,7 @@ import PackageGraph
 import SPMBuildCore
 import XCBuildSupport
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 import var TSCBasic.stdoutStream
 
 import enum TSCUtility.Diagnostics
@@ -97,6 +97,10 @@ struct BuildCommandOptions: ParsableArguments {
     @Option(help: "Build the specified product")
     var product: String?
 
+    /// Specifies the traits to build.
+    @OptionGroup(visibility: .hidden)
+    package var traits: TraitOptions
+
     /// If should link the Swift stdlib statically.
     @Flag(name: .customLong("static-swift-stdlib"), inversion: .prefixedNo, help: "Link Swift stdlib statically")
     public var shouldLinkStaticSwiftStdlib: Bool = false
@@ -140,7 +144,10 @@ public struct SwiftBuildCommand: AsyncSwiftCommand {
 
         if options.printManifestGraphviz {
             // FIXME: Doesn't seem ideal that we need an explicit build operation, but this concretely uses the `LLBuildManifest`.
-            guard let buildOperation = try swiftCommandState.createBuildSystem(explicitBuildSystem: .native) as? BuildOperation else {
+            guard let buildOperation = try swiftCommandState.createBuildSystem(
+                explicitBuildSystem: .native,
+                traitConfiguration: .init(traitOptions: self.options.traits)
+            ) as? BuildOperation else {
                 throw StringError("asked for native build system but did not get it")
             }
             let buildManifest = try buildOperation.getBuildManifest()
@@ -198,6 +205,7 @@ public struct SwiftBuildCommand: AsyncSwiftCommand {
     ) throws {
         let buildSystem = try swiftCommandState.createBuildSystem(
             explicitProduct: options.product,
+            traitConfiguration: .init(traitOptions: self.options.traits),
             shouldLinkStaticSwiftStdlib: options.shouldLinkStaticSwiftStdlib,
             productsBuildParameters: productsBuildParameters,
             toolsBuildParameters: toolsBuildParameters,

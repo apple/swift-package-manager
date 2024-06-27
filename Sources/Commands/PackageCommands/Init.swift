@@ -80,7 +80,7 @@ extension SwiftPackageCommand {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension InitPackage.PackageType: ExpressibleByArgument {}
 #else
 extension InitPackage.PackageType: @retroactive ExpressibleByArgument {}

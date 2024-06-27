@@ -67,6 +67,9 @@ struct APIDiff: SwiftCommand {
             help: "One or more targets to include in the API comparison. If present, only the specified targets (and any products specified using `--products`) will be compared.")
     var targets: [String] = []
 
+    @OptionGroup(visibility: .hidden)
+    package var traits: TraitOptions
+
     @Option(name: .customLong("baseline-dir"),
             help: "The path to a directory used to store API baseline files. If unspecified, a temporary directory will be used.")
     var overrideBaselineDir: AbsolutePath?
@@ -83,7 +86,11 @@ struct APIDiff: SwiftCommand {
         let baselineRevision = try repository.resolveRevision(identifier: treeish)
 
         // We turn build manifest caching off because we need the build plan.
-        let buildSystem = try swiftCommandState.createBuildSystem(explicitBuildSystem: .native, cacheBuildManifest: false)
+        let buildSystem = try swiftCommandState.createBuildSystem(
+            explicitBuildSystem: .native,
+            traitConfiguration: .init(traitOptions: self.traits),
+            cacheBuildManifest: false
+        )
 
         let packageGraph = try buildSystem.getPackageGraph()
         let modulesToDiff = try determineModulesToDiff(
@@ -177,12 +184,12 @@ struct APIDiff: SwiftCommand {
                     observabilityScope.emit(error: "'\(productName)' is not a library product")
                     continue
                 }
-                modulesToDiff.formUnion(product.targets.filter { $0.underlying is SwiftTarget }.map(\.c99name))
+                modulesToDiff.formUnion(product.modules.filter { $0.underlying is SwiftModule }.map(\.c99name))
             }
             for targetName in targets {
                 guard let target = packageGraph
                         .rootPackages
-                        .flatMap(\.targets)
+                        .flatMap(\.modules)
                         .first(where: { $0.name == targetName }) else {
                     observabilityScope.emit(error: "no such target '\(targetName)'")
                     continue
@@ -191,7 +198,7 @@ struct APIDiff: SwiftCommand {
                     observabilityScope.emit(error: "'\(targetName)' is not a library target")
                     continue
                 }
-                guard target.underlying is SwiftTarget else {
+                guard target.underlying is SwiftModule else {
                     observabilityScope.emit(error: "'\(targetName)' is not a Swift language target")
                     continue
                 }

@@ -10,13 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(Glibc)
-@_implementationOnly import Glibc
-#elseif canImport(Musl)
-@_implementationOnly import Musl
-#elseif canImport(Darwin)
-@_implementationOnly import Darwin.C
-#elseif canImport(ucrt) && canImport(WinSDK)
+#if canImport(ucrt) && canImport(WinSDK)
 @_implementationOnly import ucrt
 @_implementationOnly import struct WinSDK.HANDLE
 #endif
@@ -106,6 +100,11 @@ public final class Package {
     /// The list of products that this package vends and that clients can use.
     public var products: [Product]
 
+    /// The set of traits of this package.
+    @_spi(ExperimentalTraits)
+    @available(_PackageDescription, introduced: 999.0)
+    public var traits: Set<Trait>
+
     /// The list of package dependencies.
     public var dependencies: [Dependency]
 
@@ -158,7 +157,8 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageModes = swiftLanguageVersions.map{ $0.map{ .version("\($0)") } }
+        self.traits = []
+        self.swiftLanguageModes = swiftLanguageVersions.map { $0.map { .version("\($0)") } }
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -196,6 +196,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
+        self.traits = []
         self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
@@ -237,6 +238,7 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
+        self.traits = []
         self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
@@ -281,12 +283,13 @@ public final class Package {
         self.products = products
         self.dependencies = dependencies
         self.targets = targets
+        self.traits = []
         self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
     }
-    
+
     /// Initializes a Swift package with configuration options you provide.
     ///
     /// - Parameters:
@@ -297,12 +300,15 @@ public final class Package {
     ///   `<name>.pc` file to get the additional flags required for a system target.
     ///   - providers: The package providers for a system target.
     ///   - products: The list of products that this package makes available for clients to use.
+    ///   - traits: The set of traits of this package.
     ///   - dependencies: The list of package dependencies.
     ///   - targets: The list of targets that are part of this package.
     ///   - swiftLanguageModes: The list of Swift language modes with which this package is compatible.
     ///   - cLanguageStandard: The C language standard to use for all C targets in this package.
     ///   - cxxLanguageStandard: The C++ language standard to use for all C++ targets in this package.
     @available(_PackageDescription, introduced: 6)
+    @_spi(ExperimentalTraits)
+    @available(_PackageDescription, introduced: 999.0)
     public init(
         name: String,
         defaultLocalization: LanguageTag? = nil,
@@ -310,9 +316,13 @@ public final class Package {
         pkgConfig: String? = nil,
         providers: [SystemPackageProvider]? = nil,
         products: [Product] = [],
+        traits: Set<Trait> = [],
         dependencies: [Dependency] = [],
         targets: [Target] = [],
         swiftLanguageModes: [SwiftLanguageMode]? = nil,
+        dependencies: [Dependency] = [],
+        targets: [Target] = [],
+        swiftLanguageVersions: [SwiftVersion]? = nil,
         cLanguageStandard: CLanguageStandard? = nil,
         cxxLanguageStandard: CXXLanguageStandard? = nil
     ) {
@@ -322,6 +332,7 @@ public final class Package {
         self.pkgConfig = pkgConfig
         self.providers = providers
         self.products = products
+        self.traits = traits
         self.dependencies = dependencies
         self.targets = targets
         self.swiftLanguageModes = swiftLanguageModes

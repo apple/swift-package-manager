@@ -13,7 +13,7 @@
 import Basics
 import Foundation
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 
 #if os(Windows)
 private let hostExecutableSuffix = ".exe"
@@ -84,7 +84,7 @@ public final class UserToolchain: Toolchain {
 
     private var _clangCompiler: AbsolutePath?
 
-    private let environment: EnvironmentVariables
+    private let environment: Environment
 
     public let installedSwiftPMConfiguration: InstalledSwiftPMConfiguration
 
@@ -115,9 +115,9 @@ public final class UserToolchain: Toolchain {
     private static func lookup(
         variable: String,
         searchPaths: [AbsolutePath],
-        environment: EnvironmentVariables
+        environment: Environment
     ) -> AbsolutePath? {
-        lookupExecutablePath(filename: environment[variable], searchPaths: searchPaths)
+        lookupExecutablePath(filename: environment[.init(variable)], searchPaths: searchPaths)
     }
 
     private static func getTool(
@@ -151,7 +151,7 @@ public final class UserToolchain: Toolchain {
     ) throws -> AbsolutePath {
         if useXcrun {
             #if os(macOS)
-            let foundPath = try TSCBasic.Process.checkNonZeroExit(arguments: ["/usr/bin/xcrun", "--find", name])
+            let foundPath = try AsyncProcess.checkNonZeroExit(arguments: ["/usr/bin/xcrun", "--find", name])
                 .spm_chomp()
             return try AbsolutePath(validating: foundPath)
             #endif
@@ -166,7 +166,7 @@ public final class UserToolchain: Toolchain {
         triple: Triple,
         binDirectories: [AbsolutePath],
         useXcrun: Bool,
-        environment: EnvironmentVariables,
+        environment: Environment,
         searchPaths: [AbsolutePath],
         extraSwiftFlags: [String],
         fileSystem: any FileSystem
@@ -226,7 +226,7 @@ public final class UserToolchain: Toolchain {
     public static func determineSwiftCompilers(
         binDirectories: [AbsolutePath],
         useXcrun: Bool,
-        environment: EnvironmentVariables,
+        environment: Environment,
         searchPaths: [AbsolutePath],
         fileSystem: any FileSystem
     ) throws -> SwiftCompilers {
@@ -390,7 +390,7 @@ public final class UserToolchain: Toolchain {
     internal static func deriveSwiftCFlags(
         triple: Triple,
         swiftSDK: SwiftSDK,
-        environment: EnvironmentVariables,
+        environment: Environment,
         fileSystem: any FileSystem
     ) throws -> [String] {
         var swiftCompilerFlags = swiftSDK.toolset.knownTools[.swiftCompiler]?.extraCLIOptions ?? []
@@ -509,7 +509,7 @@ public final class UserToolchain: Toolchain {
     @available(*, deprecated, message: "use init(swiftSDK:environment:searchStrategy:customLibrariesLocation) instead")
     public convenience init(
         destination: SwiftSDK,
-        environment: EnvironmentVariables = .process(),
+        environment: Environment = .current,
         searchStrategy: SearchStrategy = .default,
         customLibrariesLocation: ToolchainConfiguration.SwiftPMLibrariesLocation? = nil
     ) throws {
@@ -524,7 +524,7 @@ public final class UserToolchain: Toolchain {
 
     public init(
         swiftSDK: SwiftSDK,
-        environment: EnvironmentVariables = .process(),
+        environment: Environment = .current,
         searchStrategy: SearchStrategy = .default,
         customLibrariesLocation: ToolchainConfiguration.SwiftPMLibrariesLocation? = nil,
         customInstalledSwiftPMConfiguration: InstalledSwiftPMConfiguration? = nil,
@@ -538,7 +538,7 @@ public final class UserToolchain: Toolchain {
         case .default:
             // Get the search paths from PATH.
             self.envSearchPaths = getEnvSearchPaths(
-                pathString: environment.path,
+                pathString: environment[.path],
                 currentWorkingDirectory: fileSystem.currentWorkingDirectory
             )
             self.useXcrun = true
@@ -704,7 +704,7 @@ public final class UserToolchain: Toolchain {
     private static func deriveSwiftPMLibrariesLocation(
         swiftCompilerPath: AbsolutePath,
         swiftSDK: SwiftSDK,
-        environment: EnvironmentVariables,
+        environment: Environment,
         fileSystem: any FileSystem
     ) throws -> ToolchainConfiguration.SwiftPMLibrariesLocation? {
         // Look for an override in the env.
@@ -783,7 +783,7 @@ public final class UserToolchain: Toolchain {
     private static func derivePluginServerPath(triple: Triple) throws -> AbsolutePath? {
         if triple.isDarwin() {
             let pluginServerPathFindArgs = ["/usr/bin/xcrun", "--find", "swift-plugin-server"]
-            if let path = try? TSCBasic.Process.checkNonZeroExit(arguments: pluginServerPathFindArgs, environment: [:])
+            if let path = try? AsyncProcess.checkNonZeroExit(arguments: pluginServerPathFindArgs, environment: [:])
                 .spm_chomp() {
                 return try AbsolutePath(validating: path)
             }
@@ -795,13 +795,13 @@ public final class UserToolchain: Toolchain {
     private static func deriveXCTestPath(
         swiftSDK: SwiftSDK,
         triple: Triple,
-        environment: EnvironmentVariables,
+        environment: Environment,
         fileSystem: any FileSystem
     ) throws -> AbsolutePath? {
         if triple.isDarwin() {
             // XCTest is optional on macOS, for example when Xcode is not installed
             let xctestFindArgs = ["/usr/bin/xcrun", "--sdk", "macosx", "--find", "xctest"]
-            if let path = try? TSCBasic.Process.checkNonZeroExit(arguments: xctestFindArgs, environment: environment)
+            if let path = try? AsyncProcess.checkNonZeroExit(arguments: xctestFindArgs, environment: environment)
                 .spm_chomp()
             {
                 return try AbsolutePath(validating: path)
@@ -895,7 +895,7 @@ public final class UserToolchain: Toolchain {
         configuration.sdkRootPath
     }
 
-    public var swiftCompilerEnvironment: EnvironmentVariables {
+    public var swiftCompilerEnvironment: Environment {
         configuration.swiftCompilerEnvironment
     }
 

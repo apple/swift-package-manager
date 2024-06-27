@@ -12,7 +12,7 @@
 
 import Basics
 @testable import PackageCollectionsSigning
-import SPMTestSupport
+import _InternalTestSupport
 import SwiftASN1
 import X509
 import XCTest

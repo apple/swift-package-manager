@@ -12,21 +12,21 @@
 
 import Basics
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
-class TestDiscoveryTests: XCTestCase {
-    func testBuild() throws {
-        try fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
-            let (stdout, _) = try executeSwiftBuild(fixturePath)
+final class TestDiscoveryTests: XCTestCase {
+    func testBuild() async throws {
+        try await fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
+            let (stdout, _) = try await executeSwiftBuild(fixturePath)
             // in "swift build" build output goes to stdout
             XCTAssertMatch(stdout, .contains("Build complete!"))
         }
     }
 
-    func testDiscovery() throws {
-        try fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+    func testDiscovery() async throws {
+        try await fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // in "swift test" test output goes to stdout
@@ -34,9 +34,9 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testNonStandardName() throws {
-        try fixture(name: "Miscellaneous/TestDiscovery/hello world") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+    func testNonStandardName() async throws {
+        try await fixture(name: "Miscellaneous/TestDiscovery/hello world") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // in "swift test" test output goes to stdout
@@ -44,9 +44,9 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testAsyncMethods() throws {
-        try fixture(name: "Miscellaneous/TestDiscovery/Async") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+    func testAsyncMethods() async throws {
+        try await fixture(name: "Miscellaneous/TestDiscovery/Async") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // in "swift test" test output goes to stdout
@@ -54,12 +54,12 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testDiscovery_whenNoTests() throws {
+    func testDiscovery_whenNoTests() async throws {
         #if os(macOS)
         try XCTSkipIf(true)
         #endif
-        try fixture(name: "Miscellaneous/TestDiscovery/NoTests") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+        try await fixture(name: "Miscellaneous/TestDiscovery/NoTests") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // we are expecting that no warning is produced
@@ -69,16 +69,17 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testEntryPointOverride() throws {
+    func testEntryPointOverride() async throws {
         #if os(macOS)
         try XCTSkipIf(true)
         #endif
-        try SwiftTarget.testEntryPointNames.forEach { name in
-            try fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
+
+        for name in SwiftModule.testEntryPointNames {
+            try await fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
                 let random = UUID().uuidString
                 let manifestPath = fixturePath.appending(components: "Tests", name)
                 try localFileSystem.writeFileContents(manifestPath, string: "print(\"\(random)\")")
-                let (stdout, stderr) = try executeSwiftTest(fixturePath)
+                let (stdout, stderr) = try await executeSwiftTest(fixturePath)
                 // in "swift test" build output goes to stderr
                 XCTAssertMatch(stderr, .contains("Build complete!"))
                 // in "swift test" test output goes to stdout
@@ -88,14 +89,15 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testEntryPointOverrideIgnored() throws {
+    func testEntryPointOverrideIgnored() async throws {
         #if os(macOS)
         try XCTSkipIf(true)
         #endif
-        try fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
-            let manifestPath = fixturePath.appending(components: "Tests", SwiftTarget.defaultTestEntryPointName)
+
+        try await fixture(name: "Miscellaneous/TestDiscovery/Simple") { fixturePath in
+            let manifestPath = fixturePath.appending(components: "Tests", SwiftModule.defaultTestEntryPointName)
             try localFileSystem.writeFileContents(manifestPath, string: "fatalError(\"should not be called\")")
-            let (stdout, stderr) = try executeSwiftTest(fixturePath, extraArgs: ["--enable-test-discovery"])
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath, extraArgs: ["--enable-test-discovery"])
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // in "swift test" test output goes to stdout
@@ -103,12 +105,12 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testTestExtensions() throws {
+    func testTestExtensions() async throws {
         #if os(macOS)
         try XCTSkipIf(true)
         #endif
-        try fixture(name: "Miscellaneous/TestDiscovery/Extensions") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+        try await fixture(name: "Miscellaneous/TestDiscovery/Extensions") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // in "swift test" test output goes to stdout
@@ -123,24 +125,24 @@ class TestDiscoveryTests: XCTestCase {
         }
     }
 
-    func testDeprecatedTests() throws {
+    func testDeprecatedTests() async throws {
         #if os(macOS)
         try XCTSkipIf(true)
         #endif
-        try fixture(name: "Miscellaneous/TestDiscovery/Deprecation") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+        try await fixture(name: "Miscellaneous/TestDiscovery/Deprecation") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" test output goes to stdout
             XCTAssertMatch(stdout, .contains("Executed 2 tests"))
             XCTAssertNoMatch(stderr, .contains("is deprecated"))
         }
     }
 
-    func testSubclassedTestClassTests() throws {
+    func testSubclassedTestClassTests() async throws {
         #if os(macOS)
         try XCTSkipIf(true)
         #endif
-        try fixture(name: "Miscellaneous/TestDiscovery/Subclass") { fixturePath in
-            let (stdout, stderr) = try executeSwiftTest(fixturePath)
+        try await fixture(name: "Miscellaneous/TestDiscovery/Subclass") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftTest(fixturePath)
             // in "swift test" build output goes to stderr
             XCTAssertMatch(stderr, .contains("Build complete!"))
             // in "swift test" test output goes to stdout

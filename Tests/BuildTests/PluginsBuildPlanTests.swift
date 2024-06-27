@@ -11,21 +11,23 @@
 //===----------------------------------------------------------------------===//
 
 import Basics
-import SPMTestSupport
+import _InternalTestSupport
 @testable import SPMBuildCore
 import XCTest
 import PackageModel
 
 final class PluginsBuildPlanTests: XCTestCase {
-    func testBuildToolsDatabasePath() throws {
-        try fixture(name: "Miscellaneous/Plugins/MySourceGenPlugin") { fixturePath in
-            let (stdout, _) = try executeSwiftBuild(fixturePath)
+    func testBuildToolsDatabasePath() async throws {
+        try await fixture(name: "Miscellaneous/Plugins/MySourceGenPlugin") { fixturePath in
+            let (stdout, _) = try await executeSwiftBuild(fixturePath)
             XCTAssertMatch(stdout, .contains("Build complete!"))
-            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/plugins/tools/build.db"))))
+            // FIXME: This is temporary until build of plugin tools is extracted into its own command.
+            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/plugin-tools.db"))))
+            XCTAssertTrue(localFileSystem.exists(fixturePath.appending(RelativePath(".build/build.db"))))
         }
     }
 
-    func testCommandPluginDependenciesWhenCrossCompiling() throws {
+    func testCommandPluginDependenciesWhenCrossCompiling() async throws {
         // Command Plugin dependencies must be built for the host.
         // This test is only supported on macOS because that is the only
         // platform on which we can currently be sure of having a viable
@@ -36,7 +38,7 @@ final class PluginsBuildPlanTests: XCTestCase {
         try XCTSkipIf(true, "test is only supported on macOS")
         #endif
 
-        let hostToolchain = try UserToolchain(swiftSDK: .hostSwiftSDK(environment: .empty()), environment: .empty())
+        let hostToolchain = try UserToolchain(swiftSDK: .hostSwiftSDK(environment: [:]), environment: [:])
         let hostTriple = try! hostToolchain.targetTriple.withoutVersion().tripleString
 
         let x86Triple = "x86_64-apple-macosx"
@@ -44,8 +46,8 @@ final class PluginsBuildPlanTests: XCTestCase {
         let targetTriple = hostToolchain.targetTriple.arch == .aarch64 ? x86Triple : armTriple
 
         // By default, plugin dependencies are built for the host platform
-        try fixture(name: "Miscellaneous/Plugins/CommandPluginTestStub") { fixturePath in
-            let (stdout, stderr) = try executeSwiftPackage(fixturePath, extraArgs: ["-v", "build-plugin-dependency"])
+        try await fixture(name: "Miscellaneous/Plugins/CommandPluginTestStub") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftPackage(fixturePath, extraArgs: ["-v", "build-plugin-dependency"])
             XCTAssertMatch(stdout, .contains("Hello from dependencies-stub"))
             XCTAssertMatch(stderr, .contains("Build of product 'plugintool' complete!"))
             XCTAssertTrue(
@@ -61,8 +63,8 @@ final class PluginsBuildPlanTests: XCTestCase {
         }
 
         // When cross compiling the final product, plugin dependencies should still be built for the host
-        try fixture(name: "Miscellaneous/Plugins/CommandPluginTestStub") { fixturePath in
-            let (stdout, stderr) = try executeSwiftPackage(fixturePath, extraArgs: ["--triple", targetTriple, "-v", "build-plugin-dependency"])
+        try await fixture(name: "Miscellaneous/Plugins/CommandPluginTestStub") { fixturePath in
+            let (stdout, stderr) = try await executeSwiftPackage(fixturePath, extraArgs: ["--triple", targetTriple, "-v", "build-plugin-dependency"])
             XCTAssertMatch(stdout, .contains("Hello from dependencies-stub"))
             XCTAssertMatch(stderr, .contains("Build of product 'plugintool' complete!"))
             XCTAssertTrue(

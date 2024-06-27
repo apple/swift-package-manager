@@ -9,7 +9,7 @@ if(NOT SwiftSyntax_FOUND)
       SOURCE_DIR "${swift_syntax_path}")
   else()
     FetchContent_Declare(SwiftSyntax
-      GIT_REPOSITORY https://github.com/apple/swift-syntax
+      GIT_REPOSITORY https://github.com/swiftlang/swift-syntax
       GIT_TAG main)
   endif()
   FetchContent_MakeAvailable(SwiftSyntax)

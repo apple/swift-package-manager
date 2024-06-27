@@ -26,6 +26,8 @@ import struct PackageModel.PackageIdentity
 import class PackageModel.Manifest
 import enum PackageModel.Sanitizer
 
+import struct PackageGraph.TraitConfiguration
+
 import struct SPMBuildCore.BuildParameters
 import struct SPMBuildCore.BuildSystemProvider
 
@@ -651,6 +653,53 @@ public struct TestLibraryOptions: ParsableArguments {
     }
 }
 
+
+package struct TraitOptions: ParsableArguments {
+    package init() {}
+
+    /// The traits to enable for the package.
+    @Option(
+        name: .customLong("experimental-traits"),
+        help: "Enables the passed traits of the package. Multiple traits can be specified by providing a space separated list e.g. `--traits Trait1 Trait2`. When enabling specific traits the defaults traits need to explictily enabled as well by passing `defaults` to this command."
+    )
+    package var _enabledTraits: String?
+
+    /// The set of enabled traits for the package.
+    package var enabledTraits: Set<String>? {
+        self._enabledTraits.flatMap { Set($0.components(separatedBy: ",")) }
+    }
+
+    /// Enables all traits of the package.
+    @Flag(
+        name: .customLong("experimental-enable-all-traits"),
+        help: "Enables all traits of the package."
+    )
+    package var enableAllTraits: Bool = false
+
+    /// Disables all default traits of the package.
+    @Flag(
+        name: .customLong("experimental-disable-default-traits"),
+        help: "Disables all default traits of the package."
+    )
+    public var disableDefaultTraits: Bool = false
+}
+
+extension TraitConfiguration {
+    package init(traitOptions: TraitOptions) {
+        var enabledTraits = traitOptions.enabledTraits
+        if traitOptions.disableDefaultTraits {
+            // If there are no enabled traits specified we can disable the
+            // default trait by passing in an empty set. Otherwise the enabling specific traits
+            // requires the user to pass the default as well.
+            enabledTraits = enabledTraits ?? []
+        }
+        self.init(
+            enabledTraits: enabledTraits,
+            enableAllTraits: traitOptions.enableAllTraits
+        )
+    }
+}
+
 // MARK: - Extensions
 
 extension BuildConfiguration {
@@ -720,7 +769,7 @@ extension URL {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension BuildConfiguration: ExpressibleByArgument {}
 extension AbsolutePath: ExpressibleByArgument {}
 extension WorkspaceConfiguration.CheckingMode: ExpressibleByArgument {}

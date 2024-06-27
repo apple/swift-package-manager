@@ -14,7 +14,7 @@ import Basics
 import Foundation
 @testable import PackageCollections
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 class PackageIndexTests: XCTestCase {

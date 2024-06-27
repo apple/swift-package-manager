@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @testable import Basics
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 final class LegacyHTTPClientTests: XCTestCase {

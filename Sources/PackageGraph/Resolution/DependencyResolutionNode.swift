@@ -37,7 +37,7 @@ public enum DependencyResolutionNode {
     /// - one implicit dependency on its own package at an exact version (as an empty package node).
     ///   This dependency is what ensures the resolver does not select two products from the same package at different versions.
     /// - zero or more dependencies on the product nodes of other packages.
-    ///   These are all the external products required to build all of the targets vended by this product.
+    ///   These are all the external products required to build all of the modules vended by this product.
     ///   They derive from the manifest.
     ///
     ///   Tools versions before 5.2 do not know which products belong to which packages, so each product is required from every dependency.
@@ -52,7 +52,7 @@ public enum DependencyResolutionNode {
     ///
     /// Root nodes may have dependencies. A root node has...
     ///
-    /// - zero or more dependencies on each external product node required to build any of its targets (vended or not).
+    /// - zero or more dependencies on each external product node required to build any of its modules (vended or not).
     /// - zero or more dependencies directly on external empty package nodes.
     ///   This special case occurs when a dependency is declared but not used.
     ///   It is a warning condition, and builds do not actually need these dependencies.

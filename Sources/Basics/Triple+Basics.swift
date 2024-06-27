@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import enum TSCBasic.JSON
-import class TSCBasic.Process
 
 extension Triple {
     public init(_ description: String) throws {
@@ -85,7 +84,7 @@ extension Triple {
         // Call the compiler to get the target info JSON.
         let compilerOutput: String
         do {
-            let result = try Process.popen(args: swiftCompiler.pathString, "-print-target-info")
+            let result = try AsyncProcess.popen(args: swiftCompiler.pathString, "-print-target-info")
             compilerOutput = try result.utf8Output().spm_chomp()
         } catch {
             throw InternalError("Failed to get target info (\(error.interpolationDescription))")

@@ -4,7 +4,7 @@
 
 Please visit the SwiftPM web site for more information:
 
-  * https://github.com/apple/swift-package-manager
+  * https://github.com/swiftlang/swift-package-manager
 
 Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 

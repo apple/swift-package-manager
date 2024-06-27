@@ -19,6 +19,57 @@ import struct TSCUtility.Version
 
 /// Represents a package dependency.
 public enum PackageDependency: Equatable, Hashable, Sendable {
+    /// A struct representing an enabled trait of a dependency.
+    package struct Trait: Hashable, Sendable, Codable, ExpressibleByStringLiteral {
+        /// A condition that limits the application of a dependencies trait.
+        package struct Condition: Hashable, Sendable, Codable {
+            /// The set of traits of this package that enable the dependencie's trait.
+            package let traits: Set<String>?
+
+            public init(traits: Set<String>?) {
+                self.traits = traits
+            }
+        }
+
+        /// The name of the enabled trait.
+        package var name: String
+
+        /// The condition under which the trait is enabled.
+        package var condition: Condition?
+
+        /// Initializes a new enabled trait.
+        ///
+        /// - Parameters:
+        ///   - name: The name of the enabled trait.
+        ///   - condition: The condition under which the trait is enabled.
+        package init(
+            name: String,
+            condition: Condition? = nil
+        ) {
+            self.name = name
+            self.condition = condition
+        }
+
+        public init(stringLiteral value: StringLiteralType) {
+            self.init(name: value)
+        }
+
+        /// Initializes a new enabled trait.
+        ///
+        /// - Parameters:
+        ///   - name: The name of the enabled trait.
+        ///   - condition: The condition under which the trait is enabled.
+        package static func trait(
+            name: String,
+            condition: Condition? = nil
+        ) -> Trait {
+            self.init(
+                name: name,
+                condition: condition
+            )
+        }
+    }
+
     case fileSystem(FileSystem)
     case sourceControl(SourceControl)
     case registry(Registry)
@@ -28,6 +79,7 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
         public let nameForTargetDependencyResolutionOnly: String?
         public let path: AbsolutePath
         public let productFilter: ProductFilter
+        package let traits: Set<Trait>?
     }
 
     public struct SourceControl: Equatable, Hashable, Encodable, Sendable {
@@ -36,6 +88,7 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
         public let location: Location
         public let requirement: Requirement
         public let productFilter: ProductFilter
+        package let traits: Set<Trait>?
 
         public enum Requirement: Equatable, Hashable, Sendable {
             case exact(Version)
@@ -54,11 +107,23 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
         public let identity: PackageIdentity
         public let requirement: Requirement
         public let productFilter: ProductFilter
+        package let traits: Set<Trait>?
 
         /// The dependency requirement.
         public enum Requirement: Equatable, Hashable, Sendable {
             case exact(Version)
             case range(Range<Version>)
+        }
+    }
+
+    package var traits: Set<Trait>? {
+        switch self {
+        case .fileSystem(let settings):
+            return settings.traits
+        case .sourceControl(let settings):
+            return settings.traits
+        case .registry(let settings):
+            return settings.traits
         }
     }
 
@@ -75,7 +140,7 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
 
     // FIXME: we should simplify target based dependencies such that this is no longer required
     // A name to be used *only* for target dependencies resolution
-    public var nameForTargetDependencyResolutionOnly: String {
+    public var nameForModuleDependencyResolutionOnly: String {
         switch self {
         case .fileSystem(let settings):
             return settings.nameForTargetDependencyResolutionOnly ?? PackageIdentityParser.computeDefaultName(fromPath: settings.path)
@@ -93,7 +158,7 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
 
     // FIXME: we should simplify target based dependencies such that this is no longer required
     // A name to be used *only* for target dependencies resolution
-    public var explicitNameForTargetDependencyResolutionOnly: String? {
+    public var explicitNameForModuleDependencyResolutionOnly: String? {
         switch self {
         case .fileSystem(let settings):
             return settings.nameForTargetDependencyResolutionOnly
@@ -122,7 +187,8 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
                 identity: settings.identity,
                 nameForTargetDependencyResolutionOnly: settings.nameForTargetDependencyResolutionOnly,
                 path: settings.path,
-                productFilter: productFilter
+                productFilter: productFilter,
+                traits: settings.traits
             )
         case .sourceControl(let settings):
             return .sourceControl(
@@ -130,67 +196,146 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
                 nameForTargetDependencyResolutionOnly: settings.nameForTargetDependencyResolutionOnly,
                 location: settings.location,
                 requirement: settings.requirement,
-                productFilter: productFilter
+                productFilter: productFilter,
+                traits: settings.traits
             )
         case .registry(let settings):
             return .registry(
                 identity: settings.identity,
                 requirement: settings.requirement,
-                productFilter: productFilter
+                productFilter: productFilter,
+                traits: settings.traits
             )
         }
     }
 
-    public static func fileSystem(identity: PackageIdentity,
-                                  nameForTargetDependencyResolutionOnly: String?,
-                                  path: AbsolutePath,
-                                  productFilter: ProductFilter
+    public static func fileSystem(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        path: AbsolutePath,
+        productFilter: ProductFilter
+    ) -> Self {
+        .fileSystem(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
+            path: path,
+            productFilter: productFilter,
+            traits: nil
+        )
+    }
+
+    package static func fileSystem(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        path: AbsolutePath,
+        productFilter: ProductFilter,
+        traits: Set<Trait>?
     ) -> Self {
         .fileSystem(
             .init(
                 identity: identity,
                 nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
                 path: path,
-                productFilter: productFilter
+                productFilter: productFilter,
+                traits: traits
             )
         )
     }
 
-    public static func localSourceControl(identity: PackageIdentity,
-                                          nameForTargetDependencyResolutionOnly: String?,
-                                          path: AbsolutePath,
-                                          requirement: SourceControl.Requirement,
-                                          productFilter: ProductFilter
+    public static func localSourceControl(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        path: AbsolutePath,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter
+    ) -> Self {
+        .localSourceControl(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
+            path: path,
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: nil
+        )
+    }
+
+    package static func localSourceControl(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        path: AbsolutePath,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter,
+        traits: Set<Trait>?
     ) -> Self {
         .sourceControl(
             identity: identity,
             nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
             location: .local(path),
             requirement: requirement,
-            productFilter: productFilter
+            productFilter: productFilter,
+            traits: traits
         )
     }
     
-    public static func remoteSourceControl(identity: PackageIdentity,
-                                           nameForTargetDependencyResolutionOnly: String?,
-                                           url: SourceControlURL,
-                                           requirement: SourceControl.Requirement,
-                                           productFilter: ProductFilter
+    public static func remoteSourceControl(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        url: SourceControlURL,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter
+    ) -> Self {
+        .remoteSourceControl(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
+            url: url,
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: nil
+        )
+    }
+
+    package static func remoteSourceControl(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        url: SourceControlURL,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter,
+        traits: Set<Trait>?
     ) -> Self {
         .sourceControl(
             identity: identity,
             nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
             location: .remote(url),
             requirement: requirement,
-            productFilter: productFilter
+            productFilter: productFilter,
+            traits: traits
         )
     }
 
-    public static func sourceControl(identity: PackageIdentity,
-                                     nameForTargetDependencyResolutionOnly: String?,
-                                     location: SourceControl.Location,
-                                     requirement: SourceControl.Requirement,
-                                     productFilter: ProductFilter
+    public static func sourceControl(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        location: SourceControl.Location,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter
+    ) -> Self {
+        .sourceControl(
+            identity: identity,
+            nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
+            location: location,
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: nil
+        )
+    }
+
+    package static func sourceControl(
+        identity: PackageIdentity,
+        nameForTargetDependencyResolutionOnly: String?,
+        location: SourceControl.Location,
+        requirement: SourceControl.Requirement,
+        productFilter: ProductFilter,
+        traits: Set<Trait>?
     ) -> Self {
         .sourceControl(
             .init(
@@ -198,20 +343,37 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
                 nameForTargetDependencyResolutionOnly: nameForTargetDependencyResolutionOnly,
                 location: location,
                 requirement: requirement,
-                productFilter: productFilter
+                productFilter: productFilter,
+                traits: traits
             )
         )
     }
 
-    public static func registry(identity: PackageIdentity,
-                                requirement: Registry.Requirement,
-                                productFilter: ProductFilter
+    public static func registry(
+        identity: PackageIdentity,
+        requirement: Registry.Requirement,
+        productFilter: ProductFilter
+    ) -> Self {
+        .registry(
+            identity: identity,
+            requirement: requirement,
+            productFilter: productFilter,
+            traits: nil
+        )
+    }
+
+    package static func registry(
+        identity: PackageIdentity,
+        requirement: Registry.Requirement,
+        productFilter: ProductFilter,
+        traits: Set<Trait>?
     ) -> Self {
         .registry(
             .init(
                 identity: identity,
                 requirement: requirement,
-                productFilter: productFilter
+                productFilter: productFilter,
+                traits: traits
             )
         )
     }

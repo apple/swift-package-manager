@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2021-2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2021-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,7 +16,6 @@ import Foundation
 /// environment variables, initial working directory, etc. All paths should be
 /// based on the ones passed to the plugin in the target build context.
 public enum Command {
-
     /// Returns a command that runs when any of its output files are needed by
     /// the build, but out-of-date.
     ///
@@ -86,8 +85,7 @@ public enum Command {
     )
 }
 
-public extension Command {
-
+extension Command {
     /// Returns a command that runs when any of its output files are needed by
     /// the build, but out-of-date.
     ///
@@ -114,8 +112,8 @@ public extension Command {
     ///     was generated as if in its source directory; other files are treated
     ///     as resources as if explicitly listed in `Package.swift` using
     ///     `.process(...)`.
-    @available(_PackageDescription, deprecated: 6.0)
-    static func buildCommand(
+    @available(_PackageDescription, deprecated: 6.0, message: "Use `URL` type instead of `Path`.")
+    public static func buildCommand(
         displayName: String?,
         executable: Path,
         arguments: [CustomStringConvertible],
@@ -123,11 +121,11 @@ public extension Command {
         inputFiles: [Path] = [],
         outputFiles: [Path] = []
     ) -> Command {
-        return buildCommand(
+        self.buildCommand(
             displayName: displayName,
             executable: URL(fileURLWithPath: executable.stringValue),
-            arguments: arguments.map{ $0.description },
-            environment: environment.mapValues{ $0.description },
+            arguments: arguments.map(\.description),
+            environment: environment.mapValues { $0.description },
             inputFiles: inputFiles.map { URL(fileURLWithPath: $0.stringValue) },
             outputFiles: outputFiles.map { URL(fileURLWithPath: $0.stringValue) }
         )
@@ -160,7 +158,7 @@ public extension Command {
     ///     as resources as if explicitly listed in `Package.swift` using
     ///     `.process(...)`.
     @available(*, unavailable, message: "specifying the initial working directory for a command is not yet supported")
-    static func buildCommand(
+    public static func buildCommand(
         displayName: String?,
         executable: Path,
         arguments: [CustomStringConvertible],
@@ -169,11 +167,11 @@ public extension Command {
         inputFiles: [Path] = [],
         outputFiles: [Path] = []
     ) -> Command {
-        return buildCommand(
+        self.buildCommand(
             displayName: displayName,
             executable: URL(fileURLWithPath: executable.stringValue),
-            arguments: arguments.map{ $0.description },
-            environment: environment.mapValues{ $0.description },
+            arguments: arguments.map(\.description),
+            environment: environment.mapValues { $0.description },
             inputFiles: inputFiles.map { URL(fileURLWithPath: $0.stringValue) },
             outputFiles: outputFiles.map { URL(fileURLWithPath: $0.stringValue) }
         )
@@ -204,19 +202,19 @@ public extension Command {
     ///     this command was generated as if in its source directory; other
     ///     files are treated as resources as if explicitly listed in
     ///     `Package.swift` using `.process(...)`.
-    @available(_PackageDescription, deprecated: 6.0)
-    static func prebuildCommand(
+    @available(_PackageDescription, deprecated: 6.0, message: "Use `URL` type instead of `Path`.")
+    public static func prebuildCommand(
         displayName: String?,
         executable: Path,
         arguments: [CustomStringConvertible],
         environment: [String: CustomStringConvertible] = [:],
         outputFilesDirectory: Path
     ) -> Command {
-        return prebuildCommand(
+        self.prebuildCommand(
             displayName: displayName,
             executable: URL(fileURLWithPath: executable.stringValue),
-            arguments: arguments.map{ $0.description },
-            environment: environment.mapValues{ $0.description },
+            arguments: arguments.map(\.description),
+            environment: environment.mapValues { $0.description },
             outputFilesDirectory: URL(fileURLWithPath: outputFilesDirectory.stringValue)
         )
     }
@@ -247,7 +245,7 @@ public extension Command {
     ///     files are treated as resources as if explicitly listed in
     ///     `Package.swift` using `.process(...)`.
     @available(*, unavailable, message: "specifying the initial working directory for a command is not yet supported")
-    static func prebuildCommand(
+    public static func prebuildCommand(
         displayName: String?,
         executable: Path,
         arguments: [CustomStringConvertible],
@@ -255,11 +253,11 @@ public extension Command {
         workingDirectory: Path? = .none,
         outputFilesDirectory: Path
     ) -> Command {
-        return prebuildCommand(
+        self.prebuildCommand(
             displayName: displayName,
             executable: URL(fileURLWithPath: executable.stringValue),
-            arguments: arguments.map{ $0.description },
-            environment: environment.mapValues{ $0.description },
+            arguments: arguments.map(\.description),
+            environment: environment.mapValues { $0.description },
             outputFilesDirectory: URL(fileURLWithPath: outputFilesDirectory.stringValue)
         )
     }

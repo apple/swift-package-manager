@@ -13,7 +13,7 @@
 import Basics
 import Foundation
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 
 private func isAndroid() -> Bool {
     (try? localFileSystem.isFile(AbsolutePath(validating: "/system/bin/toolchain"))) ?? false ||
@@ -38,7 +38,7 @@ extension Platform {
         #if os(Windows)
         return .windows
         #else
-        switch try? Process.checkNonZeroExit(args: "uname")
+        switch try? AsyncProcess.checkNonZeroExit(args: "uname")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         {

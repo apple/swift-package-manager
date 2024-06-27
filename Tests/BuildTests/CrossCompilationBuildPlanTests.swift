@@ -14,32 +14,27 @@ import struct Basics.AbsolutePath
 import class Basics.ObservabilitySystem
 import class Build.BuildPlan
 import class Build.ProductBuildDescription
-import enum Build.TargetBuildDescription
-import class Build.SwiftTargetBuildDescription
+import enum Build.ModuleBuildDescription
+import class Build.SwiftModuleBuildDescription
 import struct Basics.Triple
 import enum PackageGraph.BuildTriple
 import class PackageModel.Manifest
 import struct PackageModel.TargetDescription
 import enum PackageModel.ProductType
 import struct SPMBuildCore.BuildParameters
-import func SPMTestSupport.loadPackageGraph
+import func _InternalTestSupport.loadPackageGraph
 
-@_spi(SwiftPMInternal)
-import func SPMTestSupport.embeddedCxxInteropPackageGraph
+import func _InternalTestSupport.embeddedCxxInteropPackageGraph
+import func _InternalTestSupport.macrosPackageGraph
+import func _InternalTestSupport.macrosTestsPackageGraph
+import func _InternalTestSupport.mockBuildParameters
+import func _InternalTestSupport.mockBuildPlan
+import func _InternalTestSupport.toolsExplicitLibrariesGraph
+import func _InternalTestSupport.trivialPackageGraph
 
-@_spi(SwiftPMInternal)
-import func SPMTestSupport.macrosPackageGraph
-import func SPMTestSupport.macrosTestsPackageGraph
-import func SPMTestSupport.mockBuildParameters
-import func SPMTestSupport.mockBuildPlan
-import func SPMTestSupport.toolsExplicitLibrariesGraph
-
-@_spi(SwiftPMInternal)
-import func SPMTestSupport.trivialPackageGraph
-
-import struct SPMTestSupport.BuildPlanResult
-import func SPMTestSupport.XCTAssertMatch
-import func SPMTestSupport.XCTAssertNoDiagnostics
+import struct _InternalTestSupport.BuildPlanResult
+import func _InternalTestSupport.XCTAssertMatch
+import func _InternalTestSupport.XCTAssertNoDiagnostics
 import class TSCBasic.InMemoryFileSystem
 
 import XCTest
@@ -62,7 +57,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
             observabilityScope: observabilityScope
         ))
         result.checkProductsCount(2)
-        // There are two additional targets on non-Apple platforms, for test discovery and
+        // There are two additional modules on non-Apple platforms, for test discovery and
         // test entry point
         result.checkTargetsCount(5)
 
@@ -91,7 +86,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
             observabilityScope: observabilityScope
         ))
         result.checkProductsCount(2)
-        // There are two additional targets on non-Apple platforms, for test discovery and
+        // There are two additional modules on non-Apple platforms, for test discovery and
         // test entry point
         result.checkTargetsCount(5)
 
@@ -158,7 +153,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
             observabilityScope: observabilityScope
         ))
         result.checkProductsCount(2)
-        // There are two additional targets on non-Apple platforms, for test discovery and
+        // There are two additional modules on non-Apple platforms, for test discovery and
         // test entry point
         result.checkTargetsCount(5)
 
@@ -166,7 +161,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
 
         let lib = try XCTUnwrap(
             result.allTargets(named: "lib")
-                .map { try $0.clangTarget() }
+                .map { try $0.clang() }
                 .first { $0.target.buildTriple == .destination }
         )
 
@@ -180,7 +175,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
         XCTAssertEqual(try lib.objects, [buildPath.appending(components: "lib.build", "lib.c.o")])
         XCTAssertEqual(lib.moduleMap, buildPath.appending(components: "lib.build", "module.modulemap"))
 
-        let exe = try result.target(for: "app").swiftTarget().compileArguments()
+        let exe = try result.moduleBuildDescription(for: "app").swift().compileArguments()
         XCTAssertMatch(
             exe,
             [
@@ -253,7 +248,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
         result.checkTargetsCount(10)
 
         XCTAssertTrue(try result.allTargets(named: "SwiftSyntax")
-            .map { try $0.swiftTarget() }
+            .map { try $0.swift() }
             .contains { $0.target.buildTriple == .tools })
         try result.check(buildTriple: .tools, triple: toolsTriple, for: "MMIOMacros")
         try result.check(buildTriple: .destination, triple: destinationTriple, for: "MMIO")
@@ -265,7 +260,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
         let macroProduct = try XCTUnwrap(macroProducts.first)
         XCTAssertEqual(macroProduct.buildParameters.triple, toolsTriple)
 
-        let mmioTargets = try result.allTargets(named: "MMIO").map { try $0.swiftTarget() }
+        let mmioTargets = try result.allTargets(named: "MMIO").map { try $0.swift() }
         XCTAssertEqual(mmioTargets.count, 1)
         let mmioTarget = try XCTUnwrap(mmioTargets.first)
         let compileArguments = try mmioTarget.emitCommandLine()
@@ -302,10 +297,10 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
         )
         let result = try BuildPlanResult(plan: plan)
         result.checkProductsCount(2)
-        result.checkTargetsCount(15)
+        result.checkTargetsCount(16)
 
         XCTAssertTrue(try result.allTargets(named: "SwiftSyntax")
-            .map { try $0.swiftTarget() }
+            .map { try $0.swift() }
             .contains { $0.target.buildTriple == .tools })
 
         try result.check(buildTriple: .tools, triple: toolsTriple, for: "swift-mmioPackageTests")
@@ -319,7 +314,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
         let macroProduct = try XCTUnwrap(macroProducts.first)
         XCTAssertEqual(macroProduct.buildParameters.triple, toolsTriple)
 
-        let mmioTargets = try result.allTargets(named: "MMIO").map { try $0.swiftTarget() }
+        let mmioTargets = try result.allTargets(named: "MMIO").map { try $0.swift() }
         XCTAssertEqual(mmioTargets.count, 1)
         let mmioTarget = try XCTUnwrap(mmioTargets.first)
         let compileArguments = try mmioTarget.emitCommandLine()
@@ -360,7 +355,7 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
             result.checkTargetsCount(6)
 
             XCTAssertTrue(try result.allTargets(named: "SwiftSyntax")
-                .map { try $0.swiftTarget() }
+                .map { try $0.swift() }
                 .contains { $0.target.buildTriple == .tools })
 
             try result.check(buildTriple: .tools, triple: toolsTriple, for: "swift-mmioPackageTests")
@@ -385,9 +380,9 @@ final class CrossCompilationBuildPlanTests: XCTestCase {
 }
 
 extension BuildPlanResult {
-    func allTargets(named name: String) throws -> some Collection<TargetBuildDescription> {
+    func allTargets(named name: String) throws -> some Collection<ModuleBuildDescription> {
         self.targetMap
-            .filter { $0.0.targetName == name }
+            .filter { $0.0.moduleName == name }
             .values
     }
 
@@ -405,7 +400,7 @@ extension BuildPlanResult {
         line: UInt = #line
     ) throws {
         let targets = self.targetMap.filter {
-            $0.key.targetName == target && $0.key.buildTriple == buildTriple
+            $0.key.moduleName == target && $0.key.buildTriple == buildTriple
         }
         XCTAssertEqual(targets.count, 1, file: file, line: line)
 
@@ -413,7 +408,7 @@ extension BuildPlanResult {
             targets.first?.value,
             file: file,
             line: line
-        ).swiftTarget()
+        ).swift()
         XCTAssertMatch(try target.emitCommandLine(), [.contains(triple.tripleString)], file: file, line: line)
     }
 }

@@ -13,7 +13,7 @@
 import Basics
 import Foundation
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 
 public protocol AuxiliaryFileType {
     static var name: String { get }
@@ -123,7 +123,7 @@ public enum WriteAuxiliary {
                 throw Error.unknownSwiftCompilerPath
             }
             let swiftCompilerPath = try AbsolutePath(validating: swiftCompilerPathString)
-            return try TSCBasic.Process.checkNonZeroExit(args: swiftCompilerPath.pathString, "-version")
+            return try AsyncProcess.checkNonZeroExit(args: swiftCompilerPath.pathString, "-version")
         }
 
         private enum Error: Swift.Error {
@@ -226,14 +226,18 @@ public struct LLBuildManifest {
         targets[target, default: Target(name: target, nodes: [])].nodes.append(node)
     }
 
+    private mutating func addCommand(name: String, tool: ToolProtocol) {
+        assert(commands[name] == nil, "already had a command named '\(name)'")
+        commands[name] = Command(name: name, tool: tool)
+    }
+
     public mutating func addPhonyCmd(
         name: String,
         inputs: [Node],
         outputs: [Node]
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = PhonyTool(inputs: inputs, outputs: outputs)
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addTestDiscoveryCmd(
@@ -241,9 +245,8 @@ public struct LLBuildManifest {
         inputs: [Node],
         outputs: [Node]
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = TestDiscoveryTool(inputs: inputs, outputs: outputs)
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addTestEntryPointCmd(
@@ -251,9 +254,8 @@ public struct LLBuildManifest {
         inputs: [Node],
         outputs: [Node]
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = TestEntryPointTool(inputs: inputs, outputs: outputs)
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addCopyCmd(
@@ -261,16 +263,15 @@ public struct LLBuildManifest {
         inputs: [Node],
         outputs: [Node]
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = CopyTool(inputs: inputs, outputs: outputs)
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addEntitlementPlistCommand(entitlement: String, outputPath: AbsolutePath) {
         let inputs = WriteAuxiliary.EntitlementPlist.computeInputs(entitlement: entitlement)
         let tool = WriteAuxiliaryFile(inputs: inputs, outputFilePath: outputPath)
         let name = outputPath.pathString
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addWriteLinkFileListCommand(
@@ -280,7 +281,7 @@ public struct LLBuildManifest {
         let inputs = WriteAuxiliary.LinkFileList.computeInputs(objects: objects)
         let tool = WriteAuxiliaryFile(inputs: inputs, outputFilePath: linkFileListPath)
         let name = linkFileListPath.pathString
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addWriteSourcesFileListCommand(
@@ -290,7 +291,7 @@ public struct LLBuildManifest {
         let inputs = WriteAuxiliary.SourcesFileList.computeInputs(sources: sources)
         let tool = WriteAuxiliaryFile(inputs: inputs, outputFilePath: sourcesFileListPath)
         let name = sourcesFileListPath.pathString
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addSwiftGetVersionCommand(
@@ -300,14 +301,14 @@ public struct LLBuildManifest {
         let inputs = WriteAuxiliary.SwiftGetVersion.computeInputs(swiftCompilerPath: swiftCompilerPath)
         let tool = WriteAuxiliaryFile(inputs: inputs, outputFilePath: swiftVersionFilePath, alwaysOutOfDate: true)
         let name = swiftVersionFilePath.pathString
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addWriteInfoPlistCommand(principalClass: String, outputPath: AbsolutePath) {
         let inputs = WriteAuxiliary.XCTestInfoPlist.computeInputs(principalClass: principalClass)
         let tool = WriteAuxiliaryFile(inputs: inputs, outputFilePath: outputPath)
         let name = outputPath.pathString
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addWriteEmbeddedResourcesCommand(
@@ -317,7 +318,7 @@ public struct LLBuildManifest {
         let inputs = WriteAuxiliary.EmbeddedResources.computeInputs(resources: resources)
         let tool = WriteAuxiliaryFile(inputs: inputs, outputFilePath: outputPath)
         let name = outputPath.pathString
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addPkgStructureCmd(
@@ -325,9 +326,8 @@ public struct LLBuildManifest {
         inputs: [Node],
         outputs: [Node]
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = PackageStructureTool(inputs: inputs, outputs: outputs)
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addShellCmd(
@@ -336,11 +336,10 @@ public struct LLBuildManifest {
         inputs: [Node],
         outputs: [Node],
         arguments: [String],
-        environment: EnvironmentVariables = .empty(),
+        environment: Environment = [:],
         workingDirectory: String? = nil,
         allowMissingInputs: Bool = false
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = ShellTool(
             description: description,
             inputs: inputs,
@@ -350,7 +349,7 @@ public struct LLBuildManifest {
             workingDirectory: workingDirectory,
             allowMissingInputs: allowMissingInputs
         )
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addSwiftFrontendCmd(
@@ -362,7 +361,6 @@ public struct LLBuildManifest {
         outputs: [Node],
         arguments: [String]
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = SwiftFrontendTool(
                 moduleName: moduleName,
                 description: description,
@@ -370,7 +368,7 @@ public struct LLBuildManifest {
                 outputs: outputs,
                 arguments: arguments
         )
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addClangCmd(
@@ -381,7 +379,6 @@ public struct LLBuildManifest {
         arguments: [String],
         dependencies: String? = nil
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = ClangTool(
             description: description,
             inputs: inputs,
@@ -389,7 +386,7 @@ public struct LLBuildManifest {
             arguments: arguments,
             dependencies: dependencies
         )
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 
     public mutating func addSwiftCmd(
@@ -411,7 +408,6 @@ public struct LLBuildManifest {
         outputFileMapPath: AbsolutePath,
         prepareForIndexing: Bool
     ) {
-        assert(commands[name] == nil, "already had a command named '\(name)'")
         let tool = SwiftCompilerTool(
             inputs: inputs,
             outputs: outputs,
@@ -430,6 +426,6 @@ public struct LLBuildManifest {
             outputFileMapPath: outputFileMapPath,
             prepareForIndexing: prepareForIndexing
         )
-        commands[name] = Command(name: name, tool: tool)
+        addCommand(name: name, tool: tool)
     }
 }

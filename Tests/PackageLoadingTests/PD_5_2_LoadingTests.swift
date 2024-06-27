@@ -13,7 +13,7 @@
 import Basics
 import PackageLoading
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 final class PackageDescription5_2LoadingTests: PackageDescriptionLoadingTests {
@@ -90,15 +90,15 @@ final class PackageDescription5_2LoadingTests: PackageDescriptionLoadingTests {
         XCTAssertNoDiagnostics(validationDiagnostics)
 
         XCTAssertEqual(manifest.displayName, "Trivial")
-        XCTAssertEqual(manifest.dependencies[0].nameForTargetDependencyResolutionOnly, "Foo")
-        XCTAssertEqual(manifest.dependencies[1].nameForTargetDependencyResolutionOnly, "Foo2")
-        XCTAssertEqual(manifest.dependencies[2].nameForTargetDependencyResolutionOnly, "Foo3")
-        XCTAssertEqual(manifest.dependencies[3].nameForTargetDependencyResolutionOnly, "Foo4")
-        XCTAssertEqual(manifest.dependencies[4].nameForTargetDependencyResolutionOnly, "Foo5")
-        XCTAssertEqual(manifest.dependencies[5].nameForTargetDependencyResolutionOnly, "bar")
-        XCTAssertEqual(manifest.dependencies[6].nameForTargetDependencyResolutionOnly, "Bar2")
-        XCTAssertEqual(manifest.dependencies[7].nameForTargetDependencyResolutionOnly, "Baz")
-        XCTAssertEqual(manifest.dependencies[8].nameForTargetDependencyResolutionOnly, "swift")
+        XCTAssertEqual(manifest.dependencies[0].nameForModuleDependencyResolutionOnly, "Foo")
+        XCTAssertEqual(manifest.dependencies[1].nameForModuleDependencyResolutionOnly, "Foo2")
+        XCTAssertEqual(manifest.dependencies[2].nameForModuleDependencyResolutionOnly, "Foo3")
+        XCTAssertEqual(manifest.dependencies[3].nameForModuleDependencyResolutionOnly, "Foo4")
+        XCTAssertEqual(manifest.dependencies[4].nameForModuleDependencyResolutionOnly, "Foo5")
+        XCTAssertEqual(manifest.dependencies[5].nameForModuleDependencyResolutionOnly, "bar")
+        XCTAssertEqual(manifest.dependencies[6].nameForModuleDependencyResolutionOnly, "Bar2")
+        XCTAssertEqual(manifest.dependencies[7].nameForModuleDependencyResolutionOnly, "Baz")
+        XCTAssertEqual(manifest.dependencies[8].nameForModuleDependencyResolutionOnly, "swift")
     }
 
     func testTargetDependencyProductInvalidPackage() async throws {
@@ -284,7 +284,7 @@ final class PackageDescription5_2LoadingTests: PackageDescriptionLoadingTests {
         XCTAssertNoDiagnostics(observability.diagnostics)
         XCTAssertNoDiagnostics(validationDiagnostics)
 
-        let dependencies = Dictionary(uniqueKeysWithValues: manifest.dependencies.map{ ($0.nameForTargetDependencyResolutionOnly, $0) })
+        let dependencies = Dictionary(uniqueKeysWithValues: manifest.dependencies.map{ ($0.nameForModuleDependencyResolutionOnly, $0) })
         let dependencyFoobar = dependencies["Foobar"]!
         let dependencyBarfoo = dependencies["Barfoo"]!
         let targetFoo = manifest.targetMap["foo"]!

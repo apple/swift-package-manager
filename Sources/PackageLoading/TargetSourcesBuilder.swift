@@ -90,7 +90,7 @@ public struct TargetSourcesBuilder {
 
         self.observabilityScope = observabilityScope.makeChildScope(description: "TargetSourcesBuilder") {
             var metadata = ObservabilityMetadata.packageMetadata(identity: packageIdentity, kind: packageKind)
-            metadata.targetName = target.name
+            metadata.moduleName = target.name
             return metadata
         }
 
@@ -215,7 +215,7 @@ public struct TargetSourcesBuilder {
 
         // It's an error to contain mixed language source files.
         if sources.containsMixedLanguage {
-            throw Target.Error.mixedSources(targetPath)
+            throw Module.Error.mixedSources(targetPath)
         }
 
         return (sources, resources, headers, ignored, others)
@@ -793,16 +793,16 @@ extension Basics.Diagnostic {
 }
 
 extension ObservabilityMetadata {
-    public var targetName: String? {
+    public var moduleName: String? {
         get {
-            self[TargetNameKey.self]
+            self[ModuleNameKey.self]
         }
         set {
-            self[TargetNameKey.self] = newValue
+            self[ModuleNameKey.self] = newValue
         }
     }
 
-    enum TargetNameKey: Key {
+    enum ModuleNameKey: Key {
         typealias Value = String
     }
 }

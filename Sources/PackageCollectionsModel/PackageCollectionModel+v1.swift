@@ -82,7 +82,7 @@ extension PackageCollectionModel.V1.Collection {
         /// The URL of the package. Currently only Git repository URLs are supported.
         public let url: URL
         
-        /// Package identity for registry (https://github.com/apple/swift-package-manager/blob/main/Documentation/PackageRegistry/Registry.md#36-package-identification).
+        /// Package identity for registry (https://github.com/swiftlang/swift-package-manager/blob/main/Documentation/PackageRegistry/Registry.md#36-package-identification).
         public let identity: String?
 
         /// A description of the package.

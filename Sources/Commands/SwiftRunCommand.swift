@@ -83,6 +83,10 @@ struct RunCommandOptions: ParsableArguments {
     @Argument(help: "The executable to run", completion: .shellCommand("swift package completion-tool list-executables"))
     var executable: String?
 
+    /// Specifies the traits to build the product with.
+    @OptionGroup(visibility: .hidden)
+    package var traits: TraitOptions
+
     /// The arguments to pass to the executable.
     @Argument(parsing: .captureForPassthrough,
               help: "The arguments to pass to the executable")
@@ -130,6 +134,7 @@ public struct SwiftRunCommand: AsyncSwiftCommand {
             // FIXME: We need to implement the build tool invocation closure here so that build tool plugins work with the REPL. rdar://86112934
             let buildSystem = try swiftCommandState.createBuildSystem(
                 explicitBuildSystem: .native,
+                traitConfiguration: .init(traitOptions: self.options.traits),
                 cacheBuildManifest: false,
                 packageGraphLoader: graphLoader
             )
@@ -149,7 +154,10 @@ public struct SwiftRunCommand: AsyncSwiftCommand {
 
         case .debugger:
             do {
-                let buildSystem = try swiftCommandState.createBuildSystem(explicitProduct: options.executable)
+                let buildSystem = try swiftCommandState.createBuildSystem(
+                    explicitProduct: options.executable,
+                    traitConfiguration: .init(traitOptions: self.options.traits)
+                )
                 let productName = try findProductName(in: buildSystem.getPackageGraph())
                 if options.shouldBuildTests {
                     try buildSystem.build(subset: .allIncludingTests)
@@ -191,7 +199,10 @@ public struct SwiftRunCommand: AsyncSwiftCommand {
             }
 
             do {
-                let buildSystem = try swiftCommandState.createBuildSystem(explicitProduct: options.executable)
+                let buildSystem = try swiftCommandState.createBuildSystem(
+                    explicitProduct: options.executable,
+                    traitConfiguration: .init(traitOptions: self.options.traits)
+                )
                 let productName = try findProductName(in: buildSystem.getPackageGraph())
                 if options.shouldBuildTests {
                     try buildSystem.build(subset: .allIncludingTests)

@@ -15,7 +15,7 @@ import Basics
 import Crypto
 import Foundation
 @testable import PackageSigning
-import SPMTestSupport
+import _InternalTestSupport
 import SwiftASN1
 @testable import X509 // need internal APIs for OCSP testing
 import XCTest
@@ -708,7 +708,7 @@ final class SigningTests: XCTestCase {
         try XCTSkipIf(true)
         #endif
 
-        guard let label = ProcessInfo.processInfo.environment["REAL_SIGNING_IDENTITY_EC_LABEL"] else {
+        guard let label = Environment.current["REAL_SIGNING_IDENTITY_EC_LABEL"] else {
             throw XCTSkip("Skipping because 'REAL_SIGNING_IDENTITY_EC_LABEL' env var is not set")
         }
         let identityStore = SigningIdentityStore(observabilityScope: ObservabilitySystem.NOOP)
@@ -766,7 +766,7 @@ final class SigningTests: XCTestCase {
         try XCTSkipIf(true)
         #endif
 
-        guard let label = ProcessInfo.processInfo.environment["REAL_SIGNING_IDENTITY_EC_LABEL"] else {
+        guard let label = Environment.current["REAL_SIGNING_IDENTITY_EC_LABEL"] else {
             throw XCTSkip("Skipping because 'REAL_SIGNING_IDENTITY_EC_LABEL' env var is not set")
         }
         let identityStore = SigningIdentityStore(observabilityScope: ObservabilitySystem.NOOP)
@@ -822,7 +822,7 @@ final class SigningTests: XCTestCase {
         try XCTSkipIf(true)
         #endif
 
-        guard let label = ProcessInfo.processInfo.environment["REAL_SIGNING_IDENTITY_RSA_LABEL"] else {
+        guard let label = Environment.current["REAL_SIGNING_IDENTITY_RSA_LABEL"] else {
             throw XCTSkip("Skipping because 'REAL_SIGNING_IDENTITY_RSA_LABEL' env var is not set")
         }
         let identityStore = SigningIdentityStore(observabilityScope: ObservabilitySystem.NOOP)

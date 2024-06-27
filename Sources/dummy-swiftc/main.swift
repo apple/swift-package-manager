@@ -2,7 +2,7 @@
 
 import Foundation
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 
 let info = ProcessInfo.processInfo
 let env = info.environment
@@ -21,7 +21,7 @@ if info.arguments.last == "-version" {
         fatalError("need `SWIFT_ORIGINAL_PATH` in the environment")
     }
 
-    let result = try Process.popen(arguments: [swiftPath] + info.arguments.dropFirst())
+    let result = try AsyncProcess.popen(arguments: [swiftPath] + info.arguments.dropFirst())
     print(try result.utf8Output())
     print(try result.utf8stderrOutput())
 }

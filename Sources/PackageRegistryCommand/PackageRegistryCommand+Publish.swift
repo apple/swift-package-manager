@@ -247,7 +247,7 @@ extension SignatureFormat {
     }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension SignatureFormat: ExpressibleByArgument {}
 #else
 extension SignatureFormat: @retroactive ExpressibleByArgument {}

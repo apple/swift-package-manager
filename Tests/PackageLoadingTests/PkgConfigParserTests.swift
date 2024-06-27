@@ -12,13 +12,11 @@
 
 import Basics
 @testable import PackageLoading
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 import struct TSCBasic.ByteString
 import class TSCBasic.InMemoryFileSystem
-
-import func TSCTestSupport.withCustomEnv
 
 final class PkgConfigParserTests: XCTestCase {
     func testCircularPCFile() throws {
@@ -152,7 +150,7 @@ final class PkgConfigParserTests: XCTestCase {
             "/usr/lib/pkgconfig/foo.pc",
             try PCFileFinder().locatePCFile(name: "foo", customSearchPaths: [], fileSystem: fs, observabilityScope: observability.topScope)
         )
-        try withCustomEnv(["PKG_CONFIG_PATH": "/usr/local/opt/foo/lib/pkgconfig"]) {
+        try Environment.makeCustom(["PKG_CONFIG_PATH": "/usr/local/opt/foo/lib/pkgconfig"]) {
             XCTAssertEqual("/usr/local/opt/foo/lib/pkgconfig/foo.pc", try PkgConfig(name: "foo", fileSystem: fs, observabilityScope: observability.topScope).pcFile)
         }
 #if os(Windows)
@@ -160,7 +158,7 @@ final class PkgConfigParserTests: XCTestCase {
 #else
         let separator = ":"
 #endif
-        try withCustomEnv(["PKG_CONFIG_PATH": "/usr/local/opt/foo/lib/pkgconfig\(separator)/usr/lib/pkgconfig"]) {
+        try Environment.makeCustom(["PKG_CONFIG_PATH": "/usr/local/opt/foo/lib/pkgconfig\(separator)/usr/lib/pkgconfig"]) {
             XCTAssertEqual("/usr/local/opt/foo/lib/pkgconfig/foo.pc", try PkgConfig(name: "foo", fileSystem: fs, observabilityScope: observability.topScope).pcFile)
         }
     }

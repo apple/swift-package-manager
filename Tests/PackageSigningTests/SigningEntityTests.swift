@@ -14,7 +14,7 @@ import XCTest
 
 import Basics
 @testable import PackageSigning
-import SPMTestSupport
+import _InternalTestSupport
 import X509
 
 final class SigningEntityTests: XCTestCase {
@@ -86,7 +86,7 @@ final class SigningEntityTests: XCTestCase {
         try XCTSkipIf(true)
         #endif
 
-        guard let label = ProcessInfo.processInfo.environment["REAL_SIGNING_IDENTITY_LABEL"] else {
+        guard let label = Environment.current["REAL_SIGNING_IDENTITY_LABEL"] else {
             throw XCTSkip("Skipping because 'REAL_SIGNING_IDENTITY_LABEL' env var is not set")
         }
         let identityStore = SigningIdentityStore(observabilityScope: ObservabilitySystem.NOOP)

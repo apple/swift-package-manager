@@ -12,36 +12,38 @@
 
 import PackageModel
 
+import struct Basics.IdentifiableSet
+
 @available(*, deprecated, renamed: "ResolvedModule")
 public typealias ResolvedTarget = ResolvedModule
 
 /// Represents a fully resolved module. All the dependencies for this module are also stored as resolved.
 public struct ResolvedModule {
-    /// Represents dependency of a resolved target.
+    /// Represents dependency of a resolved module.
     public enum Dependency {
-        /// Direct dependency of the target. This target is in the same package and should be statically linked.
-        case target(_ target: ResolvedModule, conditions: [PackageCondition])
+        /// Direct dependency of the module. This module is in the same package and should be statically linked.
+        case module(_ module: ResolvedModule, conditions: [PackageCondition])
 
-        /// The target depends on this product.
+        /// The module depends on this product.
         case product(_ product: ResolvedProduct, conditions: [PackageCondition])
 
-        public var target: ResolvedModule? {
+        public var module: ResolvedModule? {
             switch self {
-            case .target(let target, _): return target
+            case .module(let module, _): return module
             case .product: return nil
             }
         }
 
         public var product: ResolvedProduct? {
             switch self {
-            case .target: return nil
+            case .module: return nil
             case .product(let product, _): return product
             }
         }
 
         public var conditions: [PackageCondition] {
             switch self {
-            case .target(_, let conditions): return conditions
+            case .module(_, let conditions): return conditions
             case .product(_, let conditions): return conditions
             }
         }
@@ -49,18 +51,18 @@ public struct ResolvedModule {
         /// Returns the direct dependencies of the underlying dependency, across the package graph.
         public var dependencies: [ResolvedModule.Dependency] {
             switch self {
-            case .target(let target, _):
-                return target.dependencies
+            case .module(let module, _):
+                return module.dependencies
             case .product(let product, _):
-                return product.targets.map { .target($0, conditions: []) }
+                return product.modules.map { .module($0, conditions: []) }
             }
         }
 
-        /// Returns the direct dependencies of the underlying dependency, limited to the target's package.
+        /// Returns the direct dependencies of the underlying dependency, limited to the module's package.
         public var packageDependencies: [ResolvedModule.Dependency] {
             switch self {
-            case .target(let target, _):
-                return target.dependencies
+            case .module(let module, _):
+                return module.dependencies
             case .product:
                 return []
             }
@@ -71,7 +73,7 @@ public struct ResolvedModule {
         }
     }
 
-    /// The name of this target.
+    /// The name of this module.
     public var name: String {
         self.underlying.name
     }
@@ -88,12 +90,12 @@ public struct ResolvedModule {
         try topologicalSort(self.dependencies) { $0.dependencies }
     }
 
-    /// Returns the recursive target dependencies, across the whole package-graph.
-    public func recursiveTargetDependencies() throws -> [ResolvedModule] {
-        try topologicalSort(self.dependencies) { $0.dependencies }.compactMap { $0.target }
+    /// Returns the recursive module dependencies, across the whole package-graph.
+    public func recursiveModuleDependencies() throws -> [ResolvedModule] {
+        try topologicalSort(self.dependencies) { $0.dependencies }.compactMap { $0.module }
     }
 
-    /// Returns the recursive dependencies, across the whole package-graph, which satisfy the input build environment,
+    /// Returns the recursive dependencies, across the whole modules graph, which satisfy the input build environment,
     /// based on their conditions.
     /// - Parameters:
     ///     - environment: The build environment to use to filter dependencies on.
@@ -103,60 +105,79 @@ public struct ResolvedModule {
         }
     }
 
-    /// The language-level target name.
+    /// Collect all of the plugins that the current target depends on.
+    package func pluginDependencies(satisfying environment: BuildEnvironment) -> [ResolvedModule] {
+        var plugins = IdentifiableSet<ResolvedModule>()
+        for dependency in self.dependencies(satisfying: environment) {
+            switch dependency {
+            case .module(let module, _):
+                if let plugin = module.underlying as? PluginModule {
+                    assert(plugin.capability == .buildTool)
+                    plugins.insert(module)
+                }
+            case .product(let product, _):
+                for plugin in product.modules.filter({ $0.underlying is PluginModule }) {
+                    plugins.insert(plugin)
+                }
+            }
+        }
+        return Array(plugins)
+    }
+
+    /// The language-level module name.
     public var c99name: String {
         self.underlying.c99name
     }
 
-    /// Module aliases for dependencies of this target. The key is an
-    /// original target name and the value is a new unique name mapped
+    /// Module aliases for dependencies of this module. The key is an
+    /// original module name and the value is a new unique name mapped
     /// to the name of its .swiftmodule binary.
     public var moduleAliases: [String: String]? {
         self.underlying.moduleAliases
     }
 
-    /// Allows access to package symbols from other targets in the package
+    /// Allows access to package symbols from other modules in the package
     public var packageAccess: Bool {
         self.underlying.packageAccess
     }
 
-    /// The "type" of target.
-    public var type: Target.Kind {
+    /// The "type" of the module.
+    public var type: Module.Kind {
         self.underlying.type
     }
 
-    /// The sources for the target.
+    /// The sources for the module.
     public var sources: Sources {
         self.underlying.sources
     }
 
     let packageIdentity: PackageIdentity
 
-    /// The underlying target represented in this resolved target.
-    public let underlying: Target
+    /// The underlying module represented in this resolved module.
+    public let underlying: Module
 
-    /// The dependencies of this target.
+    /// The dependencies of this module.
     public internal(set) var dependencies: [Dependency]
 
     /// The default localization for resources.
     public let defaultLocalization: String?
 
-    /// The list of platforms that are supported by this target.
+    /// The list of platforms that are supported by this module.
     public let supportedPlatforms: [SupportedPlatform]
 
     private let platformVersionProvider: PlatformVersionProvider
 
-    /// Triple for which this resolved target should be compiled for.
+    /// Triple for which this resolved module should be compiled for.
     public package(set) var buildTriple: BuildTriple {
         didSet {
             self.updateBuildTriplesOfDependencies()
         }
     }
 
-    /// Create a resolved target instance.
+    /// Create a resolved module instance.
     public init(
         packageIdentity: PackageIdentity,
-        underlying: Target,
+        underlying: Module,
         dependencies: [ResolvedModule.Dependency],
         defaultLocalization: String? = nil,
         supportedPlatforms: [SupportedPlatform],
@@ -173,12 +194,12 @@ public struct ResolvedModule {
             // Make sure that test products are built for the tools triple if it has tools as direct dependencies.
             // Without this workaround, `assertMacroExpansion` in tests can't be built, as it requires macros
             // and SwiftSyntax to be built for the same triple as the tests.
-            // See https://github.com/apple/swift-package-manager/pull/7349 for more context.
+            // See https://github.com/swiftlang/swift-package-manager/pull/7349 for more context.
             var inferredBuildTriple = BuildTriple.destination
             loop: for dependency in dependencies {
                 switch dependency {
-                case .target(let targetDependency, _):
-                    if targetDependency.type == .macro {
+                case .module(let moduleDependency, _):
+                    if moduleDependency.type == .macro {
                         inferredBuildTriple = .tools
                         break loop
                     }
@@ -201,9 +222,9 @@ public struct ResolvedModule {
             for (i, dependency) in dependencies.enumerated() {
                 let updatedDependency: Dependency
                 switch dependency {
-                case .target(var target, let conditions):
-                    target.buildTriple = self.buildTriple
-                    updatedDependency = .target(target, conditions: conditions)
+                case .module(var module, let conditions):
+                    module.buildTriple = self.buildTriple
+                    updatedDependency = .module(module, conditions: conditions)
                 case .product(var product, let conditions):
                     product.buildTriple = self.buildTriple
                     updatedDependency = .product(product, conditions: conditions)
@@ -235,7 +256,7 @@ extension ResolvedModule.Dependency: CustomStringConvertible {
         switch self {
         case .product(let p, _):
             str += p.description
-        case .target(let t, _):
+        case .module(let t, _):
             str += t.description
         }
         str += ">"
@@ -260,8 +281,8 @@ extension ResolvedModule.Dependency: Identifiable {
 
     public var id: ID {
         switch self {
-        case .target(let target, _):
-            return .init(kind: .module, packageIdentity: target.packageIdentity, name: target.name)
+        case .module(let module, _):
+            return .init(kind: .module, packageIdentity: module.packageIdentity, name: module.name)
         case .product(let product, _):
             return .init(kind: .product, packageIdentity: product.packageIdentity, name: product.name)
         }
@@ -271,11 +292,11 @@ extension ResolvedModule.Dependency: Identifiable {
 extension ResolvedModule.Dependency: Equatable {
     public static func == (lhs: ResolvedModule.Dependency, rhs: ResolvedModule.Dependency) -> Bool {
         switch (lhs, rhs) {
-        case (.target(let lhsTarget, _), .target(let rhsTarget, _)):
-            return lhsTarget.id == rhsTarget.id
+        case (.module(let lhsModule, _), .module(let rhsModule, _)):
+            return lhsModule.id == rhsModule.id
         case (.product(let lhsProduct, _), .product(let rhsProduct, _)):
             return lhsProduct.id == rhsProduct.id
-        case (.product, .target), (.target, .product):
+        case (.product, .module), (.module, .product):
             return false
         }
     }
@@ -284,8 +305,8 @@ extension ResolvedModule.Dependency: Equatable {
 extension ResolvedModule.Dependency: Hashable {
     public func hash(into hasher: inout Hasher) {
         switch self {
-        case .target(let target, _):
-            hasher.combine(target.id)
+        case .module(let module, _):
+            hasher.combine(module.id)
         case .product(let product, _):
             hasher.combine(product.id)
         }
@@ -293,17 +314,20 @@ extension ResolvedModule.Dependency: Hashable {
 }
 
 extension ResolvedModule: Identifiable {
-    /// Resolved target identity that uniquely identifies it in a resolution graph.
+    /// Resolved module identity that uniquely identifies it in a modules graph.
     public struct ID: Hashable {
-        public let targetName: String
+        @available(*, deprecated, renamed: "moduleName")
+        public var targetName: String { self.moduleName }
+
+        public let moduleName: String
         let packageIdentity: PackageIdentity
         public var buildTriple: BuildTriple
     }
 
     public var id: ID {
-        ID(targetName: self.name, packageIdentity: self.packageIdentity, buildTriple: self.buildTriple)
+        ID(moduleName: self.name, packageIdentity: self.packageIdentity, buildTriple: self.buildTriple)
     }
 }
 
 @available(*, unavailable, message: "Use `Identifiable` conformance or `IdentifiableSet` instead")
-extension ResolvedTarget: Hashable {}
+extension ResolvedModule: Hashable {}

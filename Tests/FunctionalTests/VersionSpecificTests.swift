@@ -12,13 +12,13 @@
 
 import Basics
 import SourceControl
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
-class VersionSpecificTests: XCTestCase {
+final class VersionSpecificTests: XCTestCase {
     /// Functional tests of end-to-end support for version specific dependency resolution.
-    func testEndToEndResolution() throws {
-        try testWithTemporaryDirectory{ path in
+    func testEndToEndResolution() async throws {
+        try await testWithTemporaryDirectory{ path in
             let fs = localFileSystem
 
             // Create a repo for the dependency to test against.
@@ -90,7 +90,7 @@ class VersionSpecificTests: XCTestCase {
                     """
             )
             // This build should fail, because of the invalid package.
-            XCTAssertBuildFails(primaryPath)
+            await XCTAssertBuildFails(primaryPath)
 
             // Create a file which requires a version 1.1.0 resolution.
             try fs.writeFileContents(
@@ -123,8 +123,8 @@ class VersionSpecificTests: XCTestCase {
             try repo.tag(name: "1.1.0@swift-\(SwiftVersion.current.major)")
 
             // The build should work now.
-            _ = try SwiftPM.Package.execute(["reset"], packagePath: primaryPath)
-            XCTAssertBuilds(primaryPath)
+            _ = try await SwiftPM.Package.execute(["reset"], packagePath: primaryPath)
+            await XCTAssertBuilds(primaryPath)
         }
     }
 }

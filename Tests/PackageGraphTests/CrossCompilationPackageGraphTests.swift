@@ -12,7 +12,7 @@
 
 @testable
 @_spi(SwiftPMInternal)
-import SPMTestSupport
+import _InternalTestSupport
 
 @testable
 import PackageGraph
@@ -25,7 +25,7 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
         try PackageGraphTester(graph) { result in
             result.check(packages: "Pkg")
             // "SwiftSyntax" is included for both host and target triples and is not pruned on this level
-            result.check(targets: "app", "lib")
+            result.check(modules: "app", "lib")
             result.check(testModules: "test")
             result.checkTarget("app") { result in
                 result.check(buildTriple: .destination)
@@ -48,7 +48,7 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
             result.check(packages: "swift-firmware", "swift-mmio", "swift-syntax")
             // "SwiftSyntax" is included for both host and target triples and is not pruned on this level
             result.check(
-                targets: "Core",
+                modules: "Core",
                 "HAL",
                 "MMIO",
                 "MMIOMacros",
@@ -83,6 +83,10 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
                 }
             }
 
+            result.checkProduct("MMIOMacros") { result in
+                result.check(buildTriple: .tools)
+            }
+
             result.checkTargets("SwiftSyntax") { results in
                 XCTAssertEqual(results.count, 2)
 
@@ -98,8 +102,9 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
             result.check(packages: "swift-mmio", "swift-syntax")
             // "SwiftSyntax" is included for both host and target triples and is not pruned on this level
             result.check(
-                targets: "MMIO",
+                modules: "MMIO",
                 "MMIOMacros",
+                "MMIOPlugin",
                 "SwiftCompilerPlugin",
                 "SwiftCompilerPlugin",
                 "SwiftCompilerPluginMessageHandling",
@@ -111,7 +116,7 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
                 "SwiftSyntaxMacrosTestSupport",
                 "SwiftSyntaxMacrosTestSupport"
             )
-            result.check(testModules: "MMIOMacrosTests")
+            result.check(testModules: "MMIOMacrosTests", "MMIOMacro+PluginTests")
             result.checkTarget("MMIO") { result in
                 result.check(buildTriple: .destination)
                 result.check(dependencies: "MMIOMacros")
@@ -119,6 +124,7 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
             result.checkTargets("MMIOMacros") { results in
                 XCTAssertEqual(results.count, 1)
             }
+
             result.checkTarget("MMIOMacrosTests", destination: .tools) { result in
                 result.check(buildTriple: .tools)
                 result.checkDependency("MMIOMacros") { result in
@@ -146,6 +152,14 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
                 }
             }
 
+            result.checkTarget("MMIOMacros") { result in
+                result.check(buildTriple: .tools)
+            }
+
+            result.checkTarget("MMIOMacrosTests") { result in
+                result.check(buildTriple: .tools)
+            }
+
             result.checkTargets("SwiftSyntax") { results in
                 XCTAssertEqual(results.count, 2)
 
@@ -165,6 +179,37 @@ final class CrossCompilationPackageGraphTests: XCTestCase {
                     XCTAssertEqual(result.target.packageIdentity, .plain("swift-syntax"))
                     XCTAssertEqual(graph.package(for: result.target)?.identity, .plain("swift-syntax"))
                 }
+            }
+        }
+    }
+
+    func testPlugins() throws {
+        let graph = try macrosTestsPackageGraph().graph
+        PackageGraphTester(graph) { result in
+            result.checkProduct("MMIOPlugin", destination: .tools) { result in
+                result.check(buildTriple: .tools)
+            }
+
+            result.checkProduct("MMIOPlugin") { result in
+                result.check(buildTriple: .tools)
+            }
+
+            result.checkTarget("MMIOPlugin", destination: .tools) { result in
+                result.check(buildTriple: .tools)
+            }
+
+            result.checkTarget("MMIOPlugin") { result in
+                result.check(buildTriple: .tools)
+            }
+
+            result.checkTarget("MMIOMacro+PluginTests", destination: .tools) { result in
+                result.check(buildTriple: .tools)
+                result.check(dependencies: "MMIOPlugin", "MMIOMacros")
+            }
+
+            result.checkTarget("MMIOMacro+PluginTests") { result in
+                result.check(buildTriple: .tools)
+                result.check(dependencies: "MMIOPlugin", "MMIOMacros")
             }
         }
     }

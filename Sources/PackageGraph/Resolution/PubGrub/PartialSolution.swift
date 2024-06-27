@@ -16,7 +16,7 @@ import OrderedCollections
 import struct TSCUtility.Version
 
 /// The partial solution is a constantly updated solution used throughout the
-/// dependency resolution process, tracking know assignments.
+/// dependency resolution process, tracking known assignments.
 public struct PartialSolution {
     var root: DependencyResolutionNode?
 
@@ -37,19 +37,19 @@ public struct PartialSolution {
 
     /// The current decision level.
     public var decisionLevel: Int {
-        decisions.count - 1
+        self.decisions.count - 1
     }
 
     public init(assignments: [Assignment] = []) {
         self.assignments = assignments
         for assignment in assignments {
-            register(assignment)
+            self.register(assignment)
         }
     }
 
     /// A list of all packages that have been assigned, but are not yet satisfied.
     public var undecided: [Term] {
-        _positive.values.filter { !decisions.keys.contains($0.node) }
+        self._positive.values.filter { !self.decisions.keys.contains($0.node) }
     }
 
     /// Create a new derivation assignment and add it to the partial solution's
@@ -57,17 +57,17 @@ public struct PartialSolution {
     public mutating func derive(_ term: Term, cause: Incompatibility) {
         let derivation = Assignment.derivation(term, cause: cause, decisionLevel: self.decisionLevel)
         self.assignments.append(derivation)
-        register(derivation)
+        self.register(derivation)
     }
 
     /// Create a new decision assignment and add it to the partial solution's
     /// list of known assignments.
     public mutating func decide(_ node: DependencyResolutionNode, at version: Version) {
-        decisions[node] = version
+        self.decisions[node] = version
         let term = Term(node, .exact(version))
-        let decision = Assignment.decision(term, decisionLevel: decisionLevel)
+        let decision = Assignment.decision(term, decisionLevel: self.decisionLevel)
         self.assignments.append(decision)
-        register(decision)
+        self.register(decision)
     }
 
     /// Populates the _positive and _negative properties with the assignment.
@@ -76,17 +76,17 @@ public struct PartialSolution {
         let pkg = term.node
 
         if let positive = _positive[pkg] {
-            _positive[term.node] = positive.intersect(with: term)
+            self._positive[term.node] = positive.intersect(with: term)
             return
         }
 
-        let newTerm = _negative[pkg].flatMap { term.intersect(with: $0) } ?? term
+        let newTerm = self._negative[pkg].flatMap { term.intersect(with: $0) } ?? term
 
         if newTerm.isPositive {
-            _negative[pkg] = nil
-            _positive[pkg] = newTerm
+            self._negative[pkg] = nil
+            self._positive[pkg] = newTerm
         } else {
-            _negative[pkg] = newTerm
+            self._negative[pkg] = newTerm
         }
     }
 
@@ -95,7 +95,7 @@ public struct PartialSolution {
     public func satisfier(for term: Term) throws -> Assignment {
         var assignedTerm: Term?
 
-        for assignment in assignments {
+        for assignment in self.assignments {
             guard assignment.term.node == term.node else {
                 continue
             }
@@ -114,24 +114,24 @@ public struct PartialSolution {
     public mutating func backtrack(toDecisionLevel decisionLevel: Int) {
         var toBeRemoved: [(Int, Assignment)] = []
 
-        for (idx, assignment) in zip(0..., assignments) {
+        for (idx, assignment) in zip(0..., self.assignments) {
             if assignment.decisionLevel > decisionLevel {
                 toBeRemoved.append((idx, assignment))
             }
         }
 
         for (idx, remove) in toBeRemoved.reversed() {
-            let assignment = assignments.remove(at: idx)
+            let assignment = self.assignments.remove(at: idx)
             if assignment.isDecision {
-                decisions.removeValue(forKey: remove.term.node)
+                self.decisions.removeValue(forKey: remove.term.node)
             }
         }
 
         // FIXME: We can optimize this by recomputing only the removed things.
-        _negative.removeAll()
-        _positive.removeAll()
-        for assignment in assignments {
-            register(assignment)
+        self._negative.removeAll()
+        self._positive.removeAll()
+        for assignment in self.assignments {
+            self.register(assignment)
         }
     }
 

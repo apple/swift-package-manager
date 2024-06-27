@@ -13,7 +13,7 @@
 #if USE_IMPL_ONLY_IMPORTS
 @_implementationOnly import TSCclibc
 #else
-import TSCclibc
+private import TSCclibc
 #endif
 
 public struct SwiftVersion: Sendable {

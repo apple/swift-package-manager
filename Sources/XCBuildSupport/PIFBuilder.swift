@@ -366,7 +366,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
             productScope.trap { try self.addTarget(for: product) }
         }
 
-        for target in package.targets.sorted(by: { $0.name < $1.name }) {
+        for target in package.modules.sorted(by: { $0.name < $1.name }) {
             let targetScope = observabilityScope.makeChildScope(
                 description: "Adding \(target.name) module",
                 metadata: package.underlying.diagnosticsMetadata
@@ -404,7 +404,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
             // Binary target don't need to be built.
             return
         case .plugin:
-            // Package plugin targets.
+            // Package plugin modules.
             return
         case .macro:
             // Macros are not supported when using XCBuild, similar to package plugins.
@@ -489,12 +489,12 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
             settings[.GENERATE_INFOPLIST_FILE] = "YES"
         }
 
-        if let clangTarget = mainTarget.underlying as? ClangTarget {
+        if let clangTarget = mainTarget.underlying as? ClangModule {
             // Let the target itself find its own headers.
             settings[.HEADER_SEARCH_PATHS, default: ["$(inherited)"]].append(clangTarget.includeDir.pathString)
             settings[.GCC_C_LANGUAGE_STANDARD] = clangTarget.cLanguageStandard
             settings[.CLANG_CXX_LANGUAGE_STANDARD] = clangTarget.cxxLanguageStandard
-        } else if let swiftTarget = mainTarget.underlying as? SwiftTarget {
+        } else if let swiftTarget = mainTarget.underlying as? SwiftModule {
             try settings.addSwiftVersionSettings(target: swiftTarget, parameters: self.parameters)
             settings.addCommonSwiftSettings(package: self.package, target: mainTarget, parameters: self.parameters)
         }
@@ -566,7 +566,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
         let dependencies = product.recursivePackageDependencies()
         for dependency in dependencies {
             switch dependency {
-            case .target(let target, let conditions):
+            case .module(let target, let conditions):
                 if target.type != .systemModule {
                     self.addDependency(to: target, in: pifTarget, conditions: conditions, linkProduct: true)
                 }
@@ -576,11 +576,11 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
         }
 
         var settings = PIF.BuildSettings()
-        let usesUnsafeFlags = dependencies.contains { $0.target?.underlying.usesUnsafeFlags == true }
+        let usesUnsafeFlags = dependencies.contains { $0.module?.underlying.usesUnsafeFlags == true }
         settings[.USES_SWIFTPM_UNSAFE_FLAGS] = usesUnsafeFlags ? "YES" : "NO"
 
         // If there are no system modules in the dependency graph, mark the target as extension-safe.
-        let dependsOnAnySystemModules = dependencies.contains { $0.target?.type == .systemModule }
+        let dependsOnAnySystemModules = dependencies.contains { $0.module?.type == .systemModule }
         if !dependsOnAnySystemModules {
             settings[.APPLICATION_EXTENSION_API_ONLY] = "YES"
         }
@@ -657,7 +657,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
         let moduleMapFileContents: String?
         let shouldImpartModuleMap: Bool
 
-        if let clangTarget = target.underlying as? ClangTarget {
+        if let clangTarget = target.underlying as? ClangModule {
             // Let the target itself find its own headers.
             settings[.HEADER_SEARCH_PATHS, default: ["$(inherited)"]].append(clangTarget.includeDir.pathString)
             settings[.GCC_C_LANGUAGE_STANDARD] = clangTarget.cLanguageStandard
@@ -682,7 +682,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
                 moduleMapFileContents = nil
                 shouldImpartModuleMap = false
             }
-        } else if let swiftTarget = target.underlying as? SwiftTarget {
+        } else if let swiftTarget = target.underlying as? SwiftModule {
             try settings.addSwiftVersionSettings(target: swiftTarget, parameters: self.parameters)
 
             // Generate ObjC compatibility header for Swift library targets.
@@ -762,7 +762,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
     }
 
     private func addSystemTarget(for target: ResolvedModule) throws {
-        guard let systemTarget = target.underlying as? SystemLibraryTarget else {
+        guard let systemTarget = target.underlying as? SystemLibraryModule else {
             throw InternalError("unexpected target type")
         }
 
@@ -830,7 +830,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
         linkProduct: Bool
     ) {
         switch dependency {
-        case .target(let target, let conditions):
+        case .module(let target, let conditions):
             self.addDependency(
                 to: target,
                 in: pifTarget,
@@ -854,7 +854,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
         linkProduct: Bool
     ) {
         // Only add the binary target as a library when we want to link against the product.
-        if let binaryTarget = target.underlying as? BinaryTarget {
+        if let binaryTarget = target.underlying as? BinaryModule {
             let ref = self.binaryGroup.addFileReference(path: binaryTarget.artifactPath.pathString)
             pifTarget.addLibrary(ref, platformFilters: conditions.toPlatformFilters())
         } else {
@@ -958,7 +958,7 @@ final class PackagePIFProjectBuilder: PIFProjectBuilder {
 
     // Apply target-specific build settings defined in the manifest.
     private func addManifestBuildSettings(
-        from target: Target,
+        from target: Module,
         debugSettings: inout PIF.BuildSettings,
         releaseSettings: inout PIF.BuildSettings,
         impartedSettings: inout PIF.BuildSettings
@@ -1525,7 +1525,7 @@ extension ResolvedProduct {
     var pifTargetGUID: PIF.GUID { "PACKAGE-PRODUCT:\(name)" }
 
     var mainTarget: ResolvedModule {
-        targets.first { $0.type == underlying.type.targetType }!
+        modules.first { $0.type == underlying.type.targetType }!
     }
 
     /// Returns the recursive dependencies, limited to the target's package, which satisfy the input build environment,
@@ -1533,7 +1533,7 @@ extension ResolvedProduct {
     /// - Parameters:
     ///     - environment: The build environment to use to filter dependencies on.
     public func recursivePackageDependencies() -> [ResolvedModule.Dependency] {
-        let initialDependencies = targets.map { ResolvedModule.Dependency.target($0, conditions: []) }
+        let initialDependencies = modules.map { ResolvedModule.Dependency.module($0, conditions: []) }
         return try! topologicalSort(initialDependencies) { dependency in
             dependency.packageDependencies
         }.sorted()
@@ -1550,13 +1550,13 @@ extension [ResolvedModule.Dependency] {
     func sorted() -> [ResolvedModule.Dependency] {
         self.sorted { lhsDependency, rhsDependency in
             switch (lhsDependency, rhsDependency) {
-            case (.product, .target):
+            case (.product, .module):
                 true
-            case (.target, .product):
+            case (.module, .product):
                 false
             case (.product(let lhsProduct, _), .product(let rhsProduct, _)):
                 lhsProduct.name < rhsProduct.name
-            case (.target(let lhsTarget, _), .target(let rhsTarget, _)):
+            case (.module(let lhsTarget, _), .module(let rhsTarget, _)):
                 lhsTarget.name < rhsTarget.name
             }
         }
@@ -1575,14 +1575,14 @@ extension ResolvedModule {
     }
 }
 
-extension Target {
+extension Module {
     var isCxx: Bool {
-        (self as? ClangTarget)?.isCXX ?? false
+        (self as? ClangModule)?.isCXX ?? false
     }
 }
 
 extension ProductType {
-    var targetType: Target.Kind {
+    var targetType: Module.Kind {
         switch self {
         case .executable:
             .executable
@@ -1810,7 +1810,7 @@ extension PIF.PlatformFilter {
 
 extension PIF.BuildSettings {
     fileprivate mutating func addSwiftVersionSettings(
-        target: SwiftTarget,
+        target: SwiftModule,
         parameters: PIFBuilderParameters
     ) throws {
         guard let versionAssignments = target.buildSettings.assignments[.SWIFT_VERSION] else {

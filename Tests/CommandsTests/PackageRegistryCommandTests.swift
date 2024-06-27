@@ -18,13 +18,13 @@ import PackageModel
 import PackageRegistry
 @testable import PackageRegistryCommand
 import PackageSigning
-import SPMTestSupport
+import _InternalTestSupport
 import TSCclibc // for SPM_posix_spawn_file_actions_addchdir_np_supported
 import Workspace
 import XCTest
 
 import enum TSCBasic.JSON
-import struct TSCBasic.ProcessResult
+import struct Basics.AsyncProcessResult
 
 let defaultRegistryBaseURL = URL("https://packages.example.com")
 let customRegistryBaseURL = URL("https://custom.packages.example.com")
@@ -34,19 +34,19 @@ final class PackageRegistryCommandTests: CommandsTestCase {
     private func execute(
         _ args: [String],
         packagePath: AbsolutePath? = nil,
-        env: EnvironmentVariables? = nil
-    ) throws -> (stdout: String, stderr: String) {
+        env: Environment? = nil
+    ) async throws -> (stdout: String, stderr: String) {
         var environment = env ?? [:]
         // don't ignore local packages when caching
         environment["SWIFTPM_TESTS_PACKAGECACHE"] = "1"
-        return try SwiftPM.Registry.execute(
+        return try await SwiftPM.Registry.execute(
             args,
             packagePath: packagePath,
             env: environment
         )
     }
 
-    func testUsage() throws {
+    func testUsage() async throws {
         // Only run the test if the environment in which we're running actually supports Swift concurrency (which the
         // plugin APIs require).
         try XCTSkipIf(
@@ -54,11 +54,11 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             "skipping because test environment doesn't support concurrency"
         )
 
-        let stdout = try execute(["-help"]).stdout
+        let stdout = try await execute(["-help"]).stdout
         XCTAssert(stdout.contains("USAGE: swift package-registry"), "got stdout:\n" + stdout)
     }
 
-    func testSeeAlso() throws {
+    func testSeeAlso() async throws {
         // Only run the test if the environment in which we're running actually supports Swift concurrency (which the
         // plugin APIs require).
         try XCTSkipIf(
@@ -66,11 +66,11 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             "skipping because test environment doesn't support concurrency"
         )
 
-        let stdout = try execute(["--help"]).stdout
+        let stdout = try await execute(["--help"]).stdout
         XCTAssert(stdout.contains("SEE ALSO: swift package"), "got stdout:\n" + stdout)
     }
 
-    func testVersion() throws {
+    func testVersion() async throws {
         // Only run the test if the environment in which we're running actually supports Swift concurrency (which the
         // plugin APIs require).
         try XCTSkipIf(
@@ -78,12 +78,12 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             "skipping because test environment doesn't support concurrency"
         )
 
-        let stdout = try execute(["--version"]).stdout
+        let stdout = try await execute(["--version"]).stdout
         XCTAssert(stdout.contains("Swift Package Manager"), "got stdout:\n" + stdout)
     }
 
-    func testLocalConfiguration() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testLocalConfiguration() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -94,7 +94,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set default registry
             do {
-                try execute(["set", "\(defaultRegistryBaseURL)"], packagePath: packageRoot)
+                try await execute(["set", "\(defaultRegistryBaseURL)"], packagePath: packageRoot)
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 1)
@@ -107,7 +107,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set new default registry
             do {
-                try execute(["set", "\(customRegistryBaseURL)"], packagePath: packageRoot)
+                try await execute(["set", "\(customRegistryBaseURL)"], packagePath: packageRoot)
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 1)
@@ -120,7 +120,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set default registry with allow-insecure-http option
             do {
-                try execute(["set", "\(customRegistryBaseURL)", "--allow-insecure-http"], packagePath: packageRoot)
+                try await execute(["set", "\(customRegistryBaseURL)", "--allow-insecure-http"], packagePath: packageRoot)
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 1)
@@ -133,7 +133,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Unset default registry
             do {
-                try execute(["unset"], packagePath: packageRoot)
+                try await execute(["unset"], packagePath: packageRoot)
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 0)
@@ -142,7 +142,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set registry for "foo" scope
             do {
-                try execute(
+                try await execute(
                     ["set", "\(customRegistryBaseURL)", "--scope", "foo"],
                     packagePath: packageRoot
                 )
@@ -158,7 +158,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set registry for "bar" scope
             do {
-                try execute(
+                try await execute(
                     ["set", "\(customRegistryBaseURL)", "--scope", "bar"],
                     packagePath: packageRoot
                 )
@@ -178,7 +178,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Unset registry for "foo" scope
             do {
-                try execute(["unset", "--scope", "foo"], packagePath: packageRoot)
+                try await execute(["unset", "--scope", "foo"], packagePath: packageRoot)
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 1)
@@ -195,8 +195,8 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
     // TODO: Test global configuration
 
-    func testSetMissingURL() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testSetMissingURL() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -206,14 +206,14 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
 
             // Set default registry
-            XCTAssertThrowsError(try execute(["set", "--scope", "foo"], packagePath: packageRoot))
+            await XCTAssertAsyncThrowsError(try await execute(["set", "--scope", "foo"], packagePath: packageRoot))
 
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
         }
     }
 
-    func testSetInvalidURL() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testSetInvalidURL() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -223,14 +223,14 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
 
             // Set default registry
-            XCTAssertThrowsError(try execute(["set", "invalid"], packagePath: packageRoot))
+            await XCTAssertAsyncThrowsError(try await execute(["set", "invalid"], packagePath: packageRoot))
 
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
         }
     }
 
-    func testSetInsecureURL() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testSetInsecureURL() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -240,14 +240,14 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
 
             // Set default registry
-            XCTAssertThrowsError(try execute(["set", "http://package.example.com"], packagePath: packageRoot))
+            await XCTAssertAsyncThrowsError(try await execute(["set", "http://package.example.com"], packagePath: packageRoot))
 
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
         }
     }
 
-    func testSetAllowedInsecureURL() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testSetAllowedInsecureURL() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -257,14 +257,14 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             XCTAssertFalse(localFileSystem.exists(configurationFilePath))
 
             // Set default registry
-            try execute(["set", "http://package.example.com", "--allow-insecure-http"], packagePath: packageRoot)
+            try await execute(["set", "http://package.example.com", "--allow-insecure-http"], packagePath: packageRoot)
 
             XCTAssertTrue(localFileSystem.exists(configurationFilePath))
         }
     }
 
-    func testSetInvalidScope() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testSetInvalidScope() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -275,7 +275,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set default registry
             do {
-                XCTAssertThrowsError(try execute(
+                await XCTAssertAsyncThrowsError(try await execute(
                     ["set", "--scope", "_invalid_", "\(defaultRegistryBaseURL)"],
                     packagePath: packageRoot
                 ))
@@ -285,8 +285,8 @@ final class PackageRegistryCommandTests: CommandsTestCase {
         }
     }
 
-    func testUnsetMissingEntry() throws {
-        try fixture(name: "DependencyResolution/External/Simple") { fixturePath in
+    func testUnsetMissingEntry() async throws {
+        try await fixture(name: "DependencyResolution/External/Simple") { fixturePath in
             let packageRoot = fixturePath.appending("Bar")
             let configurationFilePath = AbsolutePath(
                 ".swiftpm/configuration/registries.json",
@@ -297,7 +297,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Set default registry
             do {
-                try execute(["set", "\(defaultRegistryBaseURL)"], packagePath: packageRoot)
+                try await execute(["set", "\(defaultRegistryBaseURL)"], packagePath: packageRoot)
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 1)
@@ -310,7 +310,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
 
             // Unset registry for missing "baz" scope
             do {
-                XCTAssertThrowsError(try execute(["unset", "--scope", "baz"], packagePath: packageRoot))
+                await XCTAssertAsyncThrowsError(try await execute(["unset", "--scope", "baz"], packagePath: packageRoot))
 
                 let json = try JSON(data: localFileSystem.readFileContents(configurationFilePath))
                 XCTAssertEqual(json["registries"]?.dictionary?.count, 1)
@@ -478,7 +478,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             let workingDirectory = temporaryDirectory.appending(component: UUID().uuidString)
             try localFileSystem.createDirectory(workingDirectory)
 
-            XCTAssertThrowsError(try SwiftPM.Registry.execute(
+            await XCTAssertAsyncThrowsError(try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -492,7 +492,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
         }
     }
 
-    func testPublishingToAllowedHTTPRegistry() throws {
+    func testPublishingToAllowedHTTPRegistry() async throws {
         #if os(Linux)
         // needed for archiving
         guard SPM_posix_spawn_file_actions_addchdir_np_supported() else {
@@ -505,7 +505,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
         let registryURL = "http://packages.example.com"
 
         // with no authentication configured for registry
-        _ = try withTemporaryDirectory { temporaryDirectory in
+        _ = try await withTemporaryDirectory { temporaryDirectory in
             let packageDirectory = temporaryDirectory.appending("MyPackage")
             try localFileSystem.createDirectory(packageDirectory)
 
@@ -521,7 +521,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             let workingDirectory = temporaryDirectory.appending(component: UUID().uuidString)
             try localFileSystem.createDirectory(workingDirectory)
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -536,7 +536,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
         }
 
         // with authentication configured for registry
-        _ = try withTemporaryDirectory { temporaryDirectory in
+        _ = try await withTemporaryDirectory { temporaryDirectory in
             let packageDirectory = temporaryDirectory.appending("MyPackage")
             try localFileSystem.createDirectory(packageDirectory)
 
@@ -562,7 +562,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             try configuration.add(authentication: .init(type: .basic), for: URL(registryURL))
             try localFileSystem.writeFileContents(configurationFilePath, data: JSONEncoder().encode(configuration))
 
-            XCTAssertThrowsError(try SwiftPM.Registry.execute(
+            await XCTAssertAsyncThrowsError(try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -609,7 +609,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             let metadataPath = temporaryDirectory.appending("metadata.json")
             try localFileSystem.writeFileContents(metadataPath, string: "{}")
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -653,7 +653,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             let metadataPath = packageDirectory.appending(PackageRegistryCommand.Publish.metadataFilename)
             try localFileSystem.writeFileContents(metadataPath, string: "{}")
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -693,7 +693,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
             let workingDirectory = temporaryDirectory.appending(component: UUID().uuidString)
             try localFileSystem.createDirectory(workingDirectory)
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -800,7 +800,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
                 )
             }
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -911,7 +911,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
                 )
             }
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -1018,7 +1018,7 @@ final class PackageRegistryCommandTests: CommandsTestCase {
                 )
             }
 
-            try SwiftPM.Registry.execute(
+            try await SwiftPM.Registry.execute(
                 [
                     "publish",
                     packageIdentity,
@@ -1078,10 +1078,10 @@ final class PackageRegistryCommandTests: CommandsTestCase {
         }
     }
 
-    func testLoginRequiresHTTPS() {
+    func testLoginRequiresHTTPS() async {
         let registryURL = URL(string: "http://packages.example.com")!
 
-        XCTAssertThrowsError(try SwiftPM.Registry.execute(["login", "--url", registryURL.absoluteString]))
+        await XCTAssertAsyncThrowsError(try await SwiftPM.Registry.execute(["login", "--url", registryURL.absoluteString]))
     }
 
     func testCreateLoginURL() {

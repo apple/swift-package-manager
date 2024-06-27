@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @testable import Basics
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
 final class AuthorizationProviderTests: XCTestCase {
@@ -61,6 +61,15 @@ final class AuthorizationProviderTests: XCTestCase {
 
             self.assertAuthentication(provider, for: otherURL, expected: (user, otherPassword))
         }
+    }
+
+    func testBasicAPIsBearerToken() {
+        let url = URL("http://\(UUID().uuidString)")
+        let user = "token"
+        let token = UUID().uuidString
+
+        let provider = TestProvider(map: [url: (user: user, password: token)])
+        self.assertBearerAuthentication(provider, for: url, expected: token)
     }
 
     func testProtocolHostPort() throws {
@@ -256,6 +265,20 @@ final class AuthorizationProviderTests: XCTestCase {
         XCTAssertEqual(
             provider.httpAuthorizationHeader(for: url),
             "Basic " + Data("\(expected.user):\(expected.password)".utf8).base64EncodedString()
+        )
+    }
+
+    private func assertBearerAuthentication(
+        _ provider: AuthorizationProvider,
+        for url: URL,
+        expected: String
+    ) {
+        let authentication = provider.authentication(for: url)
+        XCTAssertEqual(authentication?.user, "token")
+        XCTAssertEqual(authentication?.password, expected)
+        XCTAssertEqual(
+            provider.httpAuthorizationHeader(for: url),
+            "Bearer \(expected)"
         )
     }
 }

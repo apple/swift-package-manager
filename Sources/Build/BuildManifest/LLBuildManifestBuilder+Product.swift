@@ -29,7 +29,7 @@ extension LLBuildManifestBuilder {
             testInputs = [testBundleInfoPlistPath]
 
             self.manifest.addWriteInfoPlistCommand(
-                principalClass: "\(buildProduct.product.targets[buildProduct.product.targets.startIndex].c99name).SwiftPMXCTestObserver",
+                principalClass: "\(buildProduct.product.modules[buildProduct.product.modules.startIndex].c99name).SwiftPMXCTestObserver",
                 outputPath: testBundleInfoPlistPath
             )
         } else {

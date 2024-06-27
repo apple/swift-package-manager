@@ -12,12 +12,11 @@
 
 @testable import Basics
 import PackageModel
-import SPMTestSupport
+import _InternalTestSupport
 @testable import SourceControl
 import XCTest
 
 import class TSCBasic.InMemoryFileSystem
-import enum TSCBasic.ProcessEnv
 
 class RepositoryManagerTests: XCTestCase {
     func testBasics() async throws {

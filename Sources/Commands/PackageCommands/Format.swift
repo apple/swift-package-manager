@@ -15,8 +15,7 @@ import Basics
 import CoreCommands
 import PackageModel
 
-import class TSCBasic.Process
-import enum TSCBasic.ProcessEnv
+import class Basics.AsyncProcess
 
 import enum TSCUtility.Diagnostics
 
@@ -35,8 +34,8 @@ extension SwiftPackageCommand {
         func run(_ swiftCommandState: SwiftCommandState) async throws {
             // Look for swift-format binary.
             // FIXME: This should be moved to user toolchain.
-            let swiftFormatInEnv = lookupExecutablePath(filename: ProcessEnv.block["SWIFT_FORMAT"])
-            guard let swiftFormat = swiftFormatInEnv ?? Process.findExecutable("swift-format").flatMap(AbsolutePath.init) else {
+            let swiftFormatInEnv = lookupExecutablePath(filename: Environment.current["SWIFT_FORMAT"])
+            guard let swiftFormat = swiftFormatInEnv ?? AsyncProcess.findExecutable("swift-format") else {
                 swiftCommandState.observabilityScope.emit(error: "Could not find swift-format in PATH or SWIFT_FORMAT")
                 throw TSCUtility.Diagnostics.fatalError
             }
@@ -60,7 +59,7 @@ extension SwiftPackageCommand {
                 : swiftFormatFlags
 
             // Process each target in the root package.
-            let paths = package.targets.flatMap { target in
+            let paths = package.modules.flatMap { target in
                 target.sources.paths.filter { file in
                     file.extension == SupportedLanguageExtension.swift.rawValue
                 }
@@ -69,7 +68,7 @@ extension SwiftPackageCommand {
             let args = [swiftFormat.pathString] + formatOptions + [packagePath.pathString] + paths
             print("Running:", args.map{ $0.spm_shellEscaped() }.joined(separator: " "))
 
-            let result = try await TSCBasic.Process.popen(arguments: args)
+            let result = try await AsyncProcess.popen(arguments: args)
             let output = try (result.utf8Output() + result.utf8stderrOutput())
 
             if result.exitStatus != .terminated(code: 0) {

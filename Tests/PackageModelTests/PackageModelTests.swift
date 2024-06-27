@@ -77,7 +77,7 @@ final class PackageModelTests: XCTestCase {
             try UserToolchain.deriveSwiftCFlags(
                 triple: triple,
                 swiftSDK: swiftSDK,
-                environment: .process(),
+                environment: .current,
                 fileSystem: fileSystem
             ),
             [

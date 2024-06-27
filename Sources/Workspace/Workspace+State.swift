@@ -404,7 +404,7 @@ extension WorkspaceStateStorage {
                 case artifactsArchive
                 case unknown
 
-                init(_ underlying: BinaryTarget.Kind) {
+                init(_ underlying: BinaryModule.Kind) {
                     switch underlying {
                     case .xcframework:
                         self = .xcframework
@@ -415,7 +415,7 @@ extension WorkspaceStateStorage {
                     }
                 }
 
-                var underlying: BinaryTarget.Kind {
+                var underlying: BinaryModule.Kind {
                     switch self {
                     case .xcframework:
                         return .xcframework
@@ -1115,7 +1115,7 @@ extension CheckoutState {
 
 // backwards compatibility for older formats
 
-extension BinaryTarget.Kind {
+extension BinaryModule.Kind {
     fileprivate static func forPath(_ path: AbsolutePath) -> Self {
         if let kind = allCases.first(where: { $0.fileExtension == path.extension }) {
             return kind

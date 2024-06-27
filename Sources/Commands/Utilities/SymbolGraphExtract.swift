@@ -22,11 +22,11 @@ import SPMBuildCore
 import DriverSupport
 #endif
 
-import class TSCBasic.Process
-import struct TSCBasic.ProcessResult
+import class Basics.AsyncProcess
+import struct Basics.AsyncProcessResult
 
 /// A wrapper for swift-symbolgraph-extract tool.
-public struct SymbolGraphExtract {
+package struct SymbolGraphExtract {
     let fileSystem: FileSystem
     let tool: AbsolutePath
     let observabilityScope: ObservabilityScope
@@ -53,14 +53,14 @@ public struct SymbolGraphExtract {
     /// Creates a symbol graph for `module` in `outputDirectory` using the build information from `buildPlan`.
     /// The `outputDirection` determines how the output from the tool subprocess is handled, and `verbosity` specifies
     /// how much console output to ask the tool to emit.
-    public func extractSymbolGraph(
+    package func extractSymbolGraph(
         module: ResolvedModule,
         buildPlan: BuildPlan,
         buildParameters: BuildParameters,
-        outputRedirection: TSCBasic.Process.OutputRedirection = .none,
+        outputRedirection: AsyncProcess.OutputRedirection = .none,
         outputDirectory: AbsolutePath,
         verboseOutput: Bool
-    ) throws -> ProcessResult {
+    ) throws -> AsyncProcessResult {
         try self.fileSystem.createDirectory(outputDirectory, recursive: true)
 
         // Construct arguments for extracting symbols for a single target.
@@ -101,7 +101,7 @@ public struct SymbolGraphExtract {
         commandLine += ["-output-dir", outputDirectory.pathString]
 
         // Run the extraction.
-        let process = TSCBasic.Process(
+        let process = AsyncProcess(
             arguments: commandLine,
             outputRedirection: outputRedirection
         )

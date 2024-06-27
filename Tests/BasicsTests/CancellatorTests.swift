@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 @testable import Basics
-import SPMTestSupport
+import _InternalTestSupport
 import XCTest
 
-import class TSCBasic.Process
+import class Basics.AsyncProcess
 
 final class CancellatorTests: XCTestCase {
     func testHappyCase() throws {
@@ -64,7 +64,7 @@ final class CancellatorTests: XCTestCase {
 
             // outputRedirection used to signal that the process started
             let startSemaphore = ProcessStartedSemaphore(term: "process started")
-            let process = TSCBasic.Process(
+            let process = AsyncProcess(
                 arguments: ["bash", scriptPath.pathString],
                 outputRedirection: .stream(
                     stdout: startSemaphore.handleOutput,
@@ -132,7 +132,7 @@ final class CancellatorTests: XCTestCase {
 
             // outputRedirection used to signal that the process SIGINT traps have been set up
             let startSemaphore = ProcessStartedSemaphore(term: "trap installed")
-            let process = TSCBasic.Process(
+            let process = AsyncProcess(
                 arguments: ["bash", scriptPath.pathString],
                 outputRedirection: .stream(
                     stdout: startSemaphore.handleOutput,

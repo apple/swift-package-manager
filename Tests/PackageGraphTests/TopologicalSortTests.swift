@@ -34,7 +34,7 @@ extension Int {
     public var id: Self { self }
 }
 
-#if swift(<6.0)
+#if compiler(<6.0)
 extension Int: Identifiable {}
 #else
 extension Int: @retroactive Identifiable {}

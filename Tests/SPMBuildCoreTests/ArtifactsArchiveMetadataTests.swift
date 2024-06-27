@@ -112,7 +112,7 @@ final class ArtifactsArchiveMetadataTests: XCTestCase {
             ]
         ))
 
-        let binaryTarget = BinaryTarget(
+        let binaryTarget = BinaryModule(
             name: "protoc", kind: .artifactsArchive, path: .root, origin: .local
         )
         // No supportedTriples with binaryTarget should be rejected

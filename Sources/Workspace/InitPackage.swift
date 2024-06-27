@@ -116,7 +116,7 @@ public final class InitPackage {
         fileSystem: FileSystem
     ) throws {
         if options.packageType == .macro && options.supportedTestingLibraries.contains(.swiftTesting) {
-            // FIXME: https://github.com/apple/swift-syntax/issues/2400
+            // FIXME: https://github.com/swiftlang/swift-syntax/issues/2400
             throw InitError.unsupportedTestingLibraryForPackageType(.swiftTesting, .macro)
         }
 
@@ -273,10 +273,10 @@ public final class InitPackage {
             if packageType == .tool {
                 dependencies.append(#".package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0")"#)
             } else if packageType == .macro {
-                dependencies.append(#".package(url: "https://github.com/apple/swift-syntax.git", from: "\#(self.installedSwiftPMConfiguration.swiftSyntaxVersionForMacroTemplate.description)")"#)
+                dependencies.append(#".package(url: "https://github.com/swiftlang/swift-syntax.git", from: "\#(self.installedSwiftPMConfiguration.swiftSyntaxVersionForMacroTemplate.description)")"#)
             }
             if options.supportedTestingLibraries.contains(.swiftTesting) {
-                dependencies.append(#".package(url: "https://github.com/apple/swift-testing.git", from: "0.2.0")"#)
+                dependencies.append(#".package(url: "https://github.com/swiftlang/swift-testing.git", from: "0.2.0")"#)
             }
             if !dependencies.isEmpty {
                 let dependencies = dependencies.map { dependency in
@@ -766,7 +766,7 @@ public final class InitPackage {
         // libraries, but we still only want to present a single library's
         // example tests.
         if options.supportedTestingLibraries.contains(.swiftTesting) {
-            // FIXME: https://github.com/apple/swift-syntax/issues/2400
+            // FIXME: https://github.com/swiftlang/swift-syntax/issues/2400
         } else if options.supportedTestingLibraries.contains(.xctest) {
             content += ##"""
                 final class \##(moduleName)Tests: XCTestCase {
@@ -877,7 +877,7 @@ public final class InitPackage {
     }
 
     private func writeTestFileStubs(testsPath: AbsolutePath) throws {
-        let testModule = try AbsolutePath(validating: pkgname + Target.testModuleNameSuffix, relativeTo: testsPath)
+        let testModule = try AbsolutePath(validating: pkgname + Module.testModuleNameSuffix, relativeTo: testsPath)
         progressReporter?("Creating \(testModule.relative(to: destinationPath))/")
         try makeDirectories(testModule)
 

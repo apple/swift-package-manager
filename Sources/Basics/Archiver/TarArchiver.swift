@@ -13,7 +13,6 @@
 import class Dispatch.DispatchQueue
 import struct Dispatch.DispatchTime
 import struct TSCBasic.FileSystemError
-import class TSCBasic.Process
 
 /// An `Archiver` that handles Tar archives using the command-line `tar` tool.
 public struct TarArchiver: Archiver {
@@ -58,7 +57,7 @@ public struct TarArchiver: Archiver {
                 throw FileSystemError(.notDirectory, destinationPath.underlying)
             }
 
-            let process = TSCBasic.Process(
+            let process = AsyncProcess(
                 arguments: [self.tarCommand, "zxf", archivePath.pathString, "-C", destinationPath.pathString]
             )
 
@@ -91,9 +90,10 @@ public struct TarArchiver: Archiver {
                 throw FileSystemError(.notDirectory, directory.underlying)
             }
 
-            let process = TSCBasic.Process(
+            let process = AsyncProcess(
                 arguments: [self.tarCommand, "acf", destinationPath.pathString, directory.basename],
-                workingDirectory: directory.parentDirectory.underlying
+                environment: .current,
+                workingDirectory: directory.parentDirectory
             )
 
             guard let registrationKey = self.cancellator.register(process) else {
@@ -121,7 +121,7 @@ public struct TarArchiver: Archiver {
                 throw FileSystemError(.noEntry, path.underlying)
             }
 
-            let process = TSCBasic.Process(arguments: [self.tarCommand, "tf", path.pathString])
+            let process = AsyncProcess(arguments: [self.tarCommand, "tf", path.pathString])
             guard let registrationKey = self.cancellator.register(process) else {
                 throw CancellationError.failedToRegisterProcess(process)
             }

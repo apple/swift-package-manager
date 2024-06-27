@@ -19,7 +19,11 @@ struct DiagnosticReportBuilder {
     private var lineNumbers: [Incompatibility: Int] = [:]
     private let provider: ContainerProvider
 
-    init(root: DependencyResolutionNode, incompatibilities: [DependencyResolutionNode: [Incompatibility]], provider: ContainerProvider) {
+    init(
+        root: DependencyResolutionNode,
+        incompatibilities: [DependencyResolutionNode: [Incompatibility]],
+        provider: ContainerProvider
+    ) {
         self.rootNode = root
         self.incompatibilities = incompatibilities
         self.provider = provider
@@ -41,20 +45,20 @@ struct DiagnosticReportBuilder {
             try self.visit(rootCause)
         } else {
             assertionFailure("Unimplemented")
-            self.record(
+            try self.record(
                 rootCause,
-                message: try self.description(for: rootCause),
+                message: self.description(for: rootCause),
                 isNumbered: false
             )
         }
 
-        var content: String = ""
+        var content = ""
         let padding = self.lineNumbers.isEmpty ? 0 : "\(Array(self.lineNumbers.values).last!) ".count
 
         for (idx, line) in self.lines.enumerated() {
             content += String(repeating: " ", count: padding)
             if line.number != -1 {
-                content +=  String(repeating: " ", count: padding)
+                content += String(repeating: " ", count: padding)
                 content += " (\(line.number)) "
             }
             content += line.message.prefix(1).capitalized
@@ -86,9 +90,9 @@ struct DiagnosticReportBuilder {
             let otherLine = self.lineNumbers[cause.other]
 
             if let conflictLine, let otherLine {
-                self.record(
+                try self.record(
                     incompatibility,
-                    message: "\(incompatibilityDesc) because \(try self.description(for: cause.conflict)) (\(conflictLine)) and \(try self.description(for: cause.other)) (\(otherLine).",
+                    message: "\(incompatibilityDesc) because \(self.description(for: cause.conflict)) (\(conflictLine)) and \(self.description(for: cause.other)) (\(otherLine).",
                     isNumbered: isNumbered
                 )
             } else if conflictLine != nil || otherLine != nil {
@@ -106,9 +110,9 @@ struct DiagnosticReportBuilder {
                 }
 
                 try self.visit(withoutLine)
-                self.record(
+                try self.record(
                     incompatibility,
-                    message: "\(conjunction)\(incompatibilityDesc) because \(try self.description(for: withLine)) \(line).",
+                    message: "\(conjunction)\(incompatibilityDesc) because \(self.description(for: withLine)) \(line).",
                     isNumbered: isNumbered
                 )
             } else {
@@ -127,9 +131,9 @@ struct DiagnosticReportBuilder {
                 } else {
                     try self.visit(cause.conflict, isConclusion: true)
                     try self.visit(cause.other)
-                    self.record(
+                    try self.record(
                         incompatibility,
-                        message: "\(conjunction)\(incompatibilityDesc) because \(try self.description(for: cause.conflict)) (\(self.lineNumbers[cause.conflict]!)).",
+                        message: "\(conjunction)\(incompatibilityDesc) because \(self.description(for: cause.conflict)) (\(self.lineNumbers[cause.conflict]!)).",
                         isNumbered: isNumbered
                     )
                 }
@@ -139,9 +143,9 @@ struct DiagnosticReportBuilder {
             let ext = cause.conflict.cause.isConflict ? cause.other : cause.conflict
             let derivedLine = self.lineNumbers[derived]
             if let derivedLine {
-                self.record(
+                try self.record(
                     incompatibility,
-                    message: "\(incompatibilityDesc) because \(try self.description(for: ext)) and \(try self.description(for: derived)) (\(derivedLine)).",
+                    message: "\(incompatibilityDesc) because \(self.description(for: ext)) and \(self.description(for: derived)) (\(derivedLine)).",
                     isNumbered: isNumbered
                 )
             } else if self.isCollapsible(derived) {
@@ -150,27 +154,28 @@ struct DiagnosticReportBuilder {
                     return
                 }
 
-                let collapsedDerived = derivedCause.conflict.cause.isConflict ? derivedCause.conflict : derivedCause.other
+                let collapsedDerived = derivedCause.conflict.cause.isConflict ? derivedCause.conflict : derivedCause
+                    .other
                 let collapsedExt = derivedCause.conflict.cause.isConflict ? derivedCause.other : derivedCause.conflict
 
                 try self.visit(collapsedDerived)
-                self.record(
+                try self.record(
                     incompatibility,
-                    message: "\(conjunction)\(incompatibilityDesc) because \(try self.description(for: collapsedExt)) and \(try self.description(for: ext)).",
+                    message: "\(conjunction)\(incompatibilityDesc) because \(self.description(for: collapsedExt)) and \(self.description(for: ext)).",
                     isNumbered: isNumbered
                 )
             } else {
                 try self.visit(derived)
-                self.record(
+                try self.record(
                     incompatibility,
-                    message: "\(conjunction)\(incompatibilityDesc) because \(try self.description(for: ext)).",
+                    message: "\(conjunction)\(incompatibilityDesc) because \(self.description(for: ext)).",
                     isNumbered: isNumbered
                 )
             }
         } else {
-            self.record(
+            try self.record(
                 incompatibility,
-                message: "\(incompatibilityDesc) because \(try self.description(for: cause.conflict)) and \(try self.description(for: cause.other)).",
+                message: "\(incompatibilityDesc) because \(self.description(for: cause.conflict)) and \(self.description(for: cause.other)).",
                 isNumbered: isNumbered
             )
         }
@@ -213,13 +218,16 @@ struct DiagnosticReportBuilder {
             return "package '\(versionedDependency.identity)' is required using a stable-version but '\(versionedDependency.identity)' depends on an unstable-version package '\(unversionedDependency.identity)'"
         case .incompatibleToolsVersion(let version):
             let term = incompatibility.terms.first!
-            return "\(try self.description(for: term, normalizeRange: true)) contains incompatible tools version (\(version))"
+            return try "\(self.description(for: term, normalizeRange: true)) contains incompatible tools version (\(version))"
         }
 
         let terms = incompatibility.terms
         if terms.count == 1 {
             let term = terms.first!
-            let prefix = try hasEffectivelyAnyRequirement(term) ? term.node.nameForDiagnostics : self.description(for: term, normalizeRange: true)
+            let prefix = try hasEffectivelyAnyRequirement(term) ? term.node.nameForDiagnostics : self.description(
+                for: term,
+                normalizeRange: true
+            )
             return "\(prefix) " + (term.isPositive ? "cannot be used" : "is required")
         } else if terms.count == 2 {
             let term1 = terms.first!
@@ -233,12 +241,12 @@ struct DiagnosticReportBuilder {
             }
         }
 
-        let positive = try terms.filter(\.isPositive).map { try description(for: $0) }
-        let negative = try terms.filter { !$0.isPositive }.map { try description(for: $0) }
+        let positive = try terms.filter(\.isPositive).map { try self.description(for: $0) }
+        let negative = try terms.filter { !$0.isPositive }.map { try self.description(for: $0) }
         if !positive.isEmpty, !negative.isEmpty {
             if positive.count == 1 {
                 let positiveTerm = terms.first { $0.isPositive }!
-                return "\(try self.description(for: positiveTerm, normalizeRange: true)) practically depends on \(negative.joined(separator: " or "))"
+                return try "\(self.description(for: positiveTerm, normalizeRange: true)) practically depends on \(negative.joined(separator: " or "))"
             } else {
                 return "if \(positive.joined(separator: " and ")) then \(negative.joined(separator: " or "))"
             }
@@ -351,8 +359,8 @@ struct DiagnosticReportBuilder {
     }
 }
 
-private extension DependencyResolutionNode {
-    var nameForDiagnostics: String {
+extension DependencyResolutionNode {
+    fileprivate var nameForDiagnostics: String {
         "'\(self.package.identity)'"
     }
 }

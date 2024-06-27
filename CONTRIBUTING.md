@@ -10,7 +10,7 @@ For more information about making contributions to the Swift project in general 
 
 ## Reporting issues
 
-Issues are tracked using [SwiftPM GitHub Issue Tracker](https://github.com/apple/swift-package-manager/issues).
+Issues are tracked using [SwiftPM GitHub Issue Tracker](https://github.com/swiftlang/swift-package-manager/issues).
 
 Fill the following fields:
 
@@ -37,7 +37,7 @@ generated and the Xcode build log.
 
 ## Setting up the development environment
 
-First, clone a copy of SwiftPM code from https://github.com/apple/swift-package-manager.
+First, clone a copy of SwiftPM code from https://github.com/swiftlang/swift-package-manager.
 
 If you are preparing to make a contribution you should fork the repository first and clone the fork which will make opening Pull Requests easier. See "Creating Pull Requests" section below.
 
@@ -314,7 +314,7 @@ Note there are several Linux and Swift versions options to choose from, e.g.:
 
 ## Creating Pull Requests
 
-1. Fork: https://github.com/apple/swift-package-manager
+1. Fork: https://github.com/swiftlang/swift-package-manager
 2. Clone a working copy of your fork
 3. Create a new branch
 4. Make your code changes
@@ -421,7 +421,7 @@ SwiftPM uses [Tools Support Core](https://github.com/apple/swift-tools-support-c
 
 If you want to connect with the Swift community you can:
 * Use Swift Forums: [https://forums.swift.org/c/development/SwiftPM](https://forums.swift.org/c/development/SwiftPM)
-* Contact the CODEOWNERS: https://github.com/apple/swift-package-manager/blob/main/CODEOWNERS
+* Contact the CODEOWNERS: https://github.com/swiftlang/swift-package-manager/blob/main/CODEOWNERS
 
 ## Additional resources
 
