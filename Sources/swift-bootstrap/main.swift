@@ -276,7 +276,6 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
             shouldDisableLocalRpath: Bool,
             logLevel: Basics.Diagnostic.Severity
         ) throws -> BuildSystem {
-
             var buildFlags = buildFlags
             buildFlags.swiftCompilerFlags += Self.additionalSwiftBuildFlags
 
@@ -395,7 +394,14 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
                 },
                 binaryArtifacts: [:],
                 fileSystem: fileSystem,
-                observabilityScope: observabilityScope
+                observabilityScope: observabilityScope,
+                // Plugins can't be used in bootstrap builds, exclude those.
+                productsFilter: {
+                    $0.type != .plugin
+                },
+                modulesFilter: {
+                    $0.type != .plugin
+                }
             )
         }
 

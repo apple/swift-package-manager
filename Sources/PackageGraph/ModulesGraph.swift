@@ -554,6 +554,8 @@ public func loadModulesGraph(
         createREPLProduct: createREPLProduct,
         customXCTestMinimumDeploymentTargets: customXCTestMinimumDeploymentTargets,
         fileSystem: fileSystem,
-        observabilityScope: observabilityScope
+        observabilityScope: observabilityScope,
+        productsFilter: nil,
+        modulesFilter: nil
     )
 }
