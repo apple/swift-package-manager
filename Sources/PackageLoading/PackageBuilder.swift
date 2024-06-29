@@ -1197,7 +1197,7 @@ public final class PackageBuilder {
 
                 values = ["-enable-experimental-feature", value]
 
-            case .swiftLanguageVersion(let version):
+            case .swiftLanguageMode(let version):
                 switch setting.tool {
                 case .c, .cxx, .linker:
                     throw InternalError("only Swift supports swift language version")

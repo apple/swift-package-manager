@@ -108,8 +108,15 @@ public final class Package {
     /// The list of package dependencies.
     public var dependencies: [Dependency]
 
-    /// The list of Swift versions with which this package is compatible.
-    public var swiftLanguageVersions: [SwiftVersion]?
+    /// The list of Swift language modes with which this package is compatible.
+    public var swiftLanguageModes: [SwiftLanguageMode]?
+    
+    /// Legacy property name, accesses value of `swiftLanguageModes`
+    @available(_PackageDescription, obsoleted: 6, renamed: "swiftLanguageModes")
+    public var swiftLanguageVersions: [SwiftVersion]? {
+        get { swiftLanguageModes }
+        set { swiftLanguageModes = newValue }
+    }
 
     /// The C language standard to use for all C targets in this package.
     public var cLanguageStandard: CLanguageStandard?
@@ -151,7 +158,7 @@ public final class Package {
         self.dependencies = dependencies
         self.targets = targets
         self.traits = []
-        self.swiftLanguageVersions = swiftLanguageVersions.map{ $0.map{ .version("\($0)") } }
+        self.swiftLanguageModes = swiftLanguageVersions.map { $0.map { .version("\($0)") } }
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -190,7 +197,7 @@ public final class Package {
         self.dependencies = dependencies
         self.targets = targets
         self.traits = []
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -232,7 +239,7 @@ public final class Package {
         self.dependencies = dependencies
         self.targets = targets
         self.traits = []
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -254,6 +261,7 @@ public final class Package {
     ///   - cLanguageStandard: The C language standard to use for all C targets in this package.
     ///   - cxxLanguageStandard: The C++ language standard to use for all C++ targets in this package.
     @available(_PackageDescription, introduced: 5.3)
+    @available(_PackageDescription, obsoleted: 6, renamed:"init(name:defaultLocalization:platforms:pkgConfig:providers:products:dependencies:targets:swiftLanguageModes:cLanguageStandard:cxxLanguageStandard:)")
     public init(
         name: String,
         defaultLocalization: LanguageTag? = nil,
@@ -276,7 +284,7 @@ public final class Package {
         self.dependencies = dependencies
         self.targets = targets
         self.traits = []
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageVersions
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
@@ -295,9 +303,10 @@ public final class Package {
     ///   - traits: The set of traits of this package.
     ///   - dependencies: The list of package dependencies.
     ///   - targets: The list of targets that are part of this package.
-    ///   - swiftLanguageVersions: The list of Swift versions with which this package is compatible.
+    ///   - swiftLanguageModes: The list of Swift language modes with which this package is compatible.
     ///   - cLanguageStandard: The C language standard to use for all C targets in this package.
     ///   - cxxLanguageStandard: The C++ language standard to use for all C++ targets in this package.
+    @available(_PackageDescription, introduced: 6)
     @_spi(ExperimentalTraits)
     @available(_PackageDescription, introduced: 999.0)
     public init(
@@ -308,6 +317,9 @@ public final class Package {
         providers: [SystemPackageProvider]? = nil,
         products: [Product] = [],
         traits: Set<Trait> = [],
+        dependencies: [Dependency] = [],
+        targets: [Target] = [],
+        swiftLanguageModes: [SwiftLanguageMode]? = nil,
         dependencies: [Dependency] = [],
         targets: [Target] = [],
         swiftLanguageVersions: [SwiftVersion]? = nil,
@@ -323,11 +335,12 @@ public final class Package {
         self.traits = traits
         self.dependencies = dependencies
         self.targets = targets
-        self.swiftLanguageVersions = swiftLanguageVersions
+        self.swiftLanguageModes = swiftLanguageModes
         self.cLanguageStandard = cLanguageStandard
         self.cxxLanguageStandard = cxxLanguageStandard
         registerExitHandler()
     }
+
 
     private func registerExitHandler() {
         // Add a custom exit handler to cause the package's JSON representation

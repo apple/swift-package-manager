@@ -414,7 +414,8 @@ final class PackageDescription5_2LoadingTests: PackageDescriptionLoadingTests {
                     products: [],
                     targets: [
                         .target(name: "Foo"),
-                    ]
+                    ],
+                    swiftLanguageVersions: [.v5]
                 )
                 """
 

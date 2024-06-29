@@ -2931,7 +2931,7 @@ class PIFBuilderTests: XCTestCase {
                         .init(name: "bar", dependencies: [], settings: [
                             .init(
                                 tool: .swift,
-                                kind: .swiftLanguageVersion(.v4_2),
+                                kind: .swiftLanguageMode(.v4_2),
                                 condition: .init(platformNames: ["linux"])
                             ),
                         ]),
@@ -2998,24 +2998,24 @@ class PIFBuilderTests: XCTestCase {
                         .init(name: "foo", dependencies: [], settings: [
                             .init(
                                 tool: .swift,
-                                kind: .swiftLanguageVersion(.v4_2)
+                                kind: .swiftLanguageMode(.v4_2)
                             ),
                         ]),
                         .init(name: "bar", dependencies: [], settings: [
                             .init(
                                 tool: .swift,
-                                kind: .swiftLanguageVersion(.v6)
+                                kind: .swiftLanguageMode(.v6)
                             ),
                         ]),
                         .init(name: "baz", dependencies: [], settings: [
                             .init(
                                 tool: .swift,
-                                kind: .swiftLanguageVersion(.v3),
+                                kind: .swiftLanguageMode(.v3),
                                 condition: .init(platformNames: ["linux"])
                             ),
                             .init(
                                 tool: .swift,
-                                kind: .swiftLanguageVersion(.v4_2),
+                                kind: .swiftLanguageMode(.v4_2),
                                 condition: .init(platformNames: ["macOS"])
                             ),
                         ]),
