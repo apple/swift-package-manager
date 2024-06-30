@@ -391,7 +391,13 @@ public final class ProductBuildDescription: SPMBuildCore.ProductBuildDescription
         // Other linker flags.
         for target in self.staticTargets {
             let scope = self.buildParameters.createScope(for: target)
-            flags += scope.evaluate(.OTHER_LDFLAGS)
+            let additionalFlags = scope.evaluate(.OTHER_LDFLAGS)
+            // FIXME: this should be based on the target package's tools version
+            if self.toolsVersion.major >= 6 {
+                flags += additionalFlags.asSwiftcLinkerFlags()
+            } else {
+                flags += additionalFlags
+            }
         }
 
         return flags
