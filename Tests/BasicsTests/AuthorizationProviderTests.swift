@@ -63,6 +63,15 @@ final class AuthorizationProviderTests: XCTestCase {
         }
     }
 
+    func testBasicAPIsBearerToken() {
+        let url = URL("http://\(UUID().uuidString)")
+        let user = "token"
+        let token = UUID().uuidString
+
+        let provider = TestProvider(map: [url: (user: user, password: token)])
+        self.assertBearerAuthentication(provider, for: url, expected: token)
+    }
+
     func testProtocolHostPort() throws {
         #if !canImport(Security)
         try XCTSkipIf(true)
@@ -256,6 +265,20 @@ final class AuthorizationProviderTests: XCTestCase {
         XCTAssertEqual(
             provider.httpAuthorizationHeader(for: url),
             "Basic " + Data("\(expected.user):\(expected.password)".utf8).base64EncodedString()
+        )
+    }
+
+    private func assertBearerAuthentication(
+        _ provider: AuthorizationProvider,
+        for url: URL,
+        expected: String
+    ) {
+        let authentication = provider.authentication(for: url)
+        XCTAssertEqual(authentication?.user, "token")
+        XCTAssertEqual(authentication?.password, expected)
+        XCTAssertEqual(
+            provider.httpAuthorizationHeader(for: url),
+            "Bearer \(expected)"
         )
     }
 }

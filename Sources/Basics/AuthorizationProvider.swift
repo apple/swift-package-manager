@@ -71,6 +71,9 @@ extension AuthorizationProvider {
         guard let (user, password) = self.authentication(for: url) else {
             return nil
         }
+        guard user != "token" else {
+            return "Bearer \(password)"
+        }
         let authString = "\(user):\(password)"
         let authData = Data(authString.utf8)
         return "Basic \(authData.base64EncodedString())"
