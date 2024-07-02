@@ -30,13 +30,13 @@ extension SwiftPackageCommand {
         @Option(help: "The name of the executable product to install")
         var product: String?
 
-        func run(_ tool: SwiftCommandState) throws {
-            let swiftpmBinDir = try tool.fileSystem.getOrCreateSwiftPMInstalledBinariesDirectory()
+        func run(_ commandState: SwiftCommandState) throws {
+            let swiftpmBinDir = try commandState.fileSystem.getOrCreateSwiftPMInstalledBinariesDirectory()
 
             let env = Environment.current
 
             if let path = env[.path], !path.contains(swiftpmBinDir.pathString), !globalOptions.logging.quiet {
-                tool.observabilityScope.emit(
+                commandState.observabilityScope.emit(
                     warning: """
                     PATH doesn't include \(swiftpmBinDir.pathString)! This means you won't be able to access \
                     the installed executables by default, and will need to specify the full path.
@@ -44,14 +44,14 @@ extension SwiftPackageCommand {
                 )
             }
 
-            let alreadyExisting = (try? InstalledPackageProduct.installedProducts(tool.fileSystem)) ?? []
+            let alreadyExisting = (try? InstalledPackageProduct.installedProducts(commandState.fileSystem)) ?? []
 
-            let workspace = try tool.getActiveWorkspace()
-            let packageRoot = try tool.getPackageRoot()
+            let workspace = try commandState.getActiveWorkspace()
+            let packageRoot = try commandState.getPackageRoot()
 
             let packageGraph = try workspace.loadPackageGraph(
                 rootPath: packageRoot,
-                observabilityScope: tool.observabilityScope
+                observabilityScope: commandState.observabilityScope
             )
 
             let possibleCandidates = packageGraph.rootPackages.flatMap(\.products)
@@ -81,12 +81,16 @@ extension SwiftPackageCommand {
                 throw StringError("\(productToInstall.name) is already installed at \(existingPkg.path)")
             }
 
-            try tool.createBuildSystem(explicitProduct: productToInstall.name, traitConfiguration: .init())
+            if commandState.options.build.configuration == nil {
+                commandState.preferredBuildConfiguration = .release
+            }
+
+            try commandState.createBuildSystem(explicitProduct: productToInstall.name, traitConfiguration: .init())
                 .build(subset: .product(productToInstall.name))
 
-            let binPath = try tool.productsBuildParameters.buildPath.appending(component: productToInstall.name)
+            let binPath = try commandState.productsBuildParameters.buildPath.appending(component: productToInstall.name)
             let finalBinPath = swiftpmBinDir.appending(component: binPath.basename)
-            try tool.fileSystem.copy(from: binPath, to: finalBinPath)
+            try commandState.fileSystem.copy(from: binPath, to: finalBinPath)
 
             print("Executable product `\(productToInstall.name)` was successfully installed to \(finalBinPath).")
         }
