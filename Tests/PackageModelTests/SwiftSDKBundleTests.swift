@@ -19,6 +19,7 @@ import XCTest
 import struct TSCBasic.ByteString
 import protocol TSCBasic.FileSystem
 import class TSCBasic.InMemoryFileSystem
+import class Workspace.Workspace
 
 private let testArtifactID = "test-artifact"
 
@@ -146,13 +147,13 @@ final class SwiftSDKBundleTests: XCTestCase {
         let cancellator = Cancellator(observabilityScope: observabilityScope)
         let archiver = UniversalArchiver(localFileSystem, cancellator)
 
-        let fixtureAndURLs: [(url: String, fixture: String)] = [
-            ("https://localhost/archive?test=foo", "test-sdk.artifactbundle.tar.gz"),
-            ("https://localhost/archive.tar.gz", "test-sdk.artifactbundle.tar.gz"),
-            ("https://localhost/archive.zip", "test-sdk.artifactbundle.zip"),
+        let fixtureAndURLs: [(url: String, fixture: String, checksum: String)] = [
+            ("https://localhost/archive?test=foo", "test-sdk.artifactbundle.tar.gz", "724b5abf125287517dbc5be9add055d4755dfca679e163b249ea1045f5800c6e"),
+            ("https://localhost/archive.tar.gz", "test-sdk.artifactbundle.tar.gz", "724b5abf125287517dbc5be9add055d4755dfca679e163b249ea1045f5800c6e"),
+            ("https://localhost/archive.zip", "test-sdk.artifactbundle.zip", "74f6df5aa91c582c12e3a6670ff95973e463dd3266aabbc52ad13c3cd27e2793"),
         ]
 
-        for (bundleURLString, fixture) in fixtureAndURLs {
+        for (bundleURLString, fixture, checksum) in fixtureAndURLs {
             let httpClient = HTTPClient { request, _ in
                 guard case let .download(_, downloadPath) = request.kind else {
                     XCTFail("Unexpected HTTPClient.Request.Kind")
@@ -173,12 +174,16 @@ final class SwiftSDKBundleTests: XCTestCase {
                         output.append($0)
                     }
                 )
-                try await store.install(bundlePathOrURL: bundleURLString, archiver, httpClient)
+                try await store.install(bundlePathOrURL: bundleURLString, checksum: checksum, archiver, httpClient) {
+                    try Workspace.BinaryArtifactsManager.checksum(forBinaryArtifactAt: $0, fileSystem: localFileSystem)
+                }
 
                 let bundleURL = URL(string: bundleURLString)!
                 XCTAssertEqual(output, [
                     .downloadStarted(bundleURL),
                     .downloadFinishedSuccessfully(bundleURL),
+                    .verifyingChecksum,
+                    .checksumValid,
                     .unpackingArchive(bundlePathOrURL: bundleURLString),
                     .installationSuccessful(
                         bundlePathOrURL: bundleURLString,

@@ -22,6 +22,8 @@ public final class SwiftSDKBundleStore {
     public enum Output: Equatable, CustomStringConvertible {
         case downloadStarted(URL)
         case downloadFinishedSuccessfully(URL)
+        case verifyingChecksum
+        case checksumValid
         case unpackingArchive(bundlePathOrURL: String)
         case installationSuccessful(bundlePathOrURL: String, bundleName: String)
 
@@ -31,6 +33,10 @@ public final class SwiftSDKBundleStore {
                 return "Downloading a Swift SDK bundle archive from `\(url)`..."
             case let .downloadFinishedSuccessfully(url):
                 return "Swift SDK bundle archive successfully downloaded from `\(url)`."
+            case .verifyingChecksum:
+                return "Verifying if checksum of the downloaded archive is valid..."
+            case .checksumValid:
+                return "Downloaded archive has a valid checksum."
             case let .installationSuccessful(bundlePathOrURL, bundleName):
                 return "Swift SDK bundle at `\(bundlePathOrURL)` successfully installed as \(bundleName)."
             case let .unpackingArchive(bundlePathOrURL):
@@ -145,8 +151,10 @@ public final class SwiftSDKBundleStore {
     ///   - archiver: Archiver instance to use for extracting bundle archives.
     public func install(
         bundlePathOrURL: String,
+        checksum: String? = nil,
         _ archiver: any Archiver,
-        _ httpClient: HTTPClient = .init()
+        _ httpClient: HTTPClient = .init(),
+        hasher: ((_ archivePath: AbsolutePath) throws -> String)? = nil
     ) async throws {
         let bundleName = try await withTemporaryDirectory(fileSystem: self.fileSystem, removeTreeOnDeinit: true) { temporaryDirectory in
             let bundlePath: AbsolutePath
@@ -156,9 +164,13 @@ public final class SwiftSDKBundleStore {
                 let scheme = bundleURL.scheme,
                 scheme == "http" || scheme == "https"
             {
+                guard let checksum, let hasher else {
+                    throw SwiftSDKError.checksumNotProvided(bundleURL)
+                }
+
                 let bundleName: String
                 let fileNameComponent = bundleURL.lastPathComponent
-                if archiver.supportedExtensions.contains(where: { fileNameComponent.hasSuffix($0) }) {
+                if archiver.isFileSupported(fileNameComponent) {
                     bundleName = fileNameComponent
                 } else {
                     // Assume that the bundle is a tarball if it doesn't have a recognized extension.
@@ -193,9 +205,16 @@ public final class SwiftSDKBundleStore {
                 )
                 self.downloadProgressAnimation?.complete(success: true)
 
-                bundlePath = downloadedBundlePath
-
                 self.outputHandler(.downloadFinishedSuccessfully(bundleURL))
+
+                self.outputHandler(.verifyingChecksum)
+                let computedChecksum = try hasher(downloadedBundlePath)
+                guard computedChecksum == checksum else {
+                    throw SwiftSDKError.checksumInvalid(computed: computedChecksum, provided: checksum)
+                }
+                self.outputHandler(.checksumValid)
+
+                bundlePath = downloadedBundlePath
             } else if
                 let cwd: AbsolutePath = self.fileSystem.currentWorkingDirectory,
                 let originalBundlePath = try? AbsolutePath(validating: bundlePathOrURL, relativeTo: cwd)

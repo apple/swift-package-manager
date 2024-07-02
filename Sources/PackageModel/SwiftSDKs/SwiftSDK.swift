@@ -25,6 +25,12 @@ public enum SwiftSDKError: Swift.Error {
     /// A passed argument is neither a valid file system path nor a URL.
     case invalidPathOrURL(String)
 
+    ///  Bundles installed from remote URLs require a checksum to be provided.
+    case checksumNotProvided(URL)
+
+    /// Computed archive checksum does not match the provided checksum.
+    case checksumInvalid(computed: String, provided: String)
+
     /// Couldn't find the Xcode installation.
     case invalidInstallation(String)
 
@@ -64,6 +70,17 @@ public enum SwiftSDKError: Swift.Error {
 extension SwiftSDKError: CustomStringConvertible {
     public var description: String {
         switch self {
+        case let .checksumInvalid(computed, provided):
+            return """
+            Computed archive checksum `\(computed) does not match the provided checksum `\(provided)`.
+            """
+
+        case .checksumNotProvided(let url):
+            return """
+            Bundles installed from remote URLs (such as \(url)) require their checksum passed via `--checksum` option.
+            The distributor of the bundle must compute it with the `swift package compute-checksum` \
+            command and provide it with their Swift SDK installation instructions.
+            """
         case .invalidBundleArchive(let archivePath):
             return """
             Swift SDK archive at `\(archivePath)` does not contain at least one directory with the \

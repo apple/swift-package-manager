@@ -18,7 +18,7 @@ import SPMBuildCore
 
 import struct TSCBasic.ByteString
 import protocol TSCBasic.HashAlgorithm
-
+import struct TSCBasic.SHA256
 import enum TSCUtility.Diagnostics
 
 extension Workspace {
@@ -537,20 +537,35 @@ extension Workspace {
             return result.get()
         }
 
-        public func checksum(forBinaryArtifactAt path: AbsolutePath) throws -> String {
+        package static func checksum(
+            forBinaryArtifactAt path: AbsolutePath,
+            hashAlgorithm: HashAlgorithm = SHA256(),
+            archiver: (any Archiver)? = nil,
+            fileSystem: any FileSystem
+        ) throws -> String {
+            let archiver = archiver ?? UniversalArchiver(fileSystem)
             // Validate the path has a supported extension.
-            guard let pathExtension = path.extension, self.archiver.supportedExtensions.contains(pathExtension) else {
-                let supportedExtensionList = self.archiver.supportedExtensions.joined(separator: ", ")
+            guard let lastPathComponent = path.components.last, archiver.isFileSupported(lastPathComponent) else {
+                let supportedExtensionList = archiver.supportedExtensions.joined(separator: ", ")
                 throw StringError("unexpected file type; supported extensions are: \(supportedExtensionList)")
             }
 
             // Ensure that the path with the accepted extension is a file.
-            guard self.fileSystem.isFile(path) else {
+            guard fileSystem.isFile(path) else {
                 throw StringError("file not found at path: \(path.pathString)")
             }
 
-            let contents = try self.fileSystem.readFileContents(path)
-            return self.checksumAlgorithm.hash(contents).hexadecimalRepresentation
+            let contents = try fileSystem.readFileContents(path)
+            return hashAlgorithm.hash(contents).hexadecimalRepresentation
+        }
+
+        public func checksum(forBinaryArtifactAt path: AbsolutePath) throws -> String {
+            try Self.checksum(
+                forBinaryArtifactAt: path,
+                hashAlgorithm: self.checksumAlgorithm,
+                archiver: self.archiver,
+                fileSystem: self.fileSystem
+            )
         }
 
         public func cancel(deadline: DispatchTime) throws {

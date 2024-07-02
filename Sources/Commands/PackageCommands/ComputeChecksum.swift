@@ -28,17 +28,10 @@ struct ComputeChecksum: SwiftCommand {
     var path: AbsolutePath
 
     func run(_ swiftCommandState: SwiftCommandState) throws {
-        let binaryArtifactsManager = try Workspace.BinaryArtifactsManager(
-            fileSystem: swiftCommandState.fileSystem,
-            authorizationProvider: swiftCommandState.getAuthorizationProvider(),
-            hostToolchain: swiftCommandState.getHostToolchain(),
-            checksumAlgorithm: SHA256(),
-            cachePath: .none,
-            customHTTPClient: .none,
-            customArchiver: .none,
-            delegate: .none
+        let checksum = try Workspace.BinaryArtifactsManager.checksum(
+            forBinaryArtifactAt: self.path,
+            fileSystem: swiftCommandState.fileSystem
         )
-        let checksum = try binaryArtifactsManager.checksum(forBinaryArtifactAt: path)
         print(checksum)
     }
 }
