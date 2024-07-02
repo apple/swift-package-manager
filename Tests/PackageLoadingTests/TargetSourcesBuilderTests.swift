@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,9 +17,7 @@ import PackageLoading
 import _InternalTestSupport
 import XCTest
 
-import class TSCBasic.InMemoryFileSystem
-
-class TargetSourcesBuilderTests: XCTestCase {
+final class TargetSourcesBuilderTests: XCTestCase {
     func testBasicFileContentsComputation() throws {
         let target = try TargetDescription(
             name: "Foo",

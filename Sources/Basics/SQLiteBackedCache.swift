@@ -13,7 +13,6 @@
 import Foundation
 
 import protocol TSCBasic.Closable
-import class TSCBasic.InMemoryFileSystem
 import var TSCBasic.localFileSystem
 
 /// SQLite backed persistent cache.

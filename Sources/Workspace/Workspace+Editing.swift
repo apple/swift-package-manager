@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import struct Basics.AbsolutePath
+import class Basics.InMemoryFileSystem
 import class Basics.ObservabilityScope
 import struct Basics.RelativePath
 import func Basics.temp_await
 import struct PackageGraph.PackageGraphRootInput
 import struct PackageModel.ProvidedLibrary
 import struct SourceControl.Revision
-import class TSCBasic.InMemoryFileSystem
 
 extension Workspace {
     /// Edit implementation.

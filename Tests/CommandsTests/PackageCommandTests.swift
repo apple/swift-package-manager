@@ -27,7 +27,6 @@ import XCTest
 
 import struct TSCBasic.ByteString
 import class TSCBasic.BufferedOutputByteStream
-import class TSCBasic.InMemoryFileSystem
 import enum TSCBasic.JSON
 import class Basics.AsyncProcess
 

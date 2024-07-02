@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,9 +23,7 @@ import _InternalTestSupport
 @testable import XCBuildSupport
 import XCTest
 
-import class TSCBasic.InMemoryFileSystem
-
-class PIFBuilderTests: XCTestCase {
+final class PIFBuilderTests: XCTestCase {
     let inputsDir = AbsolutePath(#file).parentDirectory.appending(components: "Inputs")
 
     func testOrdering() throws {

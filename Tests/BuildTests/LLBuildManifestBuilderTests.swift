@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2015-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2015-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,7 +23,6 @@ import struct SPMBuildCore.BuildParameters
 @_spi(SwiftPMInternal)
 import _InternalTestSupport
 
-import class TSCBasic.InMemoryFileSystem
 import XCTest
 
 final class LLBuildManifestBuilderTests: XCTestCase {

@@ -23,7 +23,6 @@ import _InternalTestSupport
 import XCTest
 
 import class TSCBasic.BufferedOutputByteStream
-import class TSCBasic.InMemoryFileSystem
 
 private func mockBuildOperation(
     productsBuildParameters: BuildParameters,

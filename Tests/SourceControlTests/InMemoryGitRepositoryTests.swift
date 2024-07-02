@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@ import SourceControl
 import _InternalTestSupport
 import XCTest
 
-class InMemoryGitRepositoryTests: XCTestCase {
+final class InMemoryGitRepositoryTests: XCTestCase {
     func testBasics() throws {
         let fs = InMemoryFileSystem()
         let repo = InMemoryGitRepository(path: .root, fs: fs)

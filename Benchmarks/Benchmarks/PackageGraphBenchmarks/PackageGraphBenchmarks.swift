@@ -7,7 +7,6 @@ import PackageModel
 @_spi(DontAdoptOutsideOfSwiftPMExposedForBenchmarksAndTestsOnly)
 import func PackageGraph.loadModulesGraph
 
-import class TSCBasic.InMemoryFileSystem
 import Workspace
 
 let benchmarks = {

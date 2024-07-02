@@ -16,8 +16,6 @@ import PackageModel
 import _InternalTestSupport
 import XCTest
 
-import class TSCBasic.InMemoryFileSystem
-
 @available(macOS 13, iOS 16, tvOS 16, watchOS 9, *)
 final class ManifestLoaderCacheTests: XCTestCase {
 

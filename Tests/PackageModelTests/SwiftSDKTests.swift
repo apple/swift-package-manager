@@ -18,8 +18,6 @@
 @testable import SPMBuildCore
 import XCTest
 
-import class TSCBasic.InMemoryFileSystem
-
 private let bundleRootPath = try! AbsolutePath(validating: "/tmp/cross-toolchain")
 private let toolchainBinDir = RelativePath("swift.xctoolchain/usr/bin")
 private let sdkRootDir = RelativePath("ubuntu-jammy.sdk")

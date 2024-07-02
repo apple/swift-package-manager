@@ -23,7 +23,6 @@ import SourceControl
 
 import func TSCBasic.findCycle
 import protocol TSCBasic.HashAlgorithm
-import class TSCBasic.InMemoryFileSystem
 import struct TSCBasic.KeyedPair
 import struct TSCBasic.SHA256
 import var TSCBasic.stderrStream
