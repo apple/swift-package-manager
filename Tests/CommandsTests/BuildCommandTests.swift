@@ -182,13 +182,13 @@ final class BuildCommandTests: CommandsTestCase {
             )
 
             // Print correct path when building with XCBuild.
+            #if os(macOS)
             let xcodeDebugOutput = try await execute(["--build-system", "xcode", "--show-bin-path"], packagePath: fullPath)
                 .stdout
             let xcodeReleaseOutput = try await execute(
                 ["--build-system", "xcode", "-c", "release", "--show-bin-path"],
                 packagePath: fullPath
             ).stdout
-            #if os(macOS)
             XCTAssertEqual(
                 xcodeDebugOutput,
                 "\(xcbuildTargetPath.appending(components: "Products", "Debug").pathString)\n"
@@ -197,9 +197,6 @@ final class BuildCommandTests: CommandsTestCase {
                 xcodeReleaseOutput,
                 "\(xcbuildTargetPath.appending(components: "Products", "Release").pathString)\n"
             )
-            #else
-            XCTAssertEqual(xcodeDebugOutput, "\(targetPath.appending("debug").pathString)\n")
-            XCTAssertEqual(xcodeReleaseOutput, "\(targetPath.appending("release").pathString)\n")
             #endif
 
             // Test symlink.
