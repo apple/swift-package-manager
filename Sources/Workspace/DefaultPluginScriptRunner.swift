@@ -64,45 +64,34 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
         fileSystem: FileSystem,
         observabilityScope: ObservabilityScope,
         callbackQueue: DispatchQueue,
-        delegate: PluginScriptCompilerDelegate & PluginScriptRunnerDelegate,
-        completion: @escaping (Result<Int32, Error>) -> Void
-    ) {
+        delegate: PluginScriptCompilerDelegate & PluginScriptRunnerDelegate
+    ) async throws -> Int32 {
         // If needed, compile the plugin script to an executable (asynchronously). Compilation is skipped if the plugin hasn't changed since it was last compiled.
-        self.compilePluginScript(
+        let result = try await self.compilePluginScript(
             sourceFiles: sourceFiles,
             pluginName: pluginName,
             toolsVersion: toolsVersion,
             observabilityScope: observabilityScope,
             callbackQueue: DispatchQueue.sharedConcurrent,
-            delegate: delegate,
-            completion: {
-                dispatchPrecondition(condition: .onQueue(DispatchQueue.sharedConcurrent))
-                switch $0 {
-                case .success(let result):
-                    if result.succeeded {
-                        // Compilation succeeded, so run the executable. We are already running on an asynchronous queue.
-                        self.invoke(
-                            compiledExec: result.executableFile,
-                            workingDirectory: workingDirectory,
-                            writableDirectories: writableDirectories,
-                            readOnlyDirectories: readOnlyDirectories,
-                            allowNetworkConnections: allowNetworkConnections,
-                            initialMessage: initialMessage,
-                            observabilityScope: observabilityScope,
-                            callbackQueue: callbackQueue,
-                            delegate: delegate,
-                            completion: completion)
-                    }
-                    else {
-                        // Compilation failed, so throw an error.
-                        callbackQueue.async { completion(.failure(DefaultPluginScriptRunnerError.compilationFailed(result))) }
-                    }
-                case .failure(let error):
-                    // Compilation failed, so just call the callback block on the appropriate queue.
-                    callbackQueue.async { completion(.failure(error)) }
-                }
-            }
+            delegate: delegate
         )
+        if result.succeeded {
+            // Compilation succeeded, so run the executable. We are already running on an asynchronous queue.
+            return try await self.invoke(
+                compiledExec: result.executableFile,
+                workingDirectory: workingDirectory,
+                writableDirectories: writableDirectories,
+                readOnlyDirectories: readOnlyDirectories,
+                allowNetworkConnections: allowNetworkConnections,
+                initialMessage: initialMessage,
+                observabilityScope: observabilityScope,
+                callbackQueue: callbackQueue,
+                delegate: delegate
+            )
+        } else {
+            // Compilation failed, so throw an error.
+            throw DefaultPluginScriptRunnerError.compilationFailed(result)
+        }
     }
 
     public var hostTriple: Triple {
@@ -116,9 +105,8 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
         toolsVersion: ToolsVersion,
         observabilityScope: ObservabilityScope,
         callbackQueue: DispatchQueue,
-        delegate: PluginScriptCompilerDelegate,
-        completion: @escaping (Result<PluginCompilationResult, Error>) -> Void
-    ) {
+        delegate: PluginScriptCompilerDelegate
+    ) async throws -> PluginCompilationResult {
         // Determine the path of the executable and other produced files.
         let execName = pluginName.spm_mangledToC99ExtendedIdentifier()
         #if os(Windows)
@@ -241,9 +229,7 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
         }
         catch {
             // Bail out right away if we didn't even get this far.
-            return callbackQueue.async {
-                completion(.failure(DefaultPluginScriptRunnerError.compilationPreparationFailed(error: error)))
-            }
+            throw DefaultPluginScriptRunnerError.compilationPreparationFailed(error: error)
         }
         
         // Hash the compiler inputs to decide whether we really need to recompile.
@@ -330,11 +316,10 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
                 executableFile: execFilePath,
                 diagnosticsFile: diagFilePath,
                 compilerOutput: compilationState.output,
-                cached: true)
+                cached: true
+            )
             delegate.skippedCompilingPlugin(cachedResult: result)
-            return callbackQueue.async {
-                completion(.success(result))
-            }
+            return result
         }
 
         // Otherwise we need to recompile. We start by telling the delegate.
@@ -351,47 +336,43 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
         }
         
         // Now invoke the compiler asynchronously.
-        AsyncProcess.popen(arguments: commandLine, environment: environment, queue: callbackQueue) {
-            // We are now on our caller's requested callback queue, so we just call the completion handler directly.
-            dispatchPrecondition(condition: .onQueue(callbackQueue))
-            completion($0.tryMap { process in
-                // Emit the compiler output as observable info.
-                let compilerOutput = ((try? process.utf8Output()) ?? "") + ((try? process.utf8stderrOutput()) ?? "")
-                if !compilerOutput.isEmpty {
-                    observabilityScope.emit(info: compilerOutput)
-                }
+        let process = try await AsyncPorcess.Process.popen(arguments: commandLine, environment: environment)
 
-                // Save the persisted compilation state for possible reuse next time.
-                let compilationState = PersistedCompilationState(
-                    commandLine: commandLine,
-                    environment: toolchain.swiftCompilerEnvironment.cachable,
-                    inputHash: compilerInputHash,
-                    output: compilerOutput,
-                    result: .init(process.exitStatus))
-                do {
-                    try JSONEncoder.makeWithDefaults().encode(path: stateFilePath, fileSystem: self.fileSystem, compilationState)
-                }
-                catch {
-                    // We couldn't write out the `.state` file. We warn about it but proceed.
-                    observabilityScope.emit(debug: "Couldn't save plugin compilation state", underlyingError: error)
-                }
-
-                // Construct a PluginCompilationResult for both the successful and unsuccessful cases (to convey diagnostics, etc).
-                let result = PluginCompilationResult(
-                    succeeded: compilationState.succeeded,
-                    commandLine: commandLine,
-                    executableFile: execFilePath,
-                    diagnosticsFile: diagFilePath,
-                    compilerOutput: compilerOutput,
-                    cached: false)
-
-                // Tell the delegate that we're done compiling the plugin, passing it the result.
-                delegate.didCompilePlugin(result: result)
-                
-                // Also return the result to the caller.
-                return result
-            })
+        // Emit the compiler output as observable info.
+        let compilerOutput = ((try? process.utf8Output()) ?? "") + ((try? process.utf8stderrOutput()) ?? "")
+        if !compilerOutput.isEmpty {
+            observabilityScope.emit(info: compilerOutput)
         }
+
+        // Save the persisted compilation state for possible reuse next time.
+        let newCompilationState = PersistedCompilationState(
+            commandLine: commandLine,
+            environment: toolchain.swiftCompilerEnvironment.cachable,
+            inputHash: compilerInputHash,
+            output: compilerOutput,
+            result: .init(process.exitStatus))
+        do {
+            try JSONEncoder.makeWithDefaults().encode(path: stateFilePath, fileSystem: self.fileSystem, newCompilationState)
+        }
+        catch {
+            // We couldn't write out the `.state` file. We warn about it but proceed.
+            observabilityScope.emit(debug: "Couldn't save plugin compilation state", underlyingError: error)
+        }
+
+        // Construct a PluginCompilationResult for both the successful and unsuccessful cases (to convey diagnostics, etc).
+        let result = PluginCompilationResult(
+            succeeded: newCompilationState.succeeded,
+            commandLine: commandLine,
+            executableFile: execFilePath,
+            diagnosticsFile: diagFilePath,
+            compilerOutput: compilerOutput,
+            cached: false)
+
+        // Tell the delegate that we're done compiling the plugin, passing it the result.
+        delegate.didCompilePlugin(result: result)
+
+        // Also return the result to the caller.
+        return result
     }
 
     /// Returns path to the sdk, if possible.
@@ -418,7 +399,34 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
 
         return sdkRootPath
     }
-    
+
+    private func invoke(
+        compiledExec: Basics.AbsolutePath,
+        workingDirectory: Basics.AbsolutePath,
+        writableDirectories: [Basics.AbsolutePath],
+        readOnlyDirectories: [Basics.AbsolutePath],
+        allowNetworkConnections: [SandboxNetworkPermission],
+        initialMessage: Data,
+        observabilityScope: ObservabilityScope,
+        callbackQueue: DispatchQueue,
+        delegate: PluginScriptRunnerDelegate
+    ) async throws -> Int32 {
+        try await withCheckedThrowingContinuation {
+            self.invoke(
+                compiledExec: compiledExec,
+                workingDirectory: workingDirectory,
+                writableDirectories: writableDirectories,
+                readOnlyDirectories: readOnlyDirectories,
+                allowNetworkConnections: allowNetworkConnections,
+                initialMessage: initialMessage,
+                observabilityScope: observabilityScope,
+                callbackQueue: callbackQueue,
+                delegate: delegate,
+                completion: $0.resume(with:)
+            )
+        }
+    }
+
     /// Private function that invokes a compiled plugin executable and communicates with it until it finishes.
     fileprivate func invoke(
         compiledExec: Basics.AbsolutePath,
@@ -489,31 +497,30 @@ public struct DefaultPluginScriptRunner: PluginScriptRunner, Cancellable {
             stdoutLock.withLock {
                 do {
                     while let message = try fileHandle.readPluginMessage() {
-                        // FIXME: We should handle errors here.
-                        callbackQueue.async {
-                            do {
-                                try delegate.handleMessage(data: message, responder: { data in
-                                    outputQueue.async {
-                                        do {
-                                            try outputHandle.writePluginMessage(data)
-                                        }
-                                        catch {
-                                            print("error while trying to send message to plugin: \(error.interpolationDescription)")
-                                        }
+                        // FIXME: We should handle backpressure and errors here.
+                        do {
+                            try await delegate.handleMessage(data: message, responder: { data in
+                                outputQueue.async {
+                                    do {
+                                        try outputHandle.writePluginMessage(data)
                                     }
-                                })
-                            }
-                            catch DecodingError.keyNotFound(let key, _) where key.stringValue == "version" {
-                                print("message from plugin did not contain a 'version' key, likely an incompatible plugin library is being loaded by the plugin")
-                            }
-                            catch {
-                                print("error while trying to handle message from plugin: \(error.interpolationDescription)")
-                            }
+                                    catch {
+                                        print("error while trying to send message to plugin: \(error.interpolationDescription)")
+                                    }
+                                }
+                            })
                         }
+                        catch DecodingError.keyNotFound(let key, _) where key.stringValue == "version" {
+                            observabilityScope.emit(error: "message from plugin did not contain a 'version' key, likely an incompatible plugin library is being loaded by the plugin")
+                        }
+                        catch {
+                            observabilityScope.emit(error: "error while trying to handle message from plugin: \(error.interpolationDescription)")
+                        }
+
                     }
                 }
                 catch {
-                    print("error while trying to read message from plugin: \(error.interpolationDescription)")
+                    observabilityScope.emit(error: "error while trying to read message from plugin: \(error.interpolationDescription)")
                 }
             }
         }

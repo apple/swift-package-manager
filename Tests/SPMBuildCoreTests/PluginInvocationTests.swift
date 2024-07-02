@@ -30,7 +30,7 @@ import class TSCBasic.InMemoryFileSystem
 import struct TSCUtility.SerializedDiagnostics
 
 final class PluginInvocationTests: XCTestCase {
-    func testBasics() throws {
+    func testBasics() async throws {
         // Construct a canned file system and package graph with a single package and a library that uses a build tool plugin that invokes a tool.
         let fileSystem = InMemoryFileSystem(emptyFiles:
             "/Foo/Plugins/FooPlugin/source.swift",
@@ -121,12 +121,9 @@ final class PluginInvocationTests: XCTestCase {
                 toolsVersion: ToolsVersion,
                 observabilityScope: ObservabilityScope,
                 callbackQueue: DispatchQueue,
-                delegate: PluginScriptCompilerDelegate,
-                completion: @escaping (Result<PluginCompilationResult, Error>) -> Void
-            ) {
-                callbackQueue.sync {
-                    completion(.failure(StringError("unimplemented")))
-                }
+                delegate: PluginScriptCompilerDelegate
+            ) async throws -> PluginCompilationResult {
+                throw StringError("unimplemented")
             }
             
             func runPluginScript(
@@ -141,9 +138,8 @@ final class PluginInvocationTests: XCTestCase {
                 fileSystem: FileSystem,
                 observabilityScope: ObservabilityScope,
                 callbackQueue: DispatchQueue,
-                delegate: PluginScriptCompilerDelegate & PluginScriptRunnerDelegate,
-                completion: @escaping (Result<Int32, Error>) -> Void
-            ) {
+                delegate: PluginScriptCompilerDelegate & PluginScriptRunnerDelegate
+            ) async throws -> Int32 {
                 // Check that we were given the right sources.
                 XCTAssertEqual(sourceFiles, ["/Foo/Plugins/FooPlugin/source.swift"])
 
@@ -154,55 +150,44 @@ final class PluginInvocationTests: XCTestCase {
                     }
                     
                     // Pretend it emitted a warning.
-                    try callbackQueue.sync {
-                        let message = Data("""
-                        {   "emitDiagnostic": {
-                                "severity": "warning",
-                                "message": "A warning",
-                                "file": "/Foo/Sources/Foo/SomeFile.abc",
-                                "line": 42
-                            }
+                    var message = Data("""
+                    {   "emitDiagnostic": {
+                            "severity": "warning",
+                            "message": "A warning",
+                            "file": "/Foo/Sources/Foo/SomeFile.abc",
+                            "line": 42
                         }
-                        """.utf8)
-                        try delegate.handleMessage(data: message, responder: { _ in })
                     }
+                    """.utf8)
+                    try await delegate.handleMessage(data: message, responder: { _ in })
 
                     // Pretend it defined a build command.
-                    try callbackQueue.sync {
-                        let message = Data("""
-                        {   "defineBuildCommand": {
-                                "configuration": {
-                                    "version": 2,
-                                    "displayName": "Do something",
-                                    "executable": "/bin/FooTool",
-                                    "arguments": [
-                                        "-c", "/Foo/Sources/Foo/SomeFile.abc"
-                                    ],
-                                    "workingDirectory": "/Foo/Sources/Foo",
-                                    "environment": {
-                                        "X": "Y"
-                                    },
-                                },
-                                "inputFiles": [
+                    message = Data("""
+                    {   "defineBuildCommand": {
+                            "configuration": {
+                                "version": 2,
+                                "displayName": "Do something",
+                                "executable": "/bin/FooTool",
+                                "arguments": [
+                                    "-c", "/Foo/Sources/Foo/SomeFile.abc"
                                 ],
-                                "outputFiles": [
-                                ]
-                            }
+                                "workingDirectory": "/Foo/Sources/Foo",
+                                "environment": {
+                                    "X": "Y"
+                                },
+                            },
+                            "inputFiles": [
+                            ],
+                            "outputFiles": [
+                            ]
                         }
-                        """.utf8)
-                        try delegate.handleMessage(data: message, responder: { _ in })
                     }
-                }
-                catch {
-                    callbackQueue.sync {
-                        completion(.failure(error))
-                    }
+                    """.utf8)
+                    try await delegate.handleMessage(data: message, responder: { _ in })
                 }
 
                 // If we get this far we succeeded, so invoke the completion handler.
-                callbackQueue.sync {
-                    completion(.success(0))
-                }
+                return 0
             }
         }
 

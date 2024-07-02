@@ -74,7 +74,7 @@ struct APIDigesterBaselineDumper {
         force: Bool,
         logLevel: Basics.Diagnostic.Severity,
         swiftCommandState: SwiftCommandState
-    ) throws -> AbsolutePath {
+    ) async throws -> AbsolutePath {
         var modulesToDiff = modulesToDiff
         let apiDiffDir = productsBuildParameters.apiDiff
         let baselineDir = (baselineDir ?? apiDiffDir).appending(component: baselineRevision.identifier)
@@ -145,7 +145,7 @@ struct APIDigesterBaselineDumper {
             toolsBuildParameters: toolsBuildParameters,
             packageGraphLoader: { graph }
         )
-        try buildSystem.build()
+        try await buildSystem.build()
 
         // Dump the SDK JSON.
         try swiftCommandState.fileSystem.createDirectory(baselineDir, recursive: true)

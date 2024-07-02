@@ -140,7 +140,7 @@ public struct SwiftRunCommand: AsyncSwiftCommand {
             )
 
             // Perform build.
-            try buildSystem.build()
+            try await buildSystem.build()
 
             // Execute the REPL.
             let arguments = try buildSystem.buildPlan.createREPLArguments()
@@ -158,11 +158,11 @@ public struct SwiftRunCommand: AsyncSwiftCommand {
                     explicitProduct: options.executable,
                     traitConfiguration: .init(traitOptions: self.options.traits)
                 )
-                let productName = try findProductName(in: buildSystem.getPackageGraph())
+                let productName = try await findProductName(in: buildSystem.getPackageGraph())
                 if options.shouldBuildTests {
-                    try buildSystem.build(subset: .allIncludingTests)
+                    try await buildSystem.build(subset: .allIncludingTests)
                 } else if options.shouldBuild {
-                    try buildSystem.build(subset: .product(productName))
+                    try await buildSystem.build(subset: .product(productName))
                 }
 
                 let executablePath = try swiftCommandState.productsBuildParameters.buildPath.appending(component: productName)
@@ -203,11 +203,11 @@ public struct SwiftRunCommand: AsyncSwiftCommand {
                     explicitProduct: options.executable,
                     traitConfiguration: .init(traitOptions: self.options.traits)
                 )
-                let productName = try findProductName(in: buildSystem.getPackageGraph())
+                let productName = try await findProductName(in: buildSystem.getPackageGraph())
                 if options.shouldBuildTests {
-                    try buildSystem.build(subset: .allIncludingTests)
+                    try await buildSystem.build(subset: .allIncludingTests)
                 } else if options.shouldBuild {
-                    try buildSystem.build(subset: .product(productName))
+                    try await buildSystem.build(subset: .product(productName))
                 }
 
                 let executablePath = try swiftCommandState.productsBuildParameters.buildPath.appending(component: productName)

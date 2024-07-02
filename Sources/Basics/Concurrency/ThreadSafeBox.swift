@@ -43,6 +43,18 @@ public final class ThreadSafeBox<Value> {
         return value
     }
 
+    @discardableResult
+    public func memoize(body: () async throws -> Value) async rethrows -> Value {
+        if let value = self.get() {
+            return value
+        }
+        let value = try await body()
+        self.lock.withLock {
+            self.underlying = value
+        }
+        return value
+    }
+
     public func clear() {
         self.lock.withLock {
             self.underlying = nil

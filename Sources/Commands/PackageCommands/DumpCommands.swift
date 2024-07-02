@@ -17,7 +17,7 @@ import Foundation
 import PackageModel
 import XCBuildSupport
 
-struct DumpSymbolGraph: SwiftCommand {
+struct DumpSymbolGraph: AsyncSwiftCommand {
     static let configuration = CommandConfiguration(
         abstract: "Dump Symbol Graph")
     static let defaultMinimumAccessLevel = SymbolGraphExtract.AccessLevel.public
@@ -43,7 +43,7 @@ struct DumpSymbolGraph: SwiftCommand {
     @Flag(help: "Emit extension block symbols for extensions to external types or directly associate members and conformances with the extended nominal.")
     var extensionBlockSymbolBehavior: ExtensionBlockSymbolBehavior = .omitExtensionBlockSymbols
 
-    func run(_ swiftCommandState: SwiftCommandState) throws {
+    func run(_ swiftCommandState: SwiftCommandState) async throws {
         // Build the current package.
         //
         // We turn build manifest caching off because we need the build plan.
@@ -53,7 +53,7 @@ struct DumpSymbolGraph: SwiftCommand {
             traitConfiguration: .init(enableAllTraits: true),
             cacheBuildManifest: false
         )
-        try buildSystem.build()
+        try await buildSystem.build()
 
         // Configure the symbol graph extractor.
         let symbolGraphExtractor = try SymbolGraphExtract(
@@ -71,7 +71,7 @@ struct DumpSymbolGraph: SwiftCommand {
         // Run the tool once for every library and executable target in the root package.
         let buildPlan = try buildSystem.buildPlan
         let symbolGraphDirectory = buildPlan.destinationBuildParameters.dataPath.appending("symbolgraph")
-        let targets = try buildSystem.getPackageGraph().rootPackages.flatMap{ $0.modules }.filter{ $0.type == .library }
+        let targets = try await buildSystem.getPackageGraph().rootPackages.flatMap{ $0.modules }.filter{ $0.type == .library }
         for target in targets {
             print("-- Emitting symbol graph for", target.name)
             let result = try symbolGraphExtractor.extractSymbolGraph(

@@ -40,7 +40,7 @@ public struct AbsolutePath: Hashable, Sendable {
     /// Root directory (whose string representation is just a path separator).
     public static let root = Self(TSCAbsolutePath.root)
 
-    internal let underlying: TSCAbsolutePath
+    package let underlying: TSCAbsolutePath
 
     // public for transition
     public init(_ underlying: TSCAbsolutePath) {

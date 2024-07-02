@@ -67,7 +67,7 @@ struct CardStack {
         return readLine(strippingNewline: true)
     }
 
-    mutating func run() {
+    mutating func run() async {
         var inputFinished = false
         while !inputFinished {
             guard let top = cards.last else {
@@ -91,7 +91,7 @@ struct CardStack {
                                             .reversed()
                                             .drop { $0.isWhitespace }
                                             .reversed())
-                let response = top.acceptLineInput(trimmedLine)
+                let response = await top.acceptLineInput(trimmedLine)
                 switch response {
                 case .none:
                     continue askForLine

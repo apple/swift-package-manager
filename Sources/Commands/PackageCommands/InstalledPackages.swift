@@ -18,7 +18,7 @@ import PackageModel
 import TSCBasic
 
 extension SwiftPackageCommand {
-    struct Install: SwiftCommand {
+    struct Install: AsyncSwiftCommand {
         static let configuration = CommandConfiguration(
             commandName: "experimental-install",
             abstract: "Offers the ability to install executable products of the current package."
@@ -30,7 +30,7 @@ extension SwiftPackageCommand {
         @Option(help: "The name of the executable product to install")
         var product: String?
 
-        func run(_ tool: SwiftCommandState) throws {
+        func run(_ tool: SwiftCommandState) async throws {
             let swiftpmBinDir = try tool.fileSystem.getOrCreateSwiftPMInstalledBinariesDirectory()
 
             let env = Environment.current
@@ -81,7 +81,7 @@ extension SwiftPackageCommand {
                 throw StringError("\(productToInstall.name) is already installed at \(existingPkg.path)")
             }
 
-            try tool.createBuildSystem(explicitProduct: productToInstall.name, traitConfiguration: .init())
+            try await tool.createBuildSystem(explicitProduct: productToInstall.name, traitConfiguration: .init())
                 .build(subset: .product(productToInstall.name))
 
             let binPath = try tool.productsBuildParameters.buildPath.appending(component: productToInstall.name)

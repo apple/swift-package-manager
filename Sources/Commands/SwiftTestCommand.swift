@@ -244,7 +244,7 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
             _ = try? localFileSystem.removeFileTree(productsBuildParameters.testOutputPath)
         }
 
-        let testProducts = try buildTestsIfNeeded(swiftCommandState: swiftCommandState, library: .xctest)
+        let testProducts = try await buildTestsIfNeeded(swiftCommandState: swiftCommandState, library: .xctest)
         if !self.options.shouldRunInParallel {
             let xctestArgs = try xctestArgs(for: testProducts, swiftCommandState: swiftCommandState)
             try await runTestProducts(
@@ -368,7 +368,7 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
 
     private func swiftTestingRun(_ swiftCommandState: SwiftCommandState) async throws {
         let (productsBuildParameters, _) = try swiftCommandState.buildParametersForTest(options: self.options, library: .swiftTesting)
-        let testProducts = try buildTestsIfNeeded(swiftCommandState: swiftCommandState, library: .swiftTesting)
+        let testProducts = try await buildTestsIfNeeded(swiftCommandState: swiftCommandState, library: .swiftTesting)
         let additionalArguments = Array(CommandLine.arguments.dropFirst())
         try await runTestProducts(
             testProducts,
@@ -395,7 +395,7 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
         } else if self.options._deprecated_shouldListTests {
             // backward compatibility 6/2022 for deprecation of flag into a subcommand
             let command = try List.parse()
-            try command.run(swiftCommandState)
+            try await command.run(swiftCommandState)
         } else {
             if try options.testLibraryOptions.enableSwiftTestingLibrarySupport(swiftCommandState: swiftCommandState) {
                 try await swiftTestingRun(swiftCommandState)
@@ -567,9 +567,9 @@ public struct SwiftTestCommand: AsyncSwiftCommand {
     private func buildTestsIfNeeded(
         swiftCommandState: SwiftCommandState,
         library: BuildParameters.Testing.Library
-    ) throws -> [BuiltTestProduct] {
+    ) async throws -> [BuiltTestProduct] {
         let (productsBuildParameters, toolsBuildParameters) = try swiftCommandState.buildParametersForTest(options: self.options, library: library)
-        return try Commands.buildTestsIfNeeded(
+        return try await Commands.buildTestsIfNeeded(
             swiftCommandState: swiftCommandState,
             productsBuildParameters: productsBuildParameters,
             toolsBuildParameters: toolsBuildParameters,
@@ -641,7 +641,7 @@ extension SwiftTestCommand {
         }
     }
 
-    struct List: SwiftCommand {
+    struct List: AsyncSwiftCommand {
         static let configuration = CommandConfiguration(
             abstract: "Lists test methods in specifier format"
         )
@@ -665,13 +665,13 @@ extension SwiftTestCommand {
 
         // MARK: - XCTest
 
-        private func xctestRun(_ swiftCommandState: SwiftCommandState) throws {
+        private func xctestRun(_ swiftCommandState: SwiftCommandState) async throws {
           let (productsBuildParameters, toolsBuildParameters) = try swiftCommandState.buildParametersForTest(
                 enableCodeCoverage: false,
                 shouldSkipBuilding: sharedOptions.shouldSkipBuilding,
                 library: .xctest
             )
-            let testProducts = try buildTestsIfNeeded(
+            let testProducts = try await buildTestsIfNeeded(
                 swiftCommandState: swiftCommandState,
                 productsBuildParameters: productsBuildParameters,
                 toolsBuildParameters: toolsBuildParameters
@@ -693,13 +693,13 @@ extension SwiftTestCommand {
 
         // MARK: - swift-testing
 
-        private func swiftTestingRun(_ swiftCommandState: SwiftCommandState) throws {
+        private func swiftTestingRun(_ swiftCommandState: SwiftCommandState) async throws {
             let (productsBuildParameters, toolsBuildParameters) = try swiftCommandState.buildParametersForTest(
                 enableCodeCoverage: false,
                 shouldSkipBuilding: sharedOptions.shouldSkipBuilding,
                 library: .swiftTesting
             )
-            let testProducts = try buildTestsIfNeeded(
+            let testProducts = try await buildTestsIfNeeded(
                 swiftCommandState: swiftCommandState,
                 productsBuildParameters: productsBuildParameters,
                 toolsBuildParameters: toolsBuildParameters
@@ -737,12 +737,12 @@ extension SwiftTestCommand {
 
         // MARK: - Common implementation
 
-        func run(_ swiftCommandState: SwiftCommandState) throws {
+        func run(_ swiftCommandState: SwiftCommandState) async throws {
             if try testLibraryOptions.enableSwiftTestingLibrarySupport(swiftCommandState: swiftCommandState) {
-                try swiftTestingRun(swiftCommandState)
+                try await swiftTestingRun(swiftCommandState)
             }
             if testLibraryOptions.enableXCTestSupport {
-                try xctestRun(swiftCommandState)
+                try await xctestRun(swiftCommandState)
             }
         }
 
@@ -750,8 +750,8 @@ extension SwiftTestCommand {
             swiftCommandState: SwiftCommandState,
             productsBuildParameters: BuildParameters,
             toolsBuildParameters: BuildParameters
-        ) throws -> [BuiltTestProduct] {
-            return try Commands.buildTestsIfNeeded(
+        ) async throws -> [BuiltTestProduct] {
+            return try await Commands.buildTestsIfNeeded(
                 swiftCommandState: swiftCommandState,
                 productsBuildParameters: productsBuildParameters,
                 toolsBuildParameters: toolsBuildParameters,
@@ -1383,7 +1383,7 @@ private func buildTestsIfNeeded(
     toolsBuildParameters: BuildParameters,
     testProduct: String?,
     traitConfiguration: TraitConfiguration
-) throws -> [BuiltTestProduct] {
+) async throws -> [BuiltTestProduct] {
     let buildSystem = try swiftCommandState.createBuildSystem(
         traitConfiguration: traitConfiguration,
         productsBuildParameters: productsBuildParameters,
@@ -1396,10 +1396,10 @@ private func buildTestsIfNeeded(
         .allIncludingTests
     }
 
-    try buildSystem.build(subset: subset)
+    try await buildSystem.build(subset: subset)
 
     // Find the test product.
-    let testProducts = buildSystem.builtTestProducts
+    let testProducts = await buildSystem.builtTestProducts
     guard !testProducts.isEmpty else {
         if let testProduct {
             throw TestError.productIsNotTest(productName: testProduct)

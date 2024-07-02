@@ -29,7 +29,7 @@ private struct NativeBuildSystemFactory: BuildSystemFactory {
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
-        packageGraphLoader: (() throws -> ModulesGraph)?,
+        packageGraphLoader: (() async throws -> ModulesGraph)?,
         outputStream: OutputByteStream?,
         logLevel: Diagnostic.Severity?,
         observabilityScope: ObservabilityScope?
@@ -74,7 +74,7 @@ private struct XcodeBuildSystemFactory: BuildSystemFactory {
         cacheBuildManifest: Bool,
         productsBuildParameters: BuildParameters?,
         toolsBuildParameters: BuildParameters?,
-        packageGraphLoader: (() throws -> ModulesGraph)?,
+        packageGraphLoader: (() async throws -> ModulesGraph)?,
         outputStream: OutputByteStream?,
         logLevel: Diagnostic.Severity?,
         observabilityScope: ObservabilityScope?

@@ -35,7 +35,7 @@ import struct TSCUtility.Version
 
 SwiftBootstrapBuildTool.main()
 
-struct SwiftBootstrapBuildTool: ParsableCommand {
+struct SwiftBootstrapBuildTool: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swift-bootstrap",
         abstract: "Bootstrapping build tool, only use in the context of bootstrapping SwiftPM itself",
@@ -158,7 +158,7 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
 
     public init() {}
 
-    public func run() throws {
+    public func run() async throws {
         do {
             let fileSystem = localFileSystem
 
@@ -187,7 +187,7 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
                 observabilityScope: observabilityScope,
                 logLevel: self.logLevel
             )
-            try builder.build(
+            try await builder.build(
                 packagePath: packagePath,
                 scratchDirectory: scratchDirectory,
                 buildSystem: self.buildSystem,
@@ -246,7 +246,7 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
             useIntegratedSwiftDriver: Bool,
             explicitTargetDependencyImportCheck: TargetDependencyImportCheckingMode,
             shouldDisableLocalRpath: Bool
-        ) throws {
+        ) async throws {
             let buildSystem = try createBuildSystem(
                 packagePath: packagePath,
                 scratchDirectory: scratchDirectory,
@@ -260,7 +260,7 @@ struct SwiftBootstrapBuildTool: ParsableCommand {
                 shouldDisableLocalRpath: shouldDisableLocalRpath,
                 logLevel: logLevel
             )
-            try buildSystem.build(subset: .allExcludingTests)
+            try await buildSystem.build(subset: .allExcludingTests)
         }
 
         func createBuildSystem(

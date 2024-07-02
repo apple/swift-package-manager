@@ -18,7 +18,7 @@ protocol Card {
 
     /// Accept a line of input from the user's terminal and provide
     /// an optional ``CardEvent`` which can alter the card stack.
-    func acceptLineInput<S: StringProtocol>(_ line: S) -> CardEvent?
+    func acceptLineInput(_ line: some StringProtocol) async -> CardEvent?
 
     /// The input prompt to present to the user when accepting a line of input.
     var inputPrompt: String? { get }

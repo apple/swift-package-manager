@@ -19,7 +19,7 @@ import PackageGraph
 
 import PackageModel
 
-struct PluginCommand: SwiftCommand {
+struct PluginCommand: AsyncSwiftCommand {
     static let configuration = CommandConfiguration(
         commandName: "plugin",
         abstract: "Invoke a command plugin or perform other actions on command plugins"
@@ -137,7 +137,7 @@ struct PluginCommand: SwiftCommand {
     )
     var arguments: [String] = []
 
-    func run(_ swiftCommandState: SwiftCommandState) throws {
+    func run(_ swiftCommandState: SwiftCommandState) async throws {
         // Check for a missing plugin command verb.
         if self.command == "" && !self.listCommands {
             throw ValidationError("Missing expected plugin command")
@@ -166,7 +166,7 @@ struct PluginCommand: SwiftCommand {
             return
         }
 
-        try Self.run(
+        try await Self.run(
             command: self.command,
             options: self.pluginOptions,
             arguments: self.arguments,
@@ -179,7 +179,7 @@ struct PluginCommand: SwiftCommand {
         options: PluginOptions,
         arguments: [String],
         swiftCommandState: SwiftCommandState
-    ) throws {
+    ) async throws {
         // Load the workspace and resolve the package graph.
         let packageGraph = try swiftCommandState.loadPackageGraph()
 
@@ -203,7 +203,7 @@ struct PluginCommand: SwiftCommand {
             .shouldDisableSandbox
 
         // At this point we know we found exactly one command plugin, so we run it. In SwiftPM CLI, we have only one root package.
-        try PluginCommand.run(
+        try await PluginCommand.run(
             plugin: matchingPlugins[0],
             package: packageGraph.rootPackages[packageGraph.rootPackages.startIndex],
             packageGraph: packageGraph,
@@ -220,7 +220,7 @@ struct PluginCommand: SwiftCommand {
         options: PluginOptions,
         arguments: [String],
         swiftCommandState: SwiftCommandState
-    ) throws {
+    ) async throws {
         let pluginTarget = plugin.underlying as! PluginModule
 
         swiftCommandState.observabilityScope
@@ -339,7 +339,7 @@ struct PluginCommand: SwiftCommand {
             for: try pluginScriptRunner.hostTriple
         ) { name, _ in
             // Build the product referenced by the tool, and add the executable to the tool map. Product dependencies are not supported within a package, so if the tool happens to be from the same package, we instead find the executable that corresponds to the product. There is always one, because of autogeneration of implicit executables with the same name as the target if there isn't an explicit one.
-            try buildSystem.build(subset: .product(name, for: .host))
+            try await buildSystem.build(subset: .product(name, for: .host))
             if let builtTool = try buildSystem.buildPlan.buildProducts.first(where: {
                 $0.product.name == name && $0.buildParameters.destination == .host
             }) {
