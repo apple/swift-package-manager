@@ -21,7 +21,7 @@ add_library(Commands
   PackageCommands/EditCommands.swift
   PackageCommands/Format.swift
   PackageCommands/Init.swift
-  PackageCommands/InstalledPackages.swift
+  PackageCommands/Install.swift
   PackageCommands/Learn.swift
   PackageCommands/PluginCommand.swift
   PackageCommands/ResetCommands.swift

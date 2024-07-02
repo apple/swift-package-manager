@@ -312,7 +312,7 @@ public struct BuildOptions: ParsableArguments {
 
     /// Build configuration.
     @Option(name: .shortAndLong, help: "Build with configuration")
-    public var configuration: BuildConfiguration = .debug
+    public var configuration: BuildConfiguration?
 
     @Option(
         name: .customLong("Xcc", withSingleDash: true),
