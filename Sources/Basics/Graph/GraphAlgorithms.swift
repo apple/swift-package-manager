@@ -55,3 +55,34 @@ public func depthFirstSearch<T: Hashable>(
         }
     }
 }
+
+package func asyncDepthFirstSearch<T: Hashable>(
+    _ nodes: [T],
+    successors: (T) async throws -> [T],
+    onUnique: (T) -> Void,
+    onDuplicate: (T, T) -> Void
+) async rethrows {
+    var stack = OrderedSet<T>()
+    var visited = Set<T>()
+
+    for node in nodes {
+        precondition(stack.isEmpty)
+        stack.append(node)
+
+        while !stack.isEmpty {
+            let curr = stack.removeLast()
+
+            let visitResult = visited.insert(curr)
+            if visitResult.inserted {
+                onUnique(curr)
+            } else {
+                onDuplicate(visitResult.memberAfterInsert, curr)
+                continue
+            }
+
+            for succ in try await successors(curr) {
+                stack.append(succ)
+            }
+        }
+    }
+}

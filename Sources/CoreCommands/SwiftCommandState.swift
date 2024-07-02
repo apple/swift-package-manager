@@ -480,16 +480,16 @@ public final class SwiftCommandState {
         return workspace
     }
 
-    public func getRootPackageInformation() throws -> (dependencies: [PackageIdentity: [PackageIdentity]], targets: [PackageIdentity: [String]]) {
+    public func getRootPackageInformation() async throws -> (
+        dependencies: [PackageIdentity: [PackageIdentity]],
+        targets: [PackageIdentity: [String]]
+    ) {
         let workspace = try self.getActiveWorkspace()
         let root = try self.getWorkspaceRoot()
-        let rootManifests = try temp_await {
-            workspace.loadRootManifests(
-                packages: root.packages,
-                observabilityScope: self.observabilityScope,
-                completion: $0
-            )
-        }
+        let rootManifests = await workspace.loadRootManifests(
+            packages: root.packages,
+            observabilityScope: self.observabilityScope
+        )
 
         var identities = [PackageIdentity: [PackageIdentity]]()
         var targets = [PackageIdentity: [String]]()
@@ -587,11 +587,11 @@ public final class SwiftCommandState {
     }
 
     /// Resolve the dependencies.
-    public func resolve() throws {
+    public func resolve() async throws {
         let workspace = try getActiveWorkspace()
         let root = try getWorkspaceRoot()
 
-        try workspace.resolve(
+        try await workspace.resolve(
             root: root,
             forceResolution: false,
             forceResolvedVersions: options.resolver.forceResolvedVersions,
@@ -614,8 +614,8 @@ public final class SwiftCommandState {
     public func loadPackageGraph(
         explicitProduct: String? = nil,
         testEntryPointPath: AbsolutePath? = nil
-    ) throws -> ModulesGraph {
-        try self.loadPackageGraph(
+    ) async throws -> ModulesGraph {
+        try await self.loadPackageGraph(
             explicitProduct: explicitProduct,
             traitConfiguration: nil,
             testEntryPointPath: testEntryPointPath
@@ -632,12 +632,12 @@ public final class SwiftCommandState {
         explicitProduct: String? = nil,
         traitConfiguration: TraitConfiguration? = nil,
         testEntryPointPath: AbsolutePath? = nil
-    ) throws -> ModulesGraph {
+    ) async throws -> ModulesGraph {
         do {
             let workspace = try getActiveWorkspace()
 
             // Fetch and load the package graph.
-            let graph = try workspace.loadPackageGraph(
+            let graph = try await workspace.loadPackageGraph(
                 rootInput: getWorkspaceRoot(),
                 explicitProduct: explicitProduct,
                 traitConfiguration: traitConfiguration,

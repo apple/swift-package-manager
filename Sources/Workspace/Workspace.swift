@@ -612,9 +612,9 @@ extension Workspace {
         revision: Revision? = nil,
         checkoutBranch: String? = nil,
         observabilityScope: ObservabilityScope
-    ) {
+    ) async {
         do {
-            try self._edit(
+            try await self._edit(
                 packageName: packageName,
                 path: path,
                 revision: revision,
@@ -642,7 +642,7 @@ extension Workspace {
         forceRemove: Bool,
         root: PackageGraphRootInput,
         observabilityScope: ObservabilityScope
-    ) throws {
+    ) async throws {
         guard let dependency = self.state.dependencies[.plain(packageName)] else {
             observabilityScope.emit(.dependencyNotFound(packageName: packageName))
             return
@@ -653,7 +653,7 @@ extension Workspace {
             metadata: dependency.packageRef.diagnosticsMetadata
         )
 
-        try self.unedit(
+        try await self.unedit(
             dependency: dependency,
             forceRemove: forceRemove,
             root: root,
@@ -673,8 +673,8 @@ extension Workspace {
         forceResolution: Bool = false,
         forceResolvedVersions: Bool = false,
         observabilityScope: ObservabilityScope
-    ) throws {
-        try self._resolve(
+    ) async throws {
+        try await self._resolve(
             root: root,
             explicitProduct: explicitProduct,
             resolvedFileStrategy: forceResolvedVersions ? .lockFile : forceResolution ? .update(forceResolution: true) :
@@ -703,7 +703,7 @@ extension Workspace {
         branch: String? = nil,
         revision: String? = nil,
         observabilityScope: ObservabilityScope
-    ) throws {
+    ) async throws {
         // Look up the dependency and check if we can pin it.
         guard let dependency = self.state.dependencies[.plain(packageName)] else {
             throw StringError("dependency '\(packageName)' was not found")
@@ -748,7 +748,7 @@ extension Workspace {
         )
 
         // Run the resolution.
-        try self.resolveAndUpdateResolvedFile(
+        try await self.resolveAndUpdateResolvedFile(
             root: root,
             forceResolution: false,
             constraints: [constraint],
@@ -763,8 +763,8 @@ extension Workspace {
     public func resolveBasedOnResolvedVersionsFile(
         root: PackageGraphRootInput,
         observabilityScope: ObservabilityScope
-    ) throws {
-        try self._resolveBasedOnResolvedVersionsFile(
+    ) async throws {
+        try await self._resolveBasedOnResolvedVersionsFile(
             root: root,
             explicitProduct: .none,
             observabilityScope: observabilityScope
@@ -872,8 +872,8 @@ extension Workspace {
         packages: [String] = [],
         dryRun: Bool = false,
         observabilityScope: ObservabilityScope
-    ) throws -> [(PackageReference, Workspace.PackageStateChange)]? {
-        try self._updateDependencies(
+    ) async throws -> [(PackageReference, Workspace.PackageStateChange)]? {
+        try await self._updateDependencies(
             root: root,
             packages: packages,
             dryRun: dryRun,
@@ -890,8 +890,8 @@ extension Workspace {
         testEntryPointPath: AbsolutePath? = nil,
         expectedSigningEntities: [PackageIdentity: RegistryReleaseMetadata.SigningEntity] = [:],
         observabilityScope: ObservabilityScope
-    ) throws -> ModulesGraph {
-        try self.loadPackageGraph(
+    ) async throws -> ModulesGraph {
+        try await self.loadPackageGraph(
             rootInput: root,
             explicitProduct: explicitProduct,
             traitConfiguration: nil,
@@ -913,7 +913,7 @@ extension Workspace {
         testEntryPointPath: AbsolutePath? = nil,
         expectedSigningEntities: [PackageIdentity: RegistryReleaseMetadata.SigningEntity] = [:],
         observabilityScope: ObservabilityScope
-    ) throws -> ModulesGraph {
+    ) async throws -> ModulesGraph {
         let start = DispatchTime.now()
         self.delegate?.willLoadGraph()
         defer {
@@ -927,7 +927,7 @@ extension Workspace {
         try self.state.reload()
 
         // Perform dependency resolution, if required.
-        let manifests = try self._resolve(
+        let manifests = try await self._resolve(
             root: root,
             explicitProduct: explicitProduct,
             resolvedFileStrategy: forceResolvedVersions ? .lockFile : .bestEffort,
@@ -974,8 +974,8 @@ extension Workspace {
         rootPath: AbsolutePath,
         explicitProduct: String? = nil,
         observabilityScope: ObservabilityScope
-    ) throws -> ModulesGraph {
-        try self.loadPackageGraph(
+    ) async throws -> ModulesGraph {
+        try await self.loadPackageGraph(
             rootPath: rootPath,
             explicitProduct: explicitProduct,
             traitConfiguration: nil,
@@ -989,8 +989,8 @@ extension Workspace {
         explicitProduct: String? = nil,
         traitConfiguration: TraitConfiguration? = nil,
         observabilityScope: ObservabilityScope
-    ) throws -> ModulesGraph {
-        try self.loadPackageGraph(
+    ) async throws -> ModulesGraph {
+        try await self.loadPackageGraph(
             rootInput: PackageGraphRootInput(packages: [rootPath]),
             explicitProduct: explicitProduct,
             traitConfiguration: traitConfiguration,
@@ -1002,54 +1002,37 @@ extension Workspace {
     public func loadRootManifests(
         packages: [AbsolutePath],
         observabilityScope: ObservabilityScope
-    ) async throws -> [AbsolutePath: Manifest] {
-        try await withCheckedThrowingContinuation { continuation in
-            self.loadRootManifests(packages: packages, observabilityScope: observabilityScope) { result in
-                continuation.resume(with: result)
-            }
-        }
-    }
-
-    /// Loads and returns manifests at the given paths.
-    @available(*, noasync, message: "Use the async alternative")
-    public func loadRootManifests(
-        packages: [AbsolutePath],
-        observabilityScope: ObservabilityScope,
-        completion: @escaping (Result<[AbsolutePath: Manifest], Error>) -> Void
-    ) {
-        let lock = NSLock()
-        let sync = DispatchGroup()
-        var rootManifests = [AbsolutePath: Manifest]()
-        Set(packages).forEach { package in
-            sync.enter()
-            // TODO: this does not use the identity resolver which is probably fine since its the root packages
-            self.loadManifest(
-                packageIdentity: PackageIdentity(path: package),
-                packageKind: .root(package),
-                packagePath: package,
-                packageLocation: package.pathString,
-                observabilityScope: observabilityScope
-            ) { result in
-                defer { sync.leave() }
-                if case .success(let manifest) = result {
-                    lock.withLock {
-                        rootManifests[package] = manifest
-                    }
+    ) async -> [AbsolutePath: Manifest] {
+        let rootManifests = await withTaskGroup(of: (path: AbsolutePath, manifest: Manifest?).self) { group in
+            for package in Set(packages) {
+                // TODO: this does not use the identity resolver which is probably fine since its the root packages
+                group.addTask {
+                    (package, try? await self.loadManifest(
+                        packageIdentity: PackageIdentity(path: package),
+                        packageKind: .root(package),
+                        packagePath: package,
+                        packageLocation: package.pathString,
+                        observabilityScope: observabilityScope
+                    ))
                 }
             }
-        }
 
-        sync.notify(queue: .sharedConcurrent) {
-            // Check for duplicate root packages.
-            let duplicateRoots = rootManifests.values.spm_findDuplicateElements(by: \.displayName)
-            if !duplicateRoots.isEmpty {
-                let name = duplicateRoots[0][0].displayName
-                observabilityScope.emit(error: "found multiple top-level packages named '\(name)'")
-                return completion(.success([:]))
+            return await group.reduce(into: [:]) {
+                dictionary,
+                taskResult in dictionary[taskResult.path] = taskResult.manifest
             }
-
-            completion(.success(rootManifests))
         }
+
+
+        // Check for duplicate root packages.
+        let duplicateRoots = rootManifests.values.spm_findDuplicateElements(by: \.displayName)
+        if !duplicateRoots.isEmpty {
+            let name = duplicateRoots[0][0].displayName
+            observabilityScope.emit(error: "found multiple top-level packages named '\(name)'")
+            return [:]
+        }
+
+        return rootManifests
     }
 
     /// Loads and returns manifest at the given path.
@@ -1057,105 +1040,73 @@ extension Workspace {
         at path: AbsolutePath,
         observabilityScope: ObservabilityScope
     ) async throws -> Manifest {
-        try await withCheckedThrowingContinuation { continuation in
-            self.loadRootManifest(at: path, observabilityScope: observabilityScope) { result in
-                continuation.resume(with: result)
-            }
+        let manifests = await self.loadRootManifests(packages: [path], observabilityScope: observabilityScope)
+        // normally, we call loadRootManifests which attempts to load any manifest it can and report errors via
+        // diagnostics
+        // in this case, we want to load a specific manifest, so if the diagnostics contains an error we want to
+        // throw
+        guard !observabilityScope.errorsReported else {
+            throw Diagnostics.fatalError
         }
-    }
-
-    /// Loads and returns manifest at the given path.
-    public func loadRootManifest(
-        at path: AbsolutePath,
-        observabilityScope: ObservabilityScope,
-        completion: @escaping (Result<Manifest, Error>) -> Void
-    ) {
-        self.loadRootManifests(packages: [path], observabilityScope: observabilityScope) { result in
-            completion(result.tryMap {
-                // normally, we call loadRootManifests which attempts to load any manifest it can and report errors via
-                // diagnostics
-                // in this case, we want to load a specific manifest, so if the diagnostics contains an error we want to
-                // throw
-                guard !observabilityScope.errorsReported else {
-                    throw Diagnostics.fatalError
-                }
-                guard let manifest = $0[path] else {
-                    throw InternalError("Unknown manifest for '\(path)'")
-                }
-                return manifest
-            })
+        guard let manifest = manifests[path] else {
+            throw InternalError("Unknown manifest for '\(path)'")
         }
+        return manifest
     }
 
     /// Loads root package
     public func loadRootPackage(at path: AbsolutePath, observabilityScope: ObservabilityScope) async throws -> Package {
-        try await withCheckedThrowingContinuation { continuation in
-            self.loadRootPackage(at: path, observabilityScope: observabilityScope) { result in
-                continuation.resume(with: result)
-            }
-        }
-    }
+        let manifest = try await self.loadRootManifest(at: path, observabilityScope: observabilityScope)
+        let identity = try self.identityResolver.resolveIdentity(for: manifest.packageKind)
 
-    /// Loads root package
-    public func loadRootPackage(
-        at path: AbsolutePath,
-        observabilityScope: ObservabilityScope,
-        completion: @escaping (Result<Package, Error>) -> Void
-    ) {
-        self.loadRootManifest(at: path, observabilityScope: observabilityScope) { result in
-            let result = result.tryMap { manifest -> Package in
-                let identity = try self.identityResolver.resolveIdentity(for: manifest.packageKind)
-
-                // radar/82263304
-                // compute binary artifacts for the sake of constructing a project model
-                // note this does not actually download remote artifacts and as such does not have the artifact's type
-                // or path
-                let binaryArtifacts = try manifest.targets.filter { $0.type == .binary }
-                    .reduce(into: [String: BinaryArtifact]()) { partial, target in
-                        if let path = target.path {
-                            let artifactPath = try manifest.path.parentDirectory
-                                .appending(RelativePath(validating: path))
-                            guard let (_, artifactKind) = try BinaryArtifactsManager.deriveBinaryArtifact(
-                                fileSystem: self.fileSystem,
-                                path: artifactPath,
-                                observabilityScope: observabilityScope
-                            ) else {
-                                throw StringError("\(artifactPath) does not contain binary artifact")
-                            }
-                            partial[target.name] = BinaryArtifact(
-                                kind: artifactKind,
-                                originURL: .none,
-                                path: artifactPath
-                            )
-                        } else if let url = target.url.flatMap(URL.init(string:)) {
-                            let fakePath = try manifest.path.parentDirectory.appending(components: "remote", "archive")
-                                .appending(RelativePath(validating: url.lastPathComponent))
-                            partial[target.name] = BinaryArtifact(
-                                kind: .unknown,
-                                originURL: url.absoluteString,
-                                path: fakePath
-                            )
-                        } else {
-                            throw InternalError("a binary target should have either a path or a URL and a checksum")
-                        }
+        // radar/82263304
+        // compute binary artifacts for the sake of constructing a project model
+        // note this does not actually download remote artifacts and as such does not have the artifact's type
+        // or path
+        let binaryArtifacts = try manifest.targets.filter { $0.type == .binary }
+            .reduce(into: [String: BinaryArtifact]()) { partial, target in
+                if let path = target.path {
+                    let artifactPath = try manifest.path.parentDirectory
+                        .appending(RelativePath(validating: path))
+                    guard let (_, artifactKind) = try BinaryArtifactsManager.deriveBinaryArtifact(
+                        fileSystem: self.fileSystem,
+                        path: artifactPath,
+                        observabilityScope: observabilityScope
+                    ) else {
+                        throw StringError("\(artifactPath) does not contain binary artifact")
                     }
-
-                let builder = PackageBuilder(
-                    identity: identity,
-                    manifest: manifest,
-                    productFilter: .everything,
-                    path: path,
-                    additionalFileRules: [],
-                    binaryArtifacts: binaryArtifacts,
-                    fileSystem: self.fileSystem,
-                    observabilityScope: observabilityScope,
-                    // For now we enable all traits
-                    enabledTraits: Set(manifest.traits.map { $0.name })
-                )
-                return try builder.construct()
+                    partial[target.name] = BinaryArtifact(
+                        kind: artifactKind,
+                        originURL: .none,
+                        path: artifactPath
+                    )
+                } else if let url = target.url.flatMap(URL.init(string:)) {
+                    let fakePath = try manifest.path.parentDirectory.appending(components: "remote", "archive")
+                        .appending(RelativePath(validating: url.lastPathComponent))
+                    partial[target.name] = BinaryArtifact(
+                        kind: .unknown,
+                        originURL: url.absoluteString,
+                        path: fakePath
+                    )
+                } else {
+                    throw InternalError("a binary target should have either a path or a URL and a checksum")
+                }
             }
-            completion(result)
-        }
+
+        let builder = PackageBuilder(
+            identity: identity,
+            manifest: manifest,
+            productFilter: .everything,
+            path: path,
+            additionalFileRules: [],
+            binaryArtifacts: binaryArtifacts,
+            fileSystem: self.fileSystem,
+            observabilityScope: observabilityScope,
+            // For now we enable all traits
+            enabledTraits: Set(manifest.traits.map { $0.name })
+        )
+        return try builder.construct()
+
     }
 
     public func loadPluginImports(
@@ -1188,56 +1139,40 @@ extension Workspace {
         return importList
     }
     
+    /// Loads a single package in the context of a previously loaded graph. This can be useful for incremental loading
+    /// in a longer-lived program, like an IDE.
     public func loadPackage(
         with identity: PackageIdentity,
         packageGraph: ModulesGraph,
         observabilityScope: ObservabilityScope
     ) async throws -> Package {
-        try await safe_async {
-            self.loadPackage(with: identity, packageGraph: packageGraph, observabilityScope: observabilityScope, completion: $0)
-        }
-    }
-
-    /// Loads a single package in the context of a previously loaded graph. This can be useful for incremental loading
-    /// in a longer-lived program, like an IDE.
-    @available(*, noasync, message: "Use the async alternative")
-    public func loadPackage(
-        with identity: PackageIdentity,
-        packageGraph: ModulesGraph,
-        observabilityScope: ObservabilityScope,
-        completion: @escaping (Result<Package, Error>) -> Void
-    ) {
         guard let previousPackage = packageGraph.package(for: identity) else {
-            return completion(.failure(StringError("could not find package with identity \(identity)")))
+            throw StringError("could not find package with identity \(identity)")
         }
 
-        self.loadManifest(
+        let manifest = try await self.loadManifest(
             packageIdentity: identity,
             packageKind: previousPackage.underlying.manifest.packageKind,
             packagePath: previousPackage.path,
             packageLocation: previousPackage.underlying.manifest.packageLocation,
             observabilityScope: observabilityScope
-        ) { result in
-            let result = result.tryMap { manifest -> Package in
-                let builder = PackageBuilder(
-                    identity: identity,
-                    manifest: manifest,
-                    productFilter: .everything,
-                    // TODO: this will not be correct when reloading a transitive dependencies if `ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION` is enabled
-                    path: previousPackage.path,
-                    additionalFileRules: self.configuration.additionalFileRules,
-                    binaryArtifacts: packageGraph.binaryArtifacts[identity] ?? [:],
-                    shouldCreateMultipleTestProducts: self.configuration.shouldCreateMultipleTestProducts,
-                    createREPLProduct: self.configuration.createREPLProduct,
-                    fileSystem: self.fileSystem,
-                    observabilityScope: observabilityScope,
-                    // For now we enable all traits
-                    enabledTraits: Set(manifest.traits.map { $0.name })
-                )
-                return try builder.construct()
-            }
-            completion(result)
-        }
+        )
+        let builder = PackageBuilder(
+            identity: identity,
+            manifest: manifest,
+            productFilter: .everything,
+            // TODO: this will not be correct when reloading a transitive dependencies if `ENABLE_TARGET_BASED_DEPENDENCY_RESOLUTION` is enabled
+            path: previousPackage.path,
+            additionalFileRules: self.configuration.additionalFileRules,
+            binaryArtifacts: packageGraph.binaryArtifacts[identity] ?? [:],
+            shouldCreateMultipleTestProducts: self.configuration.shouldCreateMultipleTestProducts,
+            createREPLProduct: self.configuration.createREPLProduct,
+            fileSystem: self.fileSystem,
+            observabilityScope: observabilityScope,
+            // For now we enable all traits
+            enabledTraits: Set(manifest.traits.map { $0.name })
+        )
+        return try builder.construct()
     }
 
     public func acceptIdentityChange(
